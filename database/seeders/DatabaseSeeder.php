@@ -8,7 +8,6 @@ use App\Models\StructureType;
 use App\Models\User;
 use App\Models\Workflow;
 use Illuminate\Database\Seeder;
-use Illuminate\Support\Facades\Hash;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 use Spatie\Permission\PermissionRegistrar;
@@ -55,39 +54,53 @@ class DatabaseSeeder extends Seeder
             $role->syncPermissions($perms);
         }
 
-        $typeDg = StructureType::query()->create(['code' => 'DG', 'name' => 'Direction Générale', 'sort_order' => 1]);
-        $typeDir = StructureType::query()->create(['code' => 'DIR', 'name' => 'Direction', 'sort_order' => 2]);
+        $typeDg = StructureType::query()->updateOrCreate(
+            ['code' => 'DG'],
+            ['name' => 'Direction Générale', 'sort_order' => 1]
+        );
+        $typeDir = StructureType::query()->updateOrCreate(
+            ['code' => 'DIR'],
+            ['name' => 'Direction', 'sort_order' => 2]
+        );
 
-        $dgtcp = Structure::query()->create([
-            'structure_type_id' => $typeDg->id,
-            'code' => 'DGTCP',
-            'name' => 'Direction Générale du Trésor et de la Comptabilité Publique',
-            'sort_order' => 1,
-        ]);
+        $dgtcp = Structure::query()->updateOrCreate(
+            ['code' => 'DGTCP'],
+            [
+                'structure_type_id' => $typeDg->id,
+                'name' => 'Direction Générale du Trésor et de la Comptabilité Publique',
+                'sort_order' => 1,
+            ]
+        );
 
-        $dg = Structure::query()->create([
-            'parent_id' => $dgtcp->id,
-            'structure_type_id' => $typeDg->id,
-            'code' => 'DG',
-            'name' => 'Cabinet du Directeur Général',
-            'sort_order' => 2,
-        ]);
+        $dg = Structure::query()->updateOrCreate(
+            ['code' => 'DG'],
+            [
+                'parent_id' => $dgtcp->id,
+                'structure_type_id' => $typeDg->id,
+                'name' => 'Cabinet du Directeur Général',
+                'sort_order' => 2,
+            ]
+        );
 
-        $dsi = Structure::query()->create([
-            'parent_id' => $dgtcp->id,
-            'structure_type_id' => $typeDir->id,
-            'code' => 'DSI',
-            'name' => 'Direction des Systèmes d\'Information',
-            'sort_order' => 3,
-        ]);
+        $dsi = Structure::query()->updateOrCreate(
+            ['code' => 'DSI'],
+            [
+                'parent_id' => $dgtcp->id,
+                'structure_type_id' => $typeDir->id,
+                'name' => 'Direction des Systèmes d\'Information',
+                'sort_order' => 3,
+            ]
+        );
 
-        $dfm = Structure::query()->create([
-            'parent_id' => $dgtcp->id,
-            'structure_type_id' => $typeDir->id,
-            'code' => 'DFM',
-            'name' => 'Direction des Finances et du Matériel',
-            'sort_order' => 4,
-        ]);
+        $dfm = Structure::query()->updateOrCreate(
+            ['code' => 'DFM'],
+            [
+                'parent_id' => $dgtcp->id,
+                'structure_type_id' => $typeDir->id,
+                'name' => 'Direction des Finances et du Matériel',
+                'sort_order' => 4,
+            ]
+        );
 
         $docTypes = [
             ['code' => 'NOTE', 'name' => 'Note', 'sort_order' => 1],
@@ -100,7 +113,10 @@ class DatabaseSeeder extends Seeder
         ];
 
         foreach ($docTypes as $type) {
-            DocumentType::query()->create($type + ['is_active' => true]);
+            DocumentType::query()->updateOrCreate(
+                ['code' => $type['code']],
+                $type + ['is_active' => true]
+            );
         }
 
         $users = [
@@ -169,25 +185,33 @@ class DatabaseSeeder extends Seeder
         foreach ($users as $payload) {
             $role = $payload['role'];
             unset($payload['role']);
-            $payload['password'] = Hash::make($payload['password']);
             $payload['is_active'] = true;
-            $user = User::query()->create($payload);
-            $user->assignRole($role);
+
+            // Mot de passe en clair : le cast "hashed" du modèle User s'occupe du hash.
+            $user = User::query()->updateOrCreate(
+                ['email' => $payload['email']],
+                $payload
+            );
+            $user->syncRoles([$role]);
         }
 
-        $workflow = Workflow::query()->create([
-            'code' => 'CIRCUIT_STANDARD',
-            'name' => 'Circuit standard vers DG',
-            'description' => 'Agent → Directeur → Secrétariat DG → DG',
-            'kind' => 'predefini',
-            'is_active' => true,
-        ]);
+        $workflow = Workflow::query()->updateOrCreate(
+            ['code' => 'CIRCUIT_STANDARD'],
+            [
+                'name' => 'Circuit standard vers DG',
+                'description' => 'Agent → Directeur → Secrétariat DG → DG',
+                'kind' => 'predefini',
+                'is_active' => true,
+            ]
+        );
 
-        $workflow->steps()->createMany([
-            ['step_order' => 1, 'name' => 'Agent', 'role_name' => 'Agent', 'expected_action' => 'consultation'],
-            ['step_order' => 2, 'name' => 'Directeur', 'role_name' => 'Directeur', 'expected_action' => 'validation'],
-            ['step_order' => 3, 'name' => 'Secrétariat DG', 'role_name' => 'Secrétariat DG', 'expected_action' => 'consultation'],
-            ['step_order' => 4, 'name' => 'Directeur Général', 'role_name' => 'Directeur Général', 'expected_action' => 'validation'],
-        ]);
+        if ($workflow->steps()->count() === 0) {
+            $workflow->steps()->createMany([
+                ['step_order' => 1, 'name' => 'Agent', 'role_name' => 'Agent', 'expected_action' => 'consultation'],
+                ['step_order' => 2, 'name' => 'Directeur', 'role_name' => 'Directeur', 'expected_action' => 'validation'],
+                ['step_order' => 3, 'name' => 'Secrétariat DG', 'role_name' => 'Secrétariat DG', 'expected_action' => 'consultation'],
+                ['step_order' => 4, 'name' => 'Directeur Général', 'role_name' => 'Directeur Général', 'expected_action' => 'validation'],
+            ]);
+        }
     }
 }

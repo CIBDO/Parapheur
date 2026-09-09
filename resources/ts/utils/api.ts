@@ -1,9 +1,62 @@
-import { ofetch } from 'ofetch';
+import { ofetch } from 'ofetch'
+
+const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS', 'TRACE'])
+
+function readCookie(name: string): string | null {
+  if (typeof document === 'undefined')
+    return null
+
+  const match = document.cookie
+    .split('; ')
+    .find(row => row.startsWith(`${name}=`))
+
+  return match ? decodeURIComponent(match.split('=').slice(1).join('=')) : null
+}
+
+function setHeader(headers: HeadersInit | undefined, key: string, value: string): Headers {
+  const next = new Headers(headers as HeadersInit)
+
+  next.set(key, value)
+
+  return next
+}
+
+let csrfPromise: Promise<void> | null = null
+
+async function ensureCsrfCookie(): Promise<void> {
+  if (readCookie('XSRF-TOKEN'))
+    return
+
+  csrfPromise ??= ofetch('/sanctum/csrf-cookie', {
+    method: 'GET',
+    credentials: 'include',
+  }).then(() => undefined).finally(() => {
+    csrfPromise = null
+  })
+
+  await csrfPromise
+}
 
 export const $api = ofetch.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || '/api',
-  async onRequest({ options }) {
-    const accessToken = useCookie('accessToken').value;
-    if (accessToken) options.headers.append('Authorization', `Bearer ${accessToken}`);
+  credentials: 'include',
+  headers: {
+    Accept: 'application/json',
+    'X-Requested-With': 'XMLHttpRequest',
   },
-});
+  async onRequest({ options }) {
+    const method = String(options.method || 'GET').toUpperCase()
+
+    if (!SAFE_METHODS.has(method)) {
+      await ensureCsrfCookie()
+
+      const xsrfToken = readCookie('XSRF-TOKEN')
+      if (xsrfToken)
+        options.headers = setHeader(options.headers as HeadersInit, 'X-XSRF-TOKEN', xsrfToken)
+    }
+
+    const accessToken = useCookie('accessToken').value
+    if (accessToken)
+      options.headers = setHeader(options.headers as HeadersInit, 'Authorization', `Bearer ${accessToken}`)
+  },
+})

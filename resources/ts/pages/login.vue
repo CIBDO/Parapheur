@@ -53,10 +53,15 @@ const login = async () => {
       },
       onResponseError({ response }) {
         const payload = response._data?.errors || {}
+        const message = response._data?.message
+
         errors.value = {
-          email: Array.isArray(payload.email) ? payload.email[0] : payload.email,
+          email: Array.isArray(payload.email) ? payload.email[0] : (payload.email || message),
           password: Array.isArray(payload.password) ? payload.password[0] : payload.password,
         }
+
+        if (!errors.value.email && !errors.value.password)
+          errors.value.email = 'Connexion impossible. Réessayez.'
       },
     })
 
@@ -76,6 +81,8 @@ const login = async () => {
   }
   catch (err) {
     console.error(err)
+    if (!errors.value.email && !errors.value.password)
+      errors.value.email = 'Connexion impossible. Vérifiez vos identifiants ou réessayez.'
   }
   finally {
     isSubmitting.value = false
