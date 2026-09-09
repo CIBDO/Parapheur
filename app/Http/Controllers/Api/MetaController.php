@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\DocumentType;
 use App\Models\Structure;
 use App\Models\User;
+use App\Models\Workflow;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -15,6 +16,17 @@ class MetaController extends Controller
     {
         return response()->json(
             DocumentType::query()->where('is_active', true)->orderBy('sort_order')->get()
+        );
+    }
+
+    public function workflows(): JsonResponse
+    {
+        return response()->json(
+            Workflow::query()
+                ->with(['steps' => fn ($q) => $q->orderBy('step_order')])
+                ->where('is_active', true)
+                ->orderBy('name')
+                ->get()
         );
     }
 

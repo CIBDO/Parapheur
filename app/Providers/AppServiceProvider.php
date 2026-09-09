@@ -2,7 +2,9 @@
 
 namespace App\Providers;
 
+use App\Contracts\DocumentPreviewDriver;
 use App\Models\User;
+use App\Services\Preview\NativeDocumentPreviewDriver;
 use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
@@ -13,7 +15,7 @@ class AppServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        //
+        $this->app->bind(DocumentPreviewDriver::class, NativeDocumentPreviewDriver::class);
     }
 
     public function boot(): void

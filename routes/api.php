@@ -13,6 +13,7 @@ use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\RolePermissionController;
 use App\Http\Controllers\Api\StructureController;
 use App\Http\Controllers\Api\UserController;
+use App\Http\Controllers\Api\WorkflowController;
 use Illuminate\Support\Facades\Route;
 
 Route::post('/auth/login', [AuthController::class, 'login'])
@@ -34,6 +35,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/meta/document-types', [MetaController::class, 'documentTypes']);
     Route::get('/meta/structures', [MetaController::class, 'structures']);
     Route::get('/meta/users', [MetaController::class, 'users']);
+    Route::get('/meta/workflows', [MetaController::class, 'workflows']);
 
     Route::middleware('permission:admin.access')->group(function () {
         Route::get('/structures', [StructureController::class, 'index']);
@@ -66,6 +68,11 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('/document-types/{documentType}', [DocumentTypeController::class, 'destroy']);
 
         Route::get('/audit-logs', [AuditLogController::class, 'index']);
+
+        Route::get('/workflows', [WorkflowController::class, 'index']);
+        Route::post('/workflows', [WorkflowController::class, 'store']);
+        Route::put('/workflows/{workflow}', [WorkflowController::class, 'update']);
+        Route::delete('/workflows/{workflow}', [WorkflowController::class, 'destroy']);
     });
 
     Route::get('/dashboard/dg', [DashboardController::class, 'dg']);
@@ -76,6 +83,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/parapheur/documents', [DocumentController::class, 'store']);
     Route::get('/parapheur/documents/{document}', [DocumentController::class, 'show']);
     Route::post('/parapheur/documents/{document}/transmit', [DocumentController::class, 'transmit']);
+    Route::post('/parapheur/documents/{document}/reassign', [DocumentController::class, 'reassign']);
+    Route::post('/parapheur/documents/{document}/acknowledge', [DocumentController::class, 'acknowledge']);
+    Route::post('/parapheur/documents/{document}/hold', [DocumentController::class, 'hold']);
+    Route::post('/parapheur/documents/{document}/classify', [DocumentController::class, 'classify']);
     Route::post('/parapheur/documents/{document}/comments', [DocumentController::class, 'comment']);
     Route::post('/parapheur/documents/{document}/return', [DocumentController::class, 'returnCorrection']);
     Route::post('/parapheur/documents/{document}/vise', [DocumentController::class, 'vise']);
@@ -83,6 +94,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/parapheur/documents/{document}/reject', [DocumentController::class, 'reject']);
     Route::post('/parapheur/documents/{document}/archive', [DocumentController::class, 'archive']);
     Route::post('/parapheur/documents/{document}/versions', [DocumentController::class, 'addVersion']);
+    Route::post('/parapheur/documents/{document}/attachments', [DocumentController::class, 'addAttachment']);
     Route::post('/parapheur/documents/{document}/instructions', [DocumentController::class, 'createInstruction']);
 
     Route::get('/instructions', [InstructionController::class, 'index']);
@@ -104,4 +116,6 @@ Route::middleware('signed')->group(function () {
         ->name('documents.version.download');
     Route::get('/parapheur/documents/{document}/versions/{version}/stream', [DocumentController::class, 'streamVersion'])
         ->name('documents.version.stream');
+    Route::get('/parapheur/documents/{document}/attachments/{attachment}/download', [DocumentController::class, 'downloadAttachment'])
+        ->name('documents.attachment.download');
 });

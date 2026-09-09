@@ -15,7 +15,9 @@ use App\Models\DocumentVersion;
 use App\Models\Instruction;
 use App\Models\User;
 use App\Models\Visa;
+use App\Models\Workflow;
 use App\Models\WorkflowInstance;
+use App\Models\WorkflowStep;
 use App\Notifications\DocumentWorkflowNotification;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
@@ -67,24 +69,73 @@ class DocumentWorkflowService
     public function submitAndTransmit(
         Document $document,
         User $from,
-        User $to,
+        ?User $to,
         ExpectedAction $expectedAction,
         ?string $message = null,
+        ?int $workflowId = null,
     ): Document {
-        return DB::transaction(function () use ($document, $from, $to, $expectedAction, $message) {
+        return DB::transaction(function () use ($document, $from, $to, $expectedAction, $message, $workflowId) {
             if ($document->status === DocumentStatus::Brouillon) {
-                $this->stateMachine->assertCanTransition($document->status, DocumentStatus::Depose);
-                $document->status = DocumentStatus::Depose;
+                $this->transition($document, DocumentStatus::Depose);
                 $document->submitted_at = now();
                 $document->save();
             }
 
+            if (in_array($document->status, [DocumentStatus::Archive, DocumentStatus::Annule], true)) {
+                throw new InvalidArgumentException('Document figé : transmission impossible.');
+            }
+
+            $workflow = null;
+            $step = null;
+            $kind = 'libre';
+
+            if ($workflowId) {
+                $workflow = Workflow::query()->with('steps')->where('is_active', true)->findOrFail($workflowId);
+                $steps = $workflow->steps->sortBy('step_order')->values();
+                if ($steps->isEmpty()) {
+                    throw new InvalidArgumentException('Le circuit sélectionné ne contient aucune étape.');
+                }
+
+                // Sauter les étapes dont le destinataire serait l'expéditeur (ex. Agent qui dépose)
+                foreach ($steps as $candidate) {
+                    $assignee = $this->resolveStepAssignee($candidate, $document, $from);
+                    if ((int) $assignee->id !== (int) $from->id) {
+                        $step = $candidate;
+                        $to = $to ?? $assignee;
+                        break;
+                    }
+                }
+
+                if (! $step) {
+                    $step = $steps->first();
+                    $to = $to ?? $this->resolveStepAssignee($step, $document, $from);
+                }
+
+                $kind = 'predefini';
+                $expectedAction = $step->expected_action ?? $expectedAction;
+                $to = $to ?? $this->resolveStepAssignee($step, $document, $from);
+            }
+
+            if (! $to) {
+                throw new InvalidArgumentException('Destinataire de transmission requis.');
+            }
+
+            // Clôturer les transmissions en attente de l'expéditeur
+            DocumentTransmission::query()
+                ->where('document_id', $document->id)
+                ->where('to_user_id', $from->id)
+                ->where('status', 'pending')
+                ->update([
+                    'status' => 'done',
+                    'acted_at' => now(),
+                ]);
+
             $instance = WorkflowInstance::query()->create([
                 'document_id' => $document->id,
-                'workflow_id' => null,
-                'kind' => 'libre',
+                'workflow_id' => $workflow?->id,
+                'kind' => $kind,
                 'status' => 'en_cours',
-                'current_step_order' => 1,
+                'current_step_order' => $step?->step_order ?? 1,
                 'started_by' => $from->id,
             ]);
 
@@ -102,21 +153,20 @@ class DocumentWorkflowService
             ]);
 
             $fromStatus = $document->status;
+
+            if ($kind === 'predefini') {
+                $this->transition($document, DocumentStatus::EnCircuit);
+            } else {
+                $this->transition($document, DocumentStatus::Transmis);
+            }
+
             $targetStatus = match ($expectedAction) {
                 ExpectedAction::Visa => DocumentStatus::AViser,
                 ExpectedAction::Validation => DocumentStatus::AValider,
                 ExpectedAction::Information => DocumentStatus::AConsulter,
                 default => DocumentStatus::AConsulter,
             };
-
-            if ($this->stateMachine->canTransition($document->status, DocumentStatus::Transmis)) {
-                $document->status = DocumentStatus::Transmis;
-            }
-            if ($this->stateMachine->canTransition($document->status, $targetStatus)) {
-                $document->status = $targetStatus;
-            } else {
-                $document->status = $targetStatus;
-            }
+            $this->transition($document, $targetStatus);
 
             $document->expected_action = $expectedAction;
             $document->current_assignee_id = $to->id;
@@ -135,6 +185,8 @@ class DocumentWorkflowService
             $this->audit->log('document.transmitted', $document, [
                 'to_user_id' => $to->id,
                 'expected_action' => $expectedAction->value,
+                'workflow_id' => $workflow?->id,
+                'kind' => $kind,
             ]);
 
             $this->notifyUser(
@@ -145,7 +197,212 @@ class DocumentWorkflowService
                 $from->name,
             );
 
-            return $document->fresh(['type', 'structure', 'author', 'currentAssignee', 'latestVersion']);
+            return $document->fresh(['type', 'structure', 'author', 'currentAssignee', 'latestVersion', 'workflowInstance.workflow.steps']);
+        });
+    }
+
+    public function advancePredefinedWorkflow(Document $document, User $actor, ?string $message = null): ?Document
+    {
+        $instance = $document->workflowInstance;
+        if (! $instance || $instance->kind !== 'predefini' || ! $instance->workflow_id) {
+            return null;
+        }
+
+        $workflow = Workflow::query()->with('steps')->find($instance->workflow_id);
+        if (! $workflow) {
+            return null;
+        }
+
+        $steps = $workflow->steps->sortBy('step_order')->values();
+        $currentIndex = $steps->search(fn (WorkflowStep $s) => (int) $s->step_order === (int) $instance->current_step_order);
+
+        if ($currentIndex === false) {
+            return null;
+        }
+
+        $next = $steps->get($currentIndex + 1);
+        if (! $next) {
+            $instance->update([
+                'status' => 'termine',
+                'completed_at' => now(),
+            ]);
+
+            return null;
+        }
+
+        $to = $this->resolveStepAssignee($next, $document, $actor);
+        $expectedAction = $next->expected_action ?? ExpectedAction::Consultation;
+
+        DocumentTransmission::query()->create([
+            'document_id' => $document->id,
+            'workflow_instance_id' => $instance->id,
+            'from_user_id' => $actor->id,
+            'to_user_id' => $to->id,
+            'expected_action' => $expectedAction,
+            'folder' => $this->folderForAction($expectedAction),
+            'status' => 'pending',
+            'message' => $message ?? 'Étape suivante du circuit',
+        ]);
+
+        $instance->update(['current_step_order' => $next->step_order]);
+
+        $fromStatus = $document->status;
+        $this->transition($document, DocumentStatus::EnCircuit);
+
+        $targetStatus = match ($expectedAction) {
+            ExpectedAction::Visa => DocumentStatus::AViser,
+            ExpectedAction::Validation => DocumentStatus::AValider,
+            default => DocumentStatus::AConsulter,
+        };
+        $this->transition($document, $targetStatus);
+
+        $document->expected_action = $expectedAction;
+        $document->current_assignee_id = $to->id;
+        $document->save();
+
+        $this->recordAction(
+            $document,
+            $actor,
+            WorkflowActionType::Transmettre,
+            $fromStatus,
+            $document->status,
+            $message ?? 'Avancement circuit',
+            $instance->id,
+        );
+
+        $this->notifyUser(
+            $to,
+            $document,
+            'transmitted',
+            sprintf('Circuit « %s » : document transmis pour %s.', $workflow->name, $expectedAction->label()),
+            $actor->name,
+        );
+
+        return $document->fresh();
+    }
+
+    public function acknowledge(Document $document, User $user, ?string $comment = null): Document
+    {
+        return DB::transaction(function () use ($document, $user, $comment) {
+            $from = $document->status;
+            $to = $this->stateMachine->statusAfterAction(WorkflowActionType::PriseConnaissance, $from);
+            $this->stateMachine->assertCanTransition($from, $to);
+
+            $document->status = $to;
+            $document->save();
+
+            DocumentTransmission::query()
+                ->where('document_id', $document->id)
+                ->where('to_user_id', $user->id)
+                ->where('status', 'pending')
+                ->update([
+                    'status' => 'seen',
+                    'seen_at' => now(),
+                ]);
+
+            $this->recordAction($document, $user, WorkflowActionType::PriseConnaissance, $from, $to, $comment);
+            $this->audit->log('document.acknowledged', $document);
+
+            return $document->fresh(['type', 'structure', 'author', 'currentAssignee']);
+        });
+    }
+
+    public function putOnHold(Document $document, User $actor, ?string $comment = null): Document
+    {
+        return DB::transaction(function () use ($document, $actor, $comment) {
+            return $this->applyTerminalAction(
+                $document,
+                $actor,
+                WorkflowActionType::MettreEnAttente,
+                $comment,
+                function (Document $doc) use ($actor, $comment) {
+                    DocumentTransmission::query()
+                        ->where('document_id', $doc->id)
+                        ->where('to_user_id', $actor->id)
+                        ->whereIn('status', ['pending', 'seen'])
+                        ->update([
+                            'folder' => ParapheurFolder::EnAttente->value,
+                            'status' => 'pending',
+                            'message' => $comment,
+                        ]);
+                }
+            );
+        });
+    }
+
+    public function classify(Document $document, User $actor, ?string $comment = null): Document
+    {
+        return DB::transaction(function () use ($document, $actor, $comment) {
+            return $this->applyTerminalAction(
+                $document,
+                $actor,
+                WorkflowActionType::Classer,
+                $comment,
+                null,
+                null,
+                ParapheurFolder::Traites,
+            );
+        });
+    }
+
+    public function reassign(Document $document, User $from, User $to, ExpectedAction $expectedAction, ?string $message = null): Document
+    {
+        return DB::transaction(function () use ($document, $from, $to, $expectedAction, $message) {
+            $fromStatus = $document->status;
+
+            DocumentTransmission::query()
+                ->where('document_id', $document->id)
+                ->where('to_user_id', $from->id)
+                ->whereIn('status', ['pending', 'seen'])
+                ->update([
+                    'status' => 'done',
+                    'acted_at' => now(),
+                ]);
+
+            DocumentTransmission::query()->create([
+                'document_id' => $document->id,
+                'workflow_instance_id' => $document->workflowInstance?->id,
+                'from_user_id' => $from->id,
+                'to_user_id' => $to->id,
+                'expected_action' => $expectedAction,
+                'folder' => $this->folderForAction($expectedAction),
+                'status' => 'pending',
+                'message' => $message,
+            ]);
+
+            $this->transition($document, DocumentStatus::Transmis);
+
+            $targetStatus = match ($expectedAction) {
+                ExpectedAction::Visa => DocumentStatus::AViser,
+                ExpectedAction::Validation => DocumentStatus::AValider,
+                default => DocumentStatus::AConsulter,
+            };
+            $this->transition($document, $targetStatus);
+
+            $document->expected_action = $expectedAction;
+            $document->current_assignee_id = $to->id;
+            $document->save();
+
+            $this->recordAction(
+                $document,
+                $from,
+                WorkflowActionType::Reaffecter,
+                $fromStatus,
+                $document->status,
+                $message,
+            );
+
+            $this->audit->log('document.reassigned', $document, ['to_user_id' => $to->id]);
+
+            $this->notifyUser(
+                $to,
+                $document,
+                'transmitted',
+                sprintf('%s vous a réaffecté un document.', $from->name),
+                $from->name,
+            );
+
+            return $document->fresh(['type', 'structure', 'author', 'currentAssignee']);
         });
     }
 
@@ -184,24 +441,26 @@ class DocumentWorkflowService
 
     public function returnForCorrection(Document $document, User $actor, string $comment): Document
     {
-        $result = $this->applyTerminalAction(
-            $document,
-            $actor,
-            WorkflowActionType::RetourCorrection,
-            $comment,
-            function (Document $doc) use ($actor, $comment) {
-                DocumentTransmission::query()->create([
-                    'document_id' => $doc->id,
-                    'from_user_id' => $actor->id,
-                    'to_user_id' => $doc->author_id,
-                    'expected_action' => ExpectedAction::Observations,
-                    'folder' => ParapheurFolder::Retournes,
-                    'status' => 'pending',
-                    'message' => $comment,
-                ]);
-                $doc->current_assignee_id = $doc->author_id;
-            }
-        );
+        $result = DB::transaction(function () use ($document, $actor, $comment) {
+            return $this->applyTerminalAction(
+                $document,
+                $actor,
+                WorkflowActionType::RetourCorrection,
+                $comment,
+                function (Document $doc) use ($actor, $comment) {
+                    DocumentTransmission::query()->create([
+                        'document_id' => $doc->id,
+                        'from_user_id' => $actor->id,
+                        'to_user_id' => $doc->author_id,
+                        'expected_action' => ExpectedAction::Observations,
+                        'folder' => ParapheurFolder::Retournes,
+                        'status' => 'pending',
+                        'message' => $comment,
+                    ]);
+                    $doc->current_assignee_id = $doc->author_id;
+                }
+            );
+        });
 
         if ($document->author_id) {
             $this->notifyUser(
@@ -226,6 +485,7 @@ class DocumentWorkflowService
                 $comment,
                 null,
                 $delegator,
+                ParapheurFolder::Traites,
             );
 
             Visa::query()->create([
@@ -236,7 +496,24 @@ class DocumentWorkflowService
                 'vised_at' => now(),
             ]);
 
-            return $result;
+            $result = $result->fresh(['workflowInstance.workflow.steps', 'type', 'structure', 'author', 'currentAssignee', 'visas', 'approvals']);
+            $advanced = $this->advancePredefinedWorkflow($result, $actor, $comment);
+            if ($advanced) {
+                return $advanced;
+            }
+
+            // Circuit libre ou fin de circuit : passage à traité si pas d'étape suivante
+            if (! $result->workflowInstance || $result->workflowInstance->kind === 'libre'
+                || $result->workflowInstance->status === 'termine') {
+                if ($this->stateMachine->canTransition($result->status, DocumentStatus::Traite)) {
+                    $from = $result->status;
+                    $result->status = DocumentStatus::Traite;
+                    $result->save();
+                    $this->recordAction($result, $actor, WorkflowActionType::Viser, $from, DocumentStatus::Traite, 'Dossier traité après visa');
+                }
+            }
+
+            return $result->fresh(['type', 'structure', 'author', 'currentAssignee', 'visas', 'approvals']);
         });
     }
 
@@ -252,6 +529,7 @@ class DocumentWorkflowService
                     $doc->status = DocumentStatus::Valide;
                 },
                 $delegator,
+                ParapheurFolder::Traites,
             );
 
             Approval::query()->create([
@@ -273,7 +551,27 @@ class DocumentWorkflowService
                 );
             }
 
-            return $result;
+            $result = $result->fresh(['workflowInstance.workflow.steps', 'type', 'structure', 'author', 'currentAssignee', 'visas', 'approvals']);
+            $advanced = $this->advancePredefinedWorkflow($result, $actor, $comment);
+            if ($advanced) {
+                return $advanced;
+            }
+
+            if ($this->stateMachine->canTransition($result->status, DocumentStatus::Traite)) {
+                $from = $result->status;
+                $result->status = DocumentStatus::Traite;
+                $result->save();
+                $this->recordAction($result, $actor, WorkflowActionType::Valider, $from, DocumentStatus::Traite, 'Dossier traité après validation');
+
+                if ($result->workflowInstance && $result->workflowInstance->kind === 'predefini') {
+                    $result->workflowInstance->update([
+                        'status' => 'termine',
+                        'completed_at' => now(),
+                    ]);
+                }
+            }
+
+            return $result->fresh(['type', 'structure', 'author', 'currentAssignee', 'visas', 'approvals']);
         });
     }
 
@@ -285,6 +583,9 @@ class DocumentWorkflowService
                 $actor,
                 WorkflowActionType::Rejeter,
                 $comment,
+                null,
+                null,
+                ParapheurFolder::Traites,
             );
 
             Approval::query()->create([
@@ -301,15 +602,32 @@ class DocumentWorkflowService
 
     public function archive(Document $document, User $actor, ?string $comment = null): Document
     {
-        return $this->applyTerminalAction(
-            $document,
-            $actor,
-            WorkflowActionType::Archiver,
-            $comment,
-            function (Document $doc) {
-                $doc->archived_at = now();
-            }
-        );
+        return DB::transaction(function () use ($document, $actor, $comment) {
+            return $this->applyTerminalAction(
+                $document,
+                $actor,
+                WorkflowActionType::Archiver,
+                $comment,
+                function (Document $doc) use ($actor) {
+                    $doc->archived_at = now();
+
+                    if ($doc->author_id && (int) $doc->author_id !== (int) $actor->id) {
+                        DocumentTransmission::query()->create([
+                            'document_id' => $doc->id,
+                            'from_user_id' => $actor->id,
+                            'to_user_id' => $doc->author_id,
+                            'expected_action' => ExpectedAction::Information,
+                            'folder' => ParapheurFolder::Archives,
+                            'status' => 'done',
+                            'acted_at' => now(),
+                            'message' => 'Document archivé',
+                        ]);
+                    }
+                },
+                null,
+                ParapheurFolder::Archives,
+            );
+        });
     }
 
     public function addVersion(Document $document, User $user, UploadedFile $file, ?string $note = null): DocumentVersion
@@ -323,8 +641,7 @@ class DocumentWorkflowService
             $document->current_version = $version->version_number;
 
             if ($document->status === DocumentStatus::ACorriger) {
-                $this->stateMachine->assertCanTransition($document->status, DocumentStatus::Corrige);
-                $document->status = DocumentStatus::Corrige;
+                $this->transition($document, DocumentStatus::Corrige);
             }
 
             $document->save();
@@ -332,6 +649,18 @@ class DocumentWorkflowService
 
             return $version;
         });
+    }
+
+    public function addAttachment(Document $document, User $user, UploadedFile $file, string $kind = 'piece_jointe'): DocumentAttachment
+    {
+        if (in_array($document->status, [DocumentStatus::Archive, DocumentStatus::Annule], true)) {
+            throw new InvalidArgumentException('Document figé : pièce jointe impossible.');
+        }
+
+        $attachment = $this->storeAttachment($document, $user, $file, $kind);
+        $this->audit->log('document.attachment_added', $document, ['attachment_id' => $attachment->id]);
+
+        return $attachment;
     }
 
     public function createInstructionFromComment(
@@ -384,36 +713,125 @@ class DocumentWorkflowService
         ?string $comment = null,
         ?callable $mutator = null,
         ?User $delegator = null,
+        ?ParapheurFolder $doneFolder = null,
     ): Document {
-        return DB::transaction(function () use ($document, $actor, $action, $comment, $mutator, $delegator) {
-            $from = $document->status;
-            $to = $this->stateMachine->statusAfterAction($action, $from);
-            $this->stateMachine->assertCanTransition($from, $to);
+        $from = $document->status;
+        $to = $this->stateMachine->statusAfterAction($action, $from);
+        $this->stateMachine->assertCanTransition($from, $to);
 
-            $document->status = $to;
-            if ($mutator) {
-                $mutator($document);
-            }
-            $document->save();
+        $document->status = $to;
+        if ($mutator) {
+            $mutator($document);
+        }
+        $document->save();
 
+        if ($action === WorkflowActionType::MettreEnAttente) {
+            // folder déjà mis à jour dans le mutator
+        } elseif ($doneFolder) {
+            $this->closeActorTransmissions($document, $actor, $doneFolder);
+        } else {
             DocumentTransmission::query()
                 ->where('document_id', $document->id)
                 ->where('to_user_id', $actor->id)
-                ->where('status', 'pending')
+                ->whereIn('status', ['pending', 'seen'])
                 ->update([
                     'status' => 'done',
                     'acted_at' => now(),
                 ]);
+        }
 
-            $this->recordAction($document, $actor, $action, $from, $to, $comment, null, $delegator);
-            $this->audit->log('document.action.'.$action->value, $document, [
-                'from' => $from->value,
-                'to' => $to->value,
-                'delegator_id' => $delegator?->id,
+        $this->recordAction($document, $actor, $action, $from, $to, $comment, null, $delegator);
+        $this->audit->log('document.action.'.$action->value, $document, [
+            'from' => $from->value,
+            'to' => $to->value,
+            'delegator_id' => $delegator?->id,
+        ]);
+
+        return $document->fresh(['type', 'structure', 'author', 'currentAssignee', 'visas', 'approvals', 'workflowInstance']);
+    }
+
+    private function closeActorTransmissions(Document $document, User $actor, ParapheurFolder $doneFolder): void
+    {
+        DocumentTransmission::query()
+            ->where('document_id', $document->id)
+            ->where('to_user_id', $actor->id)
+            ->whereIn('status', ['pending', 'seen'])
+            ->update([
+                'status' => 'done',
+                'acted_at' => now(),
+                'folder' => $doneFolder->value,
             ]);
 
-            return $document->fresh(['type', 'structure', 'author', 'currentAssignee', 'visas', 'approvals']);
-        });
+        // Garantir une entrée dans la corbeille traites/archives
+        $exists = DocumentTransmission::query()
+            ->where('document_id', $document->id)
+            ->where('to_user_id', $actor->id)
+            ->where('folder', $doneFolder->value)
+            ->where('status', 'done')
+            ->exists();
+
+        if (! $exists) {
+            DocumentTransmission::query()->create([
+                'document_id' => $document->id,
+                'from_user_id' => $actor->id,
+                'to_user_id' => $actor->id,
+                'expected_action' => $document->expected_action ?? ExpectedAction::Consultation,
+                'folder' => $doneFolder,
+                'status' => 'done',
+                'acted_at' => now(),
+            ]);
+        }
+    }
+
+    private function transition(Document $document, DocumentStatus $to): void
+    {
+        if ($document->status === $to) {
+            return;
+        }
+
+        $this->stateMachine->assertCanTransition($document->status, $to);
+        $document->status = $to;
+    }
+
+    private function resolveStepAssignee(WorkflowStep $step, Document $document, User $from): User
+    {
+        $query = User::query()->where('is_active', true);
+
+        if ($step->role_name) {
+            $query->role($step->role_name);
+        }
+
+        if ($step->structure_id) {
+            $query->where('structure_id', $step->structure_id);
+        } elseif ($document->structure_id && $step->role_name && ! in_array($step->role_name, ['Directeur Général', 'DGA', 'Secrétariat DG', 'Conseiller'], true)) {
+            $query->where('structure_id', $document->structure_id);
+        }
+
+        $user = $query->orderBy('id')->first();
+
+        if (! $user && $step->role_name) {
+            $user = User::query()->role($step->role_name)->where('is_active', true)->orderBy('id')->first();
+        }
+
+        if (! $user) {
+            throw new InvalidArgumentException(
+                "Aucun utilisateur trouvé pour l'étape « {$step->name} » (rôle : {$step->role_name})."
+            );
+        }
+
+        if ((int) $user->id === (int) $from->id) {
+            $alt = User::query()
+                ->where('is_active', true)
+                ->when($step->role_name, fn ($q) => $q->role($step->role_name))
+                ->where('id', '!=', $from->id)
+                ->orderBy('id')
+                ->first();
+            if ($alt) {
+                return $alt;
+            }
+        }
+
+        return $user;
     }
 
     private function recordAction(
@@ -459,13 +877,13 @@ class DocumentWorkflowService
         ]);
     }
 
-    private function storeAttachment(Document $document, User $user, UploadedFile $file): DocumentAttachment
+    private function storeAttachment(Document $document, User $user, UploadedFile $file, string $kind = 'piece_jointe'): DocumentAttachment
     {
         $stored = $this->storage->store($file, 'documents/'.$document->uuid.'/attachments');
 
         return DocumentAttachment::query()->create([
             'document_id' => $document->id,
-            'kind' => 'piece_jointe',
+            'kind' => $kind,
             'disk' => $stored['disk'],
             'path' => $stored['path'],
             'original_name' => $stored['original_name'],

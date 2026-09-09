@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\DocumentStatus;
 use App\Enums\ParapheurFolder;
 use App\Models\Document;
 use App\Models\DocumentTransmission;
@@ -19,10 +20,39 @@ class ParapheurService
         $counts = [];
         foreach (ParapheurFolder::cases() as $folder) {
             $query = (clone $base)->where('folder', $folder->value);
+
             if (in_array($folder, [ParapheurFolder::Traites, ParapheurFolder::Archives], true)) {
-                $counts[$folder->value] = $query->whereIn('status', ['done'])->count();
+                $counts[$folder->value] = $query->where('status', 'done')
+                    ->distinct('document_id')
+                    ->count('document_id');
+            } elseif ($folder === ParapheurFolder::ATraiter) {
+                // Corbeille transverse : dossiers assignés ou transmis en attente d'action
+                $counts[$folder->value] = Document::query()
+                    ->where(function ($q) use ($user) {
+                        $q->where('current_assignee_id', $user->id)
+                            ->orWhereHas('transmissions', function ($t) use ($user) {
+                                $t->where('to_user_id', $user->id)
+                                    ->whereIn('status', ['pending', 'seen'])
+                                    ->whereIn('folder', [
+                                        ParapheurFolder::ATraiter->value,
+                                        ParapheurFolder::AConsulter->value,
+                                        ParapheurFolder::AViser->value,
+                                        ParapheurFolder::AValider->value,
+                                    ]);
+                            });
+                    })
+                    ->whereNotIn('status', [
+                        DocumentStatus::Archive->value,
+                        DocumentStatus::Annule->value,
+                        DocumentStatus::Traite->value,
+                        DocumentStatus::Classe->value,
+                        DocumentStatus::Brouillon->value,
+                    ])
+                    ->count();
             } else {
-                $counts[$folder->value] = $query->where('status', 'pending')->count();
+                $counts[$folder->value] = $query->whereIn('status', ['pending', 'seen'])
+                    ->distinct('document_id')
+                    ->count('document_id');
             }
         }
 
@@ -37,7 +67,6 @@ class ParapheurService
 
     public function listFolder(User $user, ?string $folder = null, int $perPage = 15): LengthAwarePaginator
     {
-        // Vue transverse pour l’administrateur (sans filtre de dossier personnel)
         if ($user->can('admin.access') && $folder === null) {
             return Document::query()
                 ->with(['type', 'structure', 'author', 'currentAssignee', 'latestVersion'])
@@ -47,26 +76,51 @@ class ParapheurService
         }
 
         $query = Document::query()
-            ->with(['type', 'structure', 'author', 'currentAssignee', 'latestVersion'])
-            ->where(function ($q) use ($user, $folder) {
-                $q->whereHas('transmissions', function ($t) use ($user, $folder) {
-                    $t->where('to_user_id', $user->id);
-                    if ($folder) {
-                        $t->where('folder', $folder);
-                        if (! in_array($folder, [ParapheurFolder::Traites->value, ParapheurFolder::Archives->value], true)) {
-                            $t->where('status', 'pending');
-                        }
-                    }
-                })->orWhere(function ($owned) use ($user, $folder) {
-                    if (! $folder || $folder === ParapheurFolder::ATraiter->value) {
-                        $owned->where('current_assignee_id', $user->id);
-                    }
-                });
-            })
-            ->orderByRaw("CASE priority WHEN 'tres_urgente' THEN 1 WHEN 'urgente' THEN 2 WHEN 'importante' THEN 3 ELSE 4 END")
-            ->orderByDesc('updated_at');
+            ->with(['type', 'structure', 'author', 'currentAssignee', 'latestVersion']);
 
-        return $query->paginate($perPage);
+        if ($folder === ParapheurFolder::ATraiter->value) {
+            $query->where(function ($q) use ($user) {
+                $q->where('current_assignee_id', $user->id)
+                    ->orWhereHas('transmissions', function ($t) use ($user) {
+                        $t->where('to_user_id', $user->id)
+                            ->whereIn('status', ['pending', 'seen'])
+                            ->whereIn('folder', [
+                                ParapheurFolder::ATraiter->value,
+                                ParapheurFolder::AConsulter->value,
+                                ParapheurFolder::AViser->value,
+                                ParapheurFolder::AValider->value,
+                            ]);
+                    });
+            })->whereNotIn('status', [
+                DocumentStatus::Archive->value,
+                DocumentStatus::Annule->value,
+                DocumentStatus::Traite->value,
+                DocumentStatus::Classe->value,
+                DocumentStatus::Brouillon->value,
+            ]);
+        } elseif (in_array($folder, [ParapheurFolder::Traites->value, ParapheurFolder::Archives->value], true)) {
+            $query->whereHas('transmissions', function ($t) use ($user, $folder) {
+                $t->where('to_user_id', $user->id)
+                    ->where('folder', $folder)
+                    ->where('status', 'done');
+            });
+        } elseif ($folder) {
+            $query->whereHas('transmissions', function ($t) use ($user, $folder) {
+                $t->where('to_user_id', $user->id)
+                    ->where('folder', $folder)
+                    ->whereIn('status', ['pending', 'seen']);
+            });
+        } else {
+            $query->where(function ($q) use ($user) {
+                $q->where('current_assignee_id', $user->id)
+                    ->orWhereHas('transmissions', fn ($t) => $t->where('to_user_id', $user->id));
+            });
+        }
+
+        return $query
+            ->orderByRaw("CASE priority WHEN 'tres_urgente' THEN 1 WHEN 'urgente' THEN 2 WHEN 'importante' THEN 3 ELSE 4 END")
+            ->orderByDesc('updated_at')
+            ->paginate($perPage);
     }
 
     public function dashboardDg(): array
@@ -84,7 +138,7 @@ class ParapheurService
 
         return [
             'received' => Document::query()->whereNotNull('submitted_at')->count(),
-            'to_process' => Document::query()->whereIn('status', ['transmis', 'a_consulter', 'a_viser', 'a_valider'])->count(),
+            'to_process' => Document::query()->whereIn('status', ['transmis', 'en_circuit', 'a_consulter', 'a_viser', 'a_valider'])->count(),
             'urgent' => Document::query()->whereIn('priority', ['urgente', 'tres_urgente'])->whereNotIn('status', ['archive', 'valide', 'traite'])->count(),
             'overdue' => Document::query()->whereNotNull('due_date')->whereDate('due_date', '<', now())->whereNotIn('status', ['archive', 'valide', 'traite', 'classe'])->count(),
             'validated' => Document::query()->where('status', 'valide')->count(),

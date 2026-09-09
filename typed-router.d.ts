@@ -141,6 +141,7 @@ declare module 'vue-router/auto-routes' {
     'parapheur-roles': RouteRecordInfo<'parapheur-roles', '/parapheur/roles', Record<never, never>, Record<never, never>>,
     'parapheur-structures': RouteRecordInfo<'parapheur-structures', '/parapheur/structures', Record<never, never>, Record<never, never>>,
     'parapheur-users': RouteRecordInfo<'parapheur-users', '/parapheur/users', Record<never, never>, Record<never, never>>,
+    'parapheur-workflows': RouteRecordInfo<'parapheur-workflows', '/parapheur/workflows', Record<never, never>, Record<never, never>>,
     'register': RouteRecordInfo<'register', '/register', Record<never, never>, Record<never, never>>,
     'reset-password': RouteRecordInfo<'reset-password', '/reset-password', Record<never, never>, Record<never, never>>,
     'tables-data-table': RouteRecordInfo<'tables-data-table', '/tables/data-table', Record<never, never>, Record<never, never>>,

@@ -90,6 +90,13 @@ export default [
         subject: 'DocumentType',
       },
       {
+        title: 'Circuits',
+        icon: { icon: 'tabler-git-branch' },
+        to: 'parapheur-workflows',
+        action: 'manage',
+        subject: 'all',
+      },
+      {
         title: 'Journal d’audit',
         icon: { icon: 'tabler-history' },
         to: 'parapheur-audit',

@@ -2,10 +2,12 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Contracts\DocumentPreviewDriver;
 use App\Enums\ExpectedAction;
 use App\Http\Controllers\Controller;
 use App\Models\Comment;
 use App\Models\Document;
+use App\Models\DocumentAttachment;
 use App\Models\DocumentVersion;
 use App\Models\User;
 use App\Services\DocumentAccessService;
@@ -26,6 +28,7 @@ class DocumentController extends Controller
         private readonly ParapheurService $parapheur,
         private readonly PrivateDocumentStorage $storage,
         private readonly DocumentAccessService $access,
+        private readonly DocumentPreviewDriver $preview,
     ) {}
 
     public function index(Request $request): JsonResponse
@@ -54,13 +57,21 @@ class DocumentController extends Controller
             'expected_action' => ['nullable', Rule::in(array_column(ExpectedAction::cases(), 'value'))],
             'document_date' => ['nullable', 'date'],
             'due_date' => ['nullable', 'date'],
-            'keywords' => ['nullable', 'array'],
+            'keywords' => ['nullable'],
             'main_file' => ['nullable', 'file', 'max:20480'],
             'attachments' => ['nullable', 'array'],
             'attachments.*' => ['file', 'max:20480'],
             'transmit_to' => ['nullable', 'exists:users,id'],
             'transmit_message' => ['nullable', 'string'],
+            'workflow_id' => ['nullable', 'exists:workflows,id'],
         ]);
+
+        if (isset($data['keywords']) && is_string($data['keywords'])) {
+            $decoded = json_decode($data['keywords'], true);
+            $data['keywords'] = is_array($decoded)
+                ? $decoded
+                : array_values(array_filter(array_map('trim', explode(',', $data['keywords']))));
+        }
 
         $document = $this->workflow->createDraft(
             $request->user(),
@@ -69,8 +80,10 @@ class DocumentController extends Controller
             $request->file('attachments', []) ?: [],
         );
 
-        if (! empty($data['transmit_to'])) {
-            $to = User::query()->findOrFail($data['transmit_to']);
+        if (! empty($data['workflow_id']) || ! empty($data['transmit_to'])) {
+            $to = ! empty($data['transmit_to'])
+                ? User::query()->findOrFail($data['transmit_to'])
+                : null;
             $action = ExpectedAction::from($data['expected_action'] ?? ExpectedAction::Consultation->value);
             $document = $this->workflow->submitAndTransmit(
                 $document,
@@ -78,6 +91,7 @@ class DocumentController extends Controller
                 $to,
                 $action,
                 $data['transmit_message'] ?? null,
+                isset($data['workflow_id']) ? (int) $data['workflow_id'] : null,
             );
         }
 
@@ -94,7 +108,7 @@ class DocumentController extends Controller
             'author',
             'currentAssignee',
             'versions.uploader',
-            'attachments',
+            'attachments.uploader',
             'comments.user',
             'actions.actor',
             'actions.delegator',
@@ -103,15 +117,17 @@ class DocumentController extends Controller
             'transmissions.fromUser',
             'transmissions.toUser',
             'instructions.assignee',
-            'workflowInstance',
+            'workflowInstance.workflow.steps',
         ]);
 
-        $document->setAttribute('versions', $document->versions->map(function (DocumentVersion $version) use ($document, $request) {
+        $userId = $request->user()->id;
+
+        $versions = $document->versions->map(function (DocumentVersion $version) use ($document, $userId) {
             $payload = $version->toArray();
             $params = [
                 'document' => $document->id,
                 'version' => $version->id,
-                'user' => $request->user()->id,
+                'user' => $userId,
             ];
             $payload['download_url'] = URL::temporarySignedRoute(
                 'documents.version.download',
@@ -123,34 +139,121 @@ class DocumentController extends Controller
                 now()->addMinutes(30),
                 $params
             );
+            $payload['preview'] = $this->preview->preview(
+                $version,
+                $payload['stream_url'],
+                $payload['download_url'],
+            );
 
             return $payload;
-        }));
+        })->values();
 
-        return response()->json($document);
+        $attachments = $document->attachments->map(function (DocumentAttachment $attachment) use ($document, $userId) {
+            $payload = $attachment->toArray();
+            $payload['download_url'] = URL::temporarySignedRoute(
+                'documents.attachment.download',
+                now()->addMinutes(30),
+                [
+                    'document' => $document->id,
+                    'attachment' => $attachment->id,
+                    'user' => $userId,
+                ]
+            );
+
+            return $payload;
+        })->values();
+
+        $document->unsetRelation('versions');
+        $document->unsetRelation('attachments');
+
+        return response()->json(array_merge($document->toArray(), [
+            'versions' => $versions,
+            'attachments' => $attachments,
+        ]));
     }
 
     public function transmit(Request $request, Document $document): JsonResponse
     {
+        $this->access->authorize($request->user(), $document);
+
+        $data = $request->validate([
+            'to_user_id' => ['nullable', 'exists:users,id'],
+            'workflow_id' => ['nullable', 'exists:workflows,id'],
+            'expected_action' => ['required', Rule::in(array_column(ExpectedAction::cases(), 'value'))],
+            'message' => ['nullable', 'string'],
+        ]);
+
+        if (empty($data['to_user_id']) && empty($data['workflow_id'])) {
+            return response()->json(['message' => 'Destinataire ou circuit requis.'], 422);
+        }
+
+        $document = $this->workflow->submitAndTransmit(
+            $document,
+            $request->user(),
+            ! empty($data['to_user_id']) ? User::query()->findOrFail($data['to_user_id']) : null,
+            ExpectedAction::from($data['expected_action']),
+            $data['message'] ?? null,
+            isset($data['workflow_id']) ? (int) $data['workflow_id'] : null,
+        );
+
+        return response()->json($document);
+    }
+
+    public function reassign(Request $request, Document $document): JsonResponse
+    {
+        $this->access->authorize($request->user(), $document);
+
         $data = $request->validate([
             'to_user_id' => ['required', 'exists:users,id'],
             'expected_action' => ['required', Rule::in(array_column(ExpectedAction::cases(), 'value'))],
             'message' => ['nullable', 'string'],
         ]);
 
-        $document = $this->workflow->submitAndTransmit(
-            $document,
-            $request->user(),
-            User::query()->findOrFail($data['to_user_id']),
-            ExpectedAction::from($data['expected_action']),
-            $data['message'] ?? null,
+        return response()->json(
+            $this->workflow->reassign(
+                $document,
+                $request->user(),
+                User::query()->findOrFail($data['to_user_id']),
+                ExpectedAction::from($data['expected_action']),
+                $data['message'] ?? null,
+            )
         );
+    }
 
-        return response()->json($document);
+    public function acknowledge(Request $request, Document $document): JsonResponse
+    {
+        $this->access->authorize($request->user(), $document);
+        $data = $request->validate(['comment' => ['nullable', 'string']]);
+
+        return response()->json(
+            $this->workflow->acknowledge($document, $request->user(), $data['comment'] ?? null)
+        );
+    }
+
+    public function hold(Request $request, Document $document): JsonResponse
+    {
+        $this->access->authorize($request->user(), $document);
+        $data = $request->validate(['comment' => ['nullable', 'string']]);
+
+        return response()->json(
+            $this->workflow->putOnHold($document, $request->user(), $data['comment'] ?? null)
+        );
+    }
+
+    public function classify(Request $request, Document $document): JsonResponse
+    {
+        $this->access->authorize($request->user(), $document);
+        $data = $request->validate(['comment' => ['nullable', 'string']]);
+
+        return response()->json(
+            $this->workflow->classify($document, $request->user(), $data['comment'] ?? null)
+        );
     }
 
     public function comment(Request $request, Document $document): JsonResponse
     {
+        $this->access->authorize($request->user(), $document);
+
         $data = $request->validate([
             'body' => ['required', 'string'],
             'kind' => ['nullable', Rule::in(['general', 'avis', 'observation'])],
@@ -168,6 +271,7 @@ class DocumentController extends Controller
 
     public function returnCorrection(Request $request, Document $document): JsonResponse
     {
+        $this->access->authorize($request->user(), $document);
         $data = $request->validate(['comment' => ['required', 'string']]);
 
         return response()->json(
@@ -177,6 +281,7 @@ class DocumentController extends Controller
 
     public function vise(Request $request, Document $document): JsonResponse
     {
+        $this->access->authorize($request->user(), $document);
         $data = $request->validate(['comment' => ['nullable', 'string']]);
 
         return response()->json(
@@ -186,6 +291,7 @@ class DocumentController extends Controller
 
     public function validateAction(Request $request, Document $document): JsonResponse
     {
+        $this->access->authorize($request->user(), $document);
         $data = $request->validate(['comment' => ['nullable', 'string']]);
 
         return response()->json(
@@ -195,6 +301,7 @@ class DocumentController extends Controller
 
     public function reject(Request $request, Document $document): JsonResponse
     {
+        $this->access->authorize($request->user(), $document);
         $data = $request->validate(['comment' => ['required', 'string']]);
 
         return response()->json(
@@ -204,6 +311,7 @@ class DocumentController extends Controller
 
     public function archive(Request $request, Document $document): JsonResponse
     {
+        $this->access->authorize($request->user(), $document);
         $data = $request->validate(['comment' => ['nullable', 'string']]);
 
         return response()->json(
@@ -213,6 +321,8 @@ class DocumentController extends Controller
 
     public function addVersion(Request $request, Document $document): JsonResponse
     {
+        $this->access->authorize($request->user(), $document);
+
         $data = $request->validate([
             'file' => ['required', 'file', 'max:20480'],
             'change_note' => ['nullable', 'string'],
@@ -228,8 +338,29 @@ class DocumentController extends Controller
         return response()->json($version, 201);
     }
 
+    public function addAttachment(Request $request, Document $document): JsonResponse
+    {
+        $this->access->authorize($request->user(), $document);
+
+        $data = $request->validate([
+            'file' => ['required', 'file', 'max:20480'],
+            'kind' => ['nullable', Rule::in(['piece_jointe', 'annexe', 'complement'])],
+        ]);
+
+        $attachment = $this->workflow->addAttachment(
+            $document,
+            $request->user(),
+            $request->file('file'),
+            $data['kind'] ?? 'piece_jointe',
+        );
+
+        return response()->json($attachment, 201);
+    }
+
     public function createInstruction(Request $request, Document $document): JsonResponse
     {
+        $this->access->authorize($request->user(), $document);
+
         $data = $request->validate([
             'comment_id' => ['nullable', 'exists:comments,id'],
             'assignee_id' => ['required', 'exists:users,id'],
@@ -280,5 +411,15 @@ class DocumentController extends Controller
         return Storage::disk($version->disk)->response($version->path, $version->original_name, [
             'Content-Type' => $version->mime_type ?: 'application/octet-stream',
         ]);
+    }
+
+    public function downloadAttachment(Request $request, Document $document, DocumentAttachment $attachment): StreamedResponse
+    {
+        abort_unless($attachment->document_id === $document->id, 404);
+        $user = User::query()->findOrFail($request->integer('user'));
+        $this->access->authorize($user, $document);
+        abort_unless($this->storage->exists($attachment->disk, $attachment->path), 404);
+
+        return Storage::disk($attachment->disk)->download($attachment->path, $attachment->original_name);
     }
 }

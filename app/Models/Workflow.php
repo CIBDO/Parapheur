@@ -36,4 +36,9 @@ class Workflow extends Model
     {
         return $this->belongsTo(Structure::class);
     }
+
+    public function instances(): HasMany
+    {
+        return $this->hasMany(WorkflowInstance::class);
+    }
 }
