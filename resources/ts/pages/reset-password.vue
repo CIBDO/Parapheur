@@ -9,14 +9,27 @@ definePage({
   },
 })
 
+const route = useRoute()
+const router = useRouter()
+
 const isOpen = ref(false)
 const isSubmitting = ref(false)
-const isSent = ref(false)
+const isDone = ref(false)
+const isPasswordVisible = ref(false)
+const isConfirmVisible = ref(false)
 
 const refVForm = ref<VForm>()
-const email = ref('')
+const form = ref({
+  email: String(route.query.email || ''),
+  password: '',
+  password_confirmation: '',
+})
+const token = computed(() => String(route.query.token || ''))
+
 const errors = ref<Record<string, string | undefined>>({
   email: undefined,
+  password: undefined,
+  token: undefined,
 })
 
 const logoSrc = typeof logoDgtcp === 'string'
@@ -28,28 +41,41 @@ const openParapheur = () => {
     isOpen.value = true
 }
 
-const sendResetLink = async () => {
+const missingLink = computed(() => !token.value || !form.value.email)
+
+const resetPassword = async () => {
   isSubmitting.value = true
-  errors.value = { email: undefined }
+  errors.value = { email: undefined, password: undefined, token: undefined }
 
   try {
-    await $api('/auth/forgot-password', {
+    await $api('/auth/reset-password', {
       method: 'POST',
-      body: { email: email.value },
+      body: {
+        token: token.value,
+        email: form.value.email,
+        password: form.value.password,
+        password_confirmation: form.value.password_confirmation,
+      },
       onResponseError({ response }) {
         const payload = response._data?.errors || {}
         const message = response._data?.message
 
-        errors.value.email = Array.isArray(payload.email)
-          ? payload.email[0]
-          : (payload.email || message || 'Envoi impossible. Réessayez.')
+        errors.value = {
+          email: Array.isArray(payload.email) ? payload.email[0] : payload.email,
+          password: Array.isArray(payload.password) ? payload.password[0] : payload.password,
+          token: Array.isArray(payload.token) ? payload.token[0] : payload.token,
+        }
+
+        if (!errors.value.email && !errors.value.password && !errors.value.token)
+          errors.value.email = message || 'Réinitialisation impossible. Le lien est peut‑être expiré.'
       },
     })
-    isSent.value = true
+
+    isDone.value = true
   }
   catch (err) {
-    if (!errors.value.email)
-      errors.value.email = 'Envoi impossible. Réessayez.'
+    if (!errors.value.email && !errors.value.password)
+      errors.value.email = 'Réinitialisation impossible. Réessayez.'
     console.error(err)
   }
   finally {
@@ -60,7 +86,7 @@ const sendResetLink = async () => {
 const onSubmit = () => {
   refVForm.value?.validate().then(({ valid: isValid }) => {
     if (isValid)
-      sendResetLink()
+      resetPassword()
   })
 }
 
@@ -119,7 +145,7 @@ onMounted(() => {
               e-Parapheur
             </h1>
             <p class="parapheur-page__text">
-              Récupérez l’accès à votre bureau numérique de consultation, de visa et de validation.
+              Choisissez un nouveau mot de passe pour retrouver l’accès à votre bureau numérique.
             </p>
             <p class="parapheur-page__meta">
               Direction Générale du Trésor<br>
@@ -145,12 +171,30 @@ onMounted(() => {
               </h1>
             </header>
 
-            <template v-if="!isSent">
+            <template v-if="missingLink && !isDone">
+              <VAlert
+                type="warning"
+                variant="tonal"
+                class="mb-4"
+              >
+                Lien invalide ou incomplet. Demandez un nouveau lien depuis la page « Mot de passe oublié ».
+              </VAlert>
+              <VBtn
+                block
+                color="primary"
+                :to="{ name: 'forgot-password' }"
+              >
+                Demander un nouveau lien
+              </VBtn>
+            </template>
+
+            <template v-else-if="!isDone">
               <h2 class="text-h5 mb-1 text-center">
-                Mot de passe oublié
+                Nouveau mot de passe
               </h2>
               <p class="text-body-2 text-medium-emphasis mb-6 text-center">
-                Indiquez votre adresse e-mail pour recevoir les instructions de réinitialisation
+                Définissez un mot de passe pour
+                <strong>{{ form.email }}</strong>
               </p>
 
               <VForm
@@ -158,16 +202,36 @@ onMounted(() => {
                 @submit.prevent="onSubmit"
               >
                 <AppTextField
-                  v-model="email"
-                  label="Adresse e-mail"
-                  placeholder="prenom.nom@dgtcp.ml"
-                  type="email"
-                  autofocus
-                  autocomplete="username"
+                  v-model="form.password"
+                  label="Nouveau mot de passe"
+                  :type="isPasswordVisible ? 'text' : 'password'"
+                  autocomplete="new-password"
                   class="mb-4"
-                  :rules="[requiredValidator, emailValidator]"
-                  :error-messages="errors.email"
+                  :append-inner-icon="isPasswordVisible ? 'tabler-eye-off' : 'tabler-eye'"
+                  :rules="[requiredValidator]"
+                  :error-messages="errors.password"
+                  @click:append-inner="isPasswordVisible = !isPasswordVisible"
                 />
+
+                <AppTextField
+                  v-model="form.password_confirmation"
+                  label="Confirmer le mot de passe"
+                  :type="isConfirmVisible ? 'text' : 'password'"
+                  autocomplete="new-password"
+                  class="mb-4"
+                  :append-inner-icon="isConfirmVisible ? 'tabler-eye-off' : 'tabler-eye'"
+                  :rules="[requiredValidator, (v: string) => v === form.password || 'Les mots de passe ne correspondent pas']"
+                  @click:append-inner="isConfirmVisible = !isConfirmVisible"
+                />
+
+                <VAlert
+                  v-if="errors.email || errors.token"
+                  type="error"
+                  variant="tonal"
+                  class="mb-4"
+                >
+                  {{ errors.email || errors.token }}
+                </VAlert>
 
                 <VBtn
                   block
@@ -176,7 +240,7 @@ onMounted(() => {
                   class="mb-4"
                   :loading="isSubmitting"
                 >
-                  Envoyer le lien
+                  Enregistrer
                 </VBtn>
 
                 <RouterLink
@@ -197,34 +261,24 @@ onMounted(() => {
               <div class="forgot-success text-center">
                 <div class="forgot-success__icon mb-4">
                   <VIcon
-                    icon="tabler-mail-check"
+                    icon="tabler-lock-check"
                     size="40"
                     color="primary"
                   />
                 </div>
                 <h2 class="text-h5 mb-1">
-                  Vérifiez votre boîte mail
+                  Mot de passe mis à jour
                 </h2>
                 <p class="text-body-2 text-medium-emphasis mb-6">
-                  Si un compte est associé à
-                  <strong>{{ email }}</strong>,
-                  vous recevrez un lien pour réinitialiser votre mot de passe.
+                  Vous pouvez maintenant vous connecter avec votre nouveau mot de passe.
                 </p>
                 <VBtn
                   block
                   color="primary"
-                  class="mb-4"
-                  :to="{ name: 'login' }"
+                  @click="router.push({ name: 'login' })"
                 >
-                  Retour à la connexion
+                  Se connecter
                 </VBtn>
-                <button
-                  type="button"
-                  class="forgot-back text-primary"
-                  @click="isSent = false"
-                >
-                  Renvoyer à une autre adresse
-                </button>
               </div>
             </template>
           </div>

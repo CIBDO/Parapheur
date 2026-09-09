@@ -157,16 +157,18 @@ const saveUser = async () => {
 
   try {
     const body: Record<string, unknown> = { ...form.value }
-    if (editingId.value && !body.password)
-      delete body.password
 
     if (editingId.value) {
+      if (!body.password)
+        delete body.password
+
       await $api(`/users/${editingId.value}`, { method: 'PUT', body })
       successMessage.value = 'Utilisateur mis à jour'
     }
     else {
+      delete body.password
       await $api('/users', { method: 'POST', body })
-      successMessage.value = 'Utilisateur créé'
+      successMessage.value = 'Utilisateur créé — identifiants envoyés par e-mail'
     }
 
     isDialogOpen.value = false
@@ -535,17 +537,33 @@ onMounted(async () => {
               />
             </VCol>
             <VCol
+              v-if="editingId"
               cols="12"
               md="6"
             >
               <AppTextField
                 v-model="form.password"
-                :label="editingId ? 'Nouveau mot de passe (optionnel)' : 'Mot de passe'"
+                label="Nouveau mot de passe (optionnel)"
                 :type="isPasswordVisible ? 'text' : 'password'"
                 :append-inner-icon="isPasswordVisible ? 'tabler-eye-off' : 'tabler-eye'"
                 autocomplete="new-password"
+                hint="Laisser vide pour conserver le mot de passe actuel"
+                persistent-hint
                 @click:append-inner="isPasswordVisible = !isPasswordVisible"
               />
+            </VCol>
+            <VCol
+              v-else
+              cols="12"
+            >
+              <VAlert
+                type="info"
+                variant="tonal"
+                density="compact"
+                class="mb-0"
+              >
+                Un mot de passe temporaire sera généré et envoyé automatiquement à l’adresse e-mail saisie.
+              </VAlert>
             </VCol>
             <VCol
               cols="12"

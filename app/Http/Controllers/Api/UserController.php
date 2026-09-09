@@ -4,9 +4,12 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Notifications\UserAccountCreatedNotification;
 use App\Support\Civilities;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password;
 use Spatie\Permission\Models\Role;
@@ -51,16 +54,28 @@ class UserController extends Controller
     {
         $data = $this->validated($request);
         $role = $data['role'];
-        unset($data['role']);
+        unset($data['role'], $data['password']);
+
+        $plainPassword = Str::password(12);
 
         $data['name'] = $this->resolveName($data);
         $data['is_active'] = $data['is_active'] ?? true;
+        $data['password'] = $plainPassword;
 
-        $user = User::query()->create($data);
-        $user->syncRoles([$role]);
+        $user = DB::transaction(function () use ($data, $role, $plainPassword) {
+            $user = User::query()->create($data);
+            $user->syncRoles([$role]);
+            $user->notify(new UserAccountCreatedNotification($plainPassword));
+
+            return $user;
+        });
+
         $user->load(['structure:id,code,name', 'roles:id,name']);
 
-        return response()->json($this->payload($user), 201);
+        return response()->json([
+            ...$this->payload($user),
+            'credentials_sent_by_email' => true,
+        ], 201);
     }
 
     public function show(User $user): JsonResponse
@@ -133,11 +148,7 @@ class UserController extends Controller
 
     private function validated(Request $request, ?User $user = null): array
     {
-        $passwordRules = $user
-            ? ['nullable', 'string', Password::defaults()]
-            : ['required', 'string', Password::defaults()];
-
-        return $request->validate([
+        $rules = [
             'first_name' => ['nullable', 'string', 'max:100'],
             'last_name' => ['nullable', 'string', 'max:100'],
             'name' => ['nullable', 'string', 'max:255'],
@@ -149,12 +160,18 @@ class UserController extends Controller
                 'max:255',
                 Rule::unique('users', 'email')->ignore($user?->id),
             ],
-            'password' => $passwordRules,
             'structure_id' => ['nullable', 'exists:structures,id'],
             'position_title' => ['nullable', 'string', 'max:150'],
             'is_active' => ['nullable', 'boolean'],
             'role' => ['required', 'string', Rule::exists('roles', 'name')],
-        ]);
+        ];
+
+        // Création : mot de passe généré côté serveur. Édition : reset optionnel.
+        if ($user) {
+            $rules['password'] = ['nullable', 'string', Password::defaults()];
+        }
+
+        return $request->validate($rules);
     }
 
     private function resolveName(array $data, ?User $user = null): string
