@@ -1,80 +1,87 @@
 <script lang="ts" setup>
-import type { Notification } from '@layouts/types';
+import type { Notification } from '@layouts/types'
+import Notifications from '@core/components/Notifications.vue'
 
-import avatar3 from '@images/avatars/avatar-3.png';
-import avatar4 from '@images/avatars/avatar-4.png';
-import avatar5 from '@images/avatars/avatar-5.png';
-import paypal from '@images/cards/paypal-rounded.png';
+type AppNotification = Notification & {
+  url?: string | null
+}
 
-const notifications = ref<Notification[]>([
-  {
-    id: 1,
-    img: avatar4,
-    title: 'Congratulation Flora! 🎉',
-    subtitle: 'Won the monthly best seller badge',
-    time: 'Today',
-    isSeen: true,
-  },
-  {
-    id: 2,
-    text: 'Tom Holland',
-    title: 'New user registered.',
-    subtitle: '5 hours ago',
-    time: 'Yesterday',
-    isSeen: false,
-  },
-  {
-    id: 3,
-    img: avatar5,
-    title: 'New message received 👋🏻',
-    subtitle: 'You have 10 unread messages',
-    time: '11 Aug',
-    isSeen: true,
-  },
-  {
-    id: 4,
-    img: paypal,
-    title: 'PayPal',
-    subtitle: 'Received Payment',
-    time: '25 May',
-    isSeen: false,
-    color: 'error',
-  },
-  {
-    id: 5,
-    img: avatar3,
-    title: 'Received Order 📦',
-    subtitle: 'New order received from john',
-    time: '19 Mar',
-    isSeen: true,
-  },
-]);
+const router = useRouter()
+const notifications = ref<AppNotification[]>([])
+let pollTimer: ReturnType<typeof setInterval> | undefined
 
-const removeNotification = (notificationId: number) => {
-  notifications.value.forEach((item, index) => {
-    if (notificationId === item.id) notifications.value.splice(index, 1);
-  });
-};
+const load = async () => {
+  try {
+    const res = await $api('/notifications')
+    notifications.value = (res.data || []).map((item: any) => ({
+      id: item.id,
+      icon: item.icon || 'tabler-bell',
+      title: item.title,
+      subtitle: item.subtitle,
+      time: item.time,
+      isSeen: item.isSeen,
+      color: item.isSeen ? undefined : 'primary',
+      url: item.url,
+    }))
+  }
+  catch {
+    notifications.value = []
+  }
+}
 
-const markRead = (notificationId: number[]) => {
+const removeNotification = async (notificationId: number | string) => {
+  try {
+    await $api(`/notifications/${notificationId}`, { method: 'DELETE' })
+  }
+  catch {}
+  notifications.value = notifications.value.filter(item => item.id !== notificationId)
+}
+
+const markRead = async (notificationIds: Array<number | string>) => {
+  try {
+    await $api('/notifications/read', {
+      method: 'POST',
+      body: { ids: notificationIds },
+    })
+  }
+  catch {}
   notifications.value.forEach(item => {
-    notificationId.forEach(id => {
-      if (id === item.id) item.isSeen = true;
-    });
-  });
-};
+    if (notificationIds.includes(item.id))
+      item.isSeen = true
+  })
+}
 
-const markUnRead = (notificationId: number[]) => {
+const markUnRead = async (notificationIds: Array<number | string>) => {
+  try {
+    await $api('/notifications/unread', {
+      method: 'POST',
+      body: { ids: notificationIds },
+    })
+  }
+  catch {}
   notifications.value.forEach(item => {
-    notificationId.forEach(id => {
-      if (id === item.id) item.isSeen = false;
-    });
-  });
-};
+    if (notificationIds.includes(item.id))
+      item.isSeen = false
+  })
+}
 
-const handleNotificationClick = (notification: Notification) => {
-  if (!notification.isSeen) markRead([notification.id]);
-};
+const handleNotificationClick = async (notification: AppNotification) => {
+  if (!notification.isSeen)
+    await markRead([notification.id])
+
+  if (notification.url)
+    await router.push(notification.url)
+}
+
+onMounted(() => {
+  load()
+  pollTimer = setInterval(load, 60000)
+})
+
+onBeforeUnmount(() => {
+  if (pollTimer)
+    clearInterval(pollTimer)
+})
 </script>
 
 <template>

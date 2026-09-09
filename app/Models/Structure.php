@@ -46,4 +46,9 @@ class Structure extends Model
     {
         return $this->hasMany(User::class);
     }
+
+    public function documents(): HasMany
+    {
+        return $this->hasMany(Document::class);
+    }
 }

@@ -73,7 +73,9 @@ const login = async () => {
     ability.update(userAbilityRules || [])
 
     const role = String(userData?.role ?? '')
-    const fallback = role === 'Directeur Général' || role === 'DGA' ? '/parapheur/dg' : '/parapheur'
+    const fallback = role === 'Administrateur'
+      ? '/parapheur/admin'
+      : (role === 'Directeur Général' || role === 'DGA' ? '/parapheur/dg' : '/parapheur')
 
     await nextTick(() => {
       router.replace(route.query.to ? String(route.query.to) : fallback)

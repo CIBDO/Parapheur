@@ -37,6 +37,15 @@ class ParapheurService
 
     public function listFolder(User $user, ?string $folder = null, int $perPage = 15): LengthAwarePaginator
     {
+        // Vue transverse pour l’administrateur (sans filtre de dossier personnel)
+        if ($user->can('admin.access') && $folder === null) {
+            return Document::query()
+                ->with(['type', 'structure', 'author', 'currentAssignee', 'latestVersion'])
+                ->orderByRaw("CASE priority WHEN 'tres_urgente' THEN 1 WHEN 'urgente' THEN 2 WHEN 'importante' THEN 3 ELSE 4 END")
+                ->orderByDesc('updated_at')
+                ->paginate($perPage);
+        }
+
         $query = Document::query()
             ->with(['type', 'structure', 'author', 'currentAssignee', 'latestVersion'])
             ->where(function ($q) use ($user, $folder) {

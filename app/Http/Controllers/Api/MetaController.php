@@ -27,12 +27,23 @@ class MetaController extends Controller
 
     public function users(Request $request): JsonResponse
     {
-        $query = User::query()->with('structure')->where('is_active', true);
+        $query = User::query()->with(['structure', 'roles'])->where('is_active', true);
 
         if ($request->filled('structure_id')) {
             $query->where('structure_id', $request->integer('structure_id'));
         }
 
-        return response()->json($query->orderBy('name')->get(['id', 'name', 'email', 'structure_id', 'position_title']));
+        $users = $query->orderBy('name')->get(['id', 'name', 'email', 'structure_id', 'position_title']);
+
+        return response()->json($users->map(fn (User $user) => [
+            'id' => $user->id,
+            'name' => $user->name,
+            'email' => $user->email,
+            'structure_id' => $user->structure_id,
+            'position_title' => $user->position_title,
+            'role' => $user->getRoleNames()->first() ?? 'agent',
+            'roles' => $user->getRoleNames()->values(),
+            'structure' => $user->structure?->only(['id', 'code', 'name']),
+        ]));
     }
 }

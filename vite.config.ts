@@ -7,14 +7,34 @@ import AutoImport from 'unplugin-auto-import/vite';
 import Components from 'unplugin-vue-components/vite';
 import { VueRouterAutoImports, getPascalCaseRouteName } from 'unplugin-vue-router';
 import VueRouter from 'unplugin-vue-router/vite';
-import { defineConfig } from 'vite';
+import { defineConfig, type Plugin } from 'vite';
 import MetaLayouts from 'vite-plugin-vue-meta-layouts';
 import vuetify from 'vite-plugin-vuetify';
 import svgLoader from 'vite-svg-loader';
 
+/**
+ * Contourne un bug Vite + vite-plugin-vuetify : les styles virtuels
+ * `/@id/virtual:plugin-vuetify:*.sass` peuvent répondre 404 avant enregistrement.
+ * @see https://github.com/vuetifyjs/vuetify-loader/issues/356
+ */
+function fixVuetifyVirtualStyles(): Plugin {
+  return {
+    name: 'fix-vuetify-virtual-styles',
+    configureServer(server) {
+      server.middlewares.use((req, _res, next) => {
+        const url = req.url;
+        if (url?.startsWith('/@id/virtual:plugin-vuetify:'))
+          req.url = url.replace('/@id/virtual:plugin-vuetify:', '/virtual:plugin-vuetify:');
+        next();
+      });
+    },
+  };
+}
+
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [
+    fixVuetifyVirtualStyles(),
     // Docs: https://github.com/posva/unplugin-vue-router
     // ℹ️ This plugin should be placed before vue plugin
     VueRouter({

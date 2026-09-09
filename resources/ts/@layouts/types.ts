@@ -108,7 +108,7 @@ export interface I18nLanguage {
 // avatar | text | icon
 // Thanks: https://stackoverflow.com/a/60617060/10796681
 export type Notification = {
-  id: number;
+  id: number | string;
   title: string;
   subtitle: string;
   time: string;

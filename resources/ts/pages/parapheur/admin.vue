@@ -4,8 +4,8 @@ import { hexToRgb } from '@layouts/utils'
 
 definePage({
   meta: {
-    action: 'read',
-    subject: 'DashboardDg',
+    action: 'manage',
+    subject: 'all',
   },
 })
 
@@ -16,8 +16,6 @@ interface DocItem {
   status: string
   priority: string
   expected_action: string
-  due_date?: string
-  submitted_at?: string
   structure?: { code: string; name: string }
   author?: { name: string }
   type?: { name: string }
@@ -40,7 +38,10 @@ const vuetifyTheme = useTheme()
 const userData = useCookie<any>('userData')
 
 const stats = ref<DgStats | null>(null)
+const direction = ref<any>(null)
 const documents = ref<DocItem[]>([])
+const users = ref<any[]>([])
+const structures = ref<any[]>([])
 const loading = ref(true)
 
 const greeting = computed(() => {
@@ -53,41 +54,36 @@ const greeting = computed(() => {
   return 'Bonsoir'
 })
 
-const kpiCards = computed(() => {
-  if (!stats.value)
-    return []
-
-  return [
-    {
-      title: 'À traiter',
-      value: stats.value.to_process,
-      subtitle: 'En attente d’action',
-      icon: 'tabler-inbox',
-      color: 'primary',
-    },
-    {
-      title: 'Urgents',
-      value: stats.value.urgent,
-      subtitle: 'Priorité haute',
-      icon: 'tabler-alert-triangle',
-      color: 'error',
-    },
-    {
-      title: 'En retard',
-      value: stats.value.overdue,
-      subtitle: 'Échéance dépassée',
-      icon: 'tabler-clock-exclamation',
-      color: 'warning',
-    },
-    {
-      title: 'Validés',
-      value: stats.value.validated,
-      subtitle: 'Dossiers clos',
-      icon: 'tabler-circle-check',
-      color: 'success',
-    },
-  ]
-})
+const kpiCards = computed(() => [
+  {
+    title: 'Dossiers reçus',
+    value: stats.value?.received ?? 0,
+    subtitle: 'Tous circuits',
+    icon: 'tabler-files',
+    color: 'primary',
+  },
+  {
+    title: 'En traitement',
+    value: stats.value?.to_process ?? 0,
+    subtitle: 'Circuits ouverts',
+    icon: 'tabler-loader',
+    color: 'info',
+  },
+  {
+    title: 'Urgents',
+    value: stats.value?.urgent ?? 0,
+    subtitle: 'Priorité haute',
+    icon: 'tabler-alert-triangle',
+    color: 'error',
+  },
+  {
+    title: 'Utilisateurs',
+    value: users.value.length,
+    subtitle: 'Comptes actifs',
+    icon: 'tabler-users',
+    color: 'success',
+  },
+])
 
 const statusLabels: Record<string, string> = {
   brouillon: 'Brouillon',
@@ -100,6 +96,7 @@ const statusLabels: Record<string, string> = {
   traite: 'Traité',
   archive: 'Archivé',
   en_circuit: 'En circuit',
+  en_attente: 'En attente',
 }
 
 const priorityLabel = (priority: string) => {
@@ -128,10 +125,41 @@ const actionLabel = (action: string) => {
     visa: 'Visa',
     validation: 'Validation',
     information: 'Information',
+    avis: 'Avis',
+    observations: 'Observations',
+    instruction: 'Instruction',
   }
 
   return map[action] ?? action
 }
+
+const statusColor = (status: string) => {
+  if (['valide', 'traite', 'archive'].includes(status))
+    return 'success'
+  if (['a_corriger', 'rejete'].includes(status))
+    return 'error'
+  if (['a_valider', 'a_viser', 'en_attente'].includes(status))
+    return 'warning'
+  if (['transmis', 'a_consulter', 'en_circuit'].includes(status))
+    return 'primary'
+
+  return 'secondary'
+}
+
+const statusBreakdown = computed(() => {
+  const entries = Object.entries(stats.value?.by_status ?? {})
+  const total = entries.reduce((sum, [, count]) => sum + Number(count), 0) || 1
+
+  return entries
+    .map(([status, count]) => ({
+      status,
+      label: statusLabels[status] ?? status,
+      count: Number(count),
+      percent: Math.round((Number(count) / total) * 100),
+    }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 6)
+})
 
 const structureSeries = computed(() => [{
   name: 'Documents',
@@ -177,80 +205,43 @@ const structureChartOptions = computed(() => {
       categories,
       axisBorder: { show: false },
       axisTicks: { show: false },
-      labels: {
-        style: { colors: labelColor, fontSize: '13px' },
-      },
+      labels: { style: { colors: labelColor, fontSize: '13px' } },
     },
     yaxis: {
-      labels: {
-        style: { colors: labelColor, fontSize: '13px' },
-      },
+      labels: { style: { colors: labelColor, fontSize: '13px' } },
     },
   }
 })
 
-const statusBreakdown = computed(() => {
-  const entries = Object.entries(stats.value?.by_status ?? {})
-  const total = entries.reduce((sum, [, count]) => sum + Number(count), 0) || 1
+const roleBreakdown = computed(() => {
+  const map = new Map<string, number>()
 
-  return entries
-    .map(([status, count]) => ({
-      status,
-      label: statusLabels[status] ?? status,
-      count: Number(count),
-      percent: Math.round((Number(count) / total) * 100),
-    }))
+  for (const user of users.value) {
+    const role = String(user.role || user.roles?.[0] || 'Agent')
+    map.set(role, (map.get(role) || 0) + 1)
+  }
+
+  return [...map.entries()]
+    .map(([role, count]) => ({ role, count }))
     .sort((a, b) => b.count - a.count)
-    .slice(0, 6)
-})
-
-const statusColor = (status: string) => {
-  if (['valide', 'traite', 'archive'].includes(status))
-    return 'success'
-  if (['a_corriger'].includes(status))
-    return 'error'
-  if (['a_valider', 'a_viser'].includes(status))
-    return 'warning'
-  if (['transmis', 'a_consulter', 'en_circuit'].includes(status))
-    return 'primary'
-
-  return 'secondary'
-}
-
-const sparkSeries = computed(() => [{
-  name: 'Volume',
-  data: Object.values(stats.value?.by_status ?? { a: 2, b: 4, c: 3, d: 6, e: 5, f: 8, g: 4 }),
-}])
-
-const sparkOptions = computed(() => {
-  const currentTheme = vuetifyTheme.current.value.colors
-
-  return {
-    chart: {
-      type: 'area',
-      sparkline: { enabled: true },
-      toolbar: { show: false },
-    },
-    stroke: { curve: 'smooth', width: 2 },
-    fill: {
-      type: 'gradient',
-      gradient: { opacityFrom: 0.45, opacityTo: 0.05 },
-    },
-    colors: [currentTheme.primary],
-    tooltip: { enabled: false },
-  }
 })
 
 const loadDashboard = async () => {
   loading.value = true
   try {
-    const [statsRes, docsRes] = await Promise.all([
+    const [statsRes, docsRes, usersRes, structuresRes, directionRes] = await Promise.all([
       $api('/dashboard/dg'),
-      $api('/parapheur/documents', { query: { folder: 'a_valider' } }),
+      $api('/parapheur/documents'),
+      $api('/meta/users'),
+      $api('/meta/structures'),
+      $api('/dashboard/direction').catch(() => null),
     ])
 
     stats.value = statsRes
     documents.value = docsRes.data ?? docsRes
+    users.value = Array.isArray(usersRes) ? usersRes : (usersRes.data ?? [])
+    structures.value = Array.isArray(structuresRes) ? structuresRes : (structuresRes.data ?? [])
+    direction.value = directionRes
   }
   finally {
     loading.value = false
@@ -268,7 +259,7 @@ onMounted(loadDashboard)
           {{ greeting }}{{ userData?.fullName ? `, ${userData.fullName}` : '' }}
         </h4>
         <p class="text-body-1 mb-0 text-medium-emphasis">
-          Bureau du Directeur Général — vue orientée action
+          Tableau de bord administrateur — pilotage global du parapheur
         </p>
       </div>
 
@@ -284,16 +275,15 @@ onMounted(loadDashboard)
         </VBtn>
         <VBtn
           color="primary"
-          :to="{ name: 'parapheur' }"
-          prepend-icon="tabler-briefcase"
+          prepend-icon="tabler-file-plus"
+          :to="{ name: 'parapheur-nouveau' }"
         >
-          Mon parapheur
+          Nouveau document
         </VBtn>
       </div>
     </div>
 
     <VRow class="match-height">
-      <!-- KPI cards style CRM -->
       <VCol
         v-for="card in kpiCards"
         :key="card.title"
@@ -317,11 +307,11 @@ onMounted(loadDashboard)
               </VAvatar>
               <VChip
                 v-if="card.color === 'error' && card.value > 0"
-                :color="card.color"
+                color="error"
                 label
                 size="small"
               >
-                Action
+                Alerte
               </VChip>
             </div>
 
@@ -338,35 +328,7 @@ onMounted(loadDashboard)
         </VCard>
       </VCol>
 
-      <!-- Mini volume -->
-      <VCol
-        cols="12"
-        md="4"
-        sm="6"
-      >
-        <VCard>
-          <VCardItem class="pb-2">
-            <VCardTitle>Volume reçu</VCardTitle>
-            <VCardSubtitle>Dossiers soumis</VCardSubtitle>
-          </VCardItem>
-          <VCardText>
-            <VueApexCharts
-              v-if="stats"
-              :options="sparkOptions"
-              :series="sparkSeries"
-              :height="72"
-            />
-            <div class="d-flex align-center justify-space-between mt-3">
-              <h4 class="text-h4 mb-0">
-                {{ stats?.received ?? '—' }}
-              </h4>
-              <span class="text-sm text-success">Circuit actif</span>
-            </div>
-          </VCardText>
-        </VCard>
-      </VCol>
-
-      <!-- Instructions -->
+      <!-- Organisation -->
       <VCol
         cols="12"
         md="4"
@@ -377,44 +339,44 @@ onMounted(loadDashboard)
             <div class="d-flex align-center justify-space-between mb-4">
               <div>
                 <VCardTitle class="pa-0 mb-1">
-                  Instructions
+                  Organisation
                 </VCardTitle>
                 <VCardSubtitle class="pa-0">
-                  Suivi des consignes
+                  Structures & comptes
                 </VCardSubtitle>
               </div>
               <VAvatar
-                color="info"
+                color="primary"
                 variant="tonal"
                 rounded
                 size="42"
               >
                 <VIcon
-                  icon="tabler-list-check"
+                  icon="tabler-building"
                   size="26"
                 />
               </VAvatar>
             </div>
 
             <div class="d-flex align-center justify-space-between mb-3">
-              <span class="text-body-2">Ouvertes</span>
-              <span class="text-h5">{{ stats?.instructions_open ?? 0 }}</span>
+              <span class="text-body-2">Structures</span>
+              <span class="text-h5">{{ structures.length }}</span>
             </div>
             <VProgressLinear
-              :model-value="stats ? Math.min(100, (stats.instructions_open || 0) * 10) : 0"
-              color="info"
+              :model-value="Math.min(100, structures.length * 12)"
+              color="primary"
               height="8"
               rounded
               class="mb-4"
             />
 
             <div class="d-flex align-center justify-space-between mb-3">
-              <span class="text-body-2">En retard</span>
-              <span class="text-h5 text-error">{{ stats?.instructions_late ?? 0 }}</span>
+              <span class="text-body-2">Utilisateurs</span>
+              <span class="text-h5">{{ users.length }}</span>
             </div>
             <VProgressLinear
-              :model-value="stats ? Math.min(100, (stats.instructions_late || 0) * 20) : 0"
-              color="error"
+              :model-value="Math.min(100, users.length * 10)"
+              color="success"
               height="8"
               rounded
               class="mb-4"
@@ -424,31 +386,73 @@ onMounted(loadDashboard)
               block
               variant="tonal"
               color="primary"
-              :to="{ name: 'parapheur-instructions' }"
+              class="mb-2"
+              :to="{ name: 'parapheur-structures' }"
             >
-              Voir les instructions
+              Gérer les structures
+            </VBtn>
+            <VBtn
+              block
+              variant="tonal"
+              color="primary"
+              class="mb-2"
+              :to="{ name: 'parapheur-users' }"
+            >
+              Gérer les utilisateurs
+            </VBtn>
+            <VBtn
+              block
+              variant="tonal"
+              color="primary"
+              class="mb-2"
+              :to="{ name: 'parapheur-roles' }"
+            >
+              Rôles & permissions
+            </VBtn>
+            <VBtn
+              block
+              variant="tonal"
+              color="primary"
+              class="mb-2"
+              :to="{ name: 'parapheur-document-types' }"
+            >
+              Types de documents
+            </VBtn>
+            <VBtn
+              block
+              variant="tonal"
+              color="primary"
+              class="mb-2"
+              :to="{ name: 'parapheur-audit' }"
+            >
+              Journal d’audit
+            </VBtn>
+            <VBtn
+              block
+              variant="tonal"
+              color="primary"
+              :to="{ name: 'parapheur' }"
+            >
+              Ouvrir mon parapheur
             </VBtn>
           </VCardText>
         </VCard>
       </VCol>
 
-      <!-- Retours / validés -->
+      <!-- Décisions -->
       <VCol
         cols="12"
         md="4"
+        sm="6"
       >
         <VCard>
           <VCardText>
-            <div class="d-flex align-center justify-space-between mb-6">
-              <div>
-                <h5 class="text-h5 mb-1">
-                  Synthèse décisionnelle
-                </h5>
-                <p class="mb-0 text-medium-emphasis">
-                  Validations et retours
-                </p>
-              </div>
-            </div>
+            <h5 class="text-h5 mb-1">
+              Synthèse décisionnelle
+            </h5>
+            <p class="mb-6 text-medium-emphasis">
+              Validations, retours et retards
+            </p>
 
             <div class="d-flex align-center justify-space-between mb-4">
               <div class="d-flex align-center gap-3">
@@ -465,7 +469,7 @@ onMounted(loadDashboard)
                     Validés
                   </div>
                   <div class="text-caption text-medium-emphasis">
-                    Décisions favorables
+                    Dossiers clos
                   </div>
                 </div>
               </div>
@@ -474,7 +478,7 @@ onMounted(loadDashboard)
               </div>
             </div>
 
-            <div class="d-flex align-center justify-space-between">
+            <div class="d-flex align-center justify-space-between mb-4">
               <div class="d-flex align-center gap-3">
                 <VAvatar
                   color="error"
@@ -497,11 +501,100 @@ onMounted(loadDashboard)
                 {{ stats?.returned ?? 0 }}
               </div>
             </div>
+
+            <div class="d-flex align-center justify-space-between">
+              <div class="d-flex align-center gap-3">
+                <VAvatar
+                  color="warning"
+                  variant="tonal"
+                  rounded
+                  size="40"
+                >
+                  <VIcon icon="tabler-clock-exclamation" />
+                </VAvatar>
+                <div>
+                  <div class="text-body-1 font-weight-medium">
+                    En retard
+                  </div>
+                  <div class="text-caption text-medium-emphasis">
+                    Échéance dépassée
+                  </div>
+                </div>
+              </div>
+              <div class="text-h5 text-warning">
+                {{ stats?.overdue ?? 0 }}
+              </div>
+            </div>
           </VCardText>
         </VCard>
       </VCol>
 
-      <!-- Répartition structures -->
+      <!-- Instructions -->
+      <VCol
+        cols="12"
+        md="4"
+      >
+        <VCard>
+          <VCardText>
+            <div class="d-flex align-center justify-space-between mb-4">
+              <div>
+                <VCardTitle class="pa-0 mb-1">
+                  Instructions
+                </VCardTitle>
+                <VCardSubtitle class="pa-0">
+                  Consignes transverses
+                </VCardSubtitle>
+              </div>
+              <VAvatar
+                color="info"
+                variant="tonal"
+                rounded
+                size="42"
+              >
+                <VIcon
+                  icon="tabler-list-check"
+                  size="26"
+                />
+              </VAvatar>
+            </div>
+
+            <div class="d-flex align-center justify-space-between mb-3">
+              <span class="text-body-2">Ouvertes</span>
+              <span class="text-h5">{{ stats?.instructions_open ?? 0 }}</span>
+            </div>
+            <VProgressLinear
+              :model-value="Math.min(100, (stats?.instructions_open || 0) * 10)"
+              color="info"
+              height="8"
+              rounded
+              class="mb-4"
+            />
+
+            <div class="d-flex align-center justify-space-between mb-3">
+              <span class="text-body-2">En retard</span>
+              <span class="text-h5 text-error">{{ stats?.instructions_late ?? 0 }}</span>
+            </div>
+            <VProgressLinear
+              :model-value="Math.min(100, (stats?.instructions_late || 0) * 20)"
+              color="error"
+              height="8"
+              rounded
+              class="mb-4"
+            />
+
+            <VBtn
+              block
+              variant="tonal"
+              color="primary"
+              :to="{ name: 'parapheur-instructions' }"
+            >
+              Gérer les instructions
+            </VBtn>
+          </VCardText>
+        </VCard>
+      </VCol>
+
+      <!-- Chart structures -->
       <VCol
         cols="12"
         md="8"
@@ -509,7 +602,7 @@ onMounted(loadDashboard)
         <VCard>
           <VCardItem>
             <VCardTitle>Répartition par structure</VCardTitle>
-            <VCardSubtitle>Volume de dossiers par direction</VCardSubtitle>
+            <VCardSubtitle>Volume global des dossiers</VCardSubtitle>
           </VCardItem>
           <VCardText>
             <div
@@ -529,12 +622,15 @@ onMounted(loadDashboard)
         </VCard>
       </VCol>
 
-      <!-- Statuts -->
+      <!-- Statuts + rôles -->
       <VCol
         cols="12"
         md="4"
       >
-        <VCard title="États des dossiers">
+        <VCard
+          title="États des dossiers"
+          class="mb-6"
+        >
           <VCardText>
             <div
               v-if="!statusBreakdown.length"
@@ -549,15 +645,13 @@ onMounted(loadDashboard)
               class="mb-4"
             >
               <div class="d-flex align-center justify-space-between mb-1">
-                <div class="d-flex align-center gap-2">
-                  <VChip
-                    :color="statusColor(item.status)"
-                    size="small"
-                    label
-                  >
-                    {{ item.label }}
-                  </VChip>
-                </div>
+                <VChip
+                  :color="statusColor(item.status)"
+                  size="small"
+                  label
+                >
+                  {{ item.label }}
+                </VChip>
                 <span class="text-body-2 font-weight-medium">
                   {{ item.count }} · {{ item.percent }}%
                 </span>
@@ -571,23 +665,43 @@ onMounted(loadDashboard)
             </div>
           </VCardText>
         </VCard>
+
+        <VCard title="Répartition des rôles">
+          <VCardText>
+            <div
+              v-for="item in roleBreakdown"
+              :key="item.role"
+              class="d-flex align-center justify-space-between mb-3"
+            >
+              <span class="text-body-2">{{ item.role }}</span>
+              <VChip
+                size="small"
+                color="primary"
+                variant="tonal"
+                label
+              >
+                {{ item.count }}
+              </VChip>
+            </div>
+          </VCardText>
+        </VCard>
       </VCol>
 
-      <!-- Documents à valider -->
+      <!-- Documents récents -->
       <VCol
         cols="12"
         md="7"
       >
         <VCard>
           <VCardItem>
-            <VCardTitle>Documents à valider</VCardTitle>
-            <VCardSubtitle>Priorité d’intervention immédiate</VCardSubtitle>
+            <VCardTitle>Dossiers en cours</VCardTitle>
+            <VCardSubtitle>Vue transverse administrateur</VCardSubtitle>
             <template #append>
               <VBtn
                 size="small"
                 variant="text"
                 color="primary"
-                :to="{ name: 'parapheur', query: { folder: 'a_valider' } }"
+                :to="{ name: 'parapheur' }"
               >
                 Tout voir
               </VBtn>
@@ -611,7 +725,7 @@ onMounted(loadDashboard)
                   colspan="4"
                   class="text-center text-medium-emphasis py-8"
                 >
-                  Aucun document à valider
+                  Aucun dossier en cours
                 </td>
               </tr>
               <tr
@@ -667,11 +781,63 @@ onMounted(loadDashboard)
         </VCard>
       </VCol>
 
-      <!-- Timeline activité -->
+      <!-- Direction + timeline -->
       <VCol
         cols="12"
         md="5"
       >
+        <VCard class="mb-6">
+          <VCardItem>
+            <VCardTitle>Indicateurs direction</VCardTitle>
+            <VCardSubtitle>Structure de l’administrateur</VCardSubtitle>
+          </VCardItem>
+          <VCardText v-if="direction">
+            <div class="d-flex flex-wrap gap-3">
+              <VChip
+                label
+                variant="tonal"
+                color="primary"
+              >
+                Préparés : {{ direction.prepared }}
+              </VChip>
+              <VChip
+                label
+                variant="tonal"
+                color="info"
+              >
+                En validation : {{ direction.in_validation }}
+              </VChip>
+              <VChip
+                label
+                variant="tonal"
+                color="warning"
+              >
+                Transmis DG : {{ direction.sent_dg }}
+              </VChip>
+              <VChip
+                label
+                variant="tonal"
+                color="error"
+              >
+                Retournés : {{ direction.returned }}
+              </VChip>
+              <VChip
+                label
+                variant="tonal"
+                color="success"
+              >
+                Validés : {{ direction.validated }}
+              </VChip>
+            </div>
+          </VCardText>
+          <VCardText
+            v-else
+            class="text-medium-emphasis"
+          >
+            Indicateurs direction indisponibles
+          </VCardText>
+        </VCard>
+
         <VCard>
           <VCardItem>
             <template #prepend>

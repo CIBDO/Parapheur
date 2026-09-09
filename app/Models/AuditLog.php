@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
+use LogicException;
 
 class AuditLog extends Model
 {
@@ -27,6 +28,17 @@ class AuditLog extends Model
             'properties' => 'array',
             'created_at' => 'datetime',
         ];
+    }
+
+    protected static function booted(): void
+    {
+        static::updating(function () {
+            throw new LogicException('Les journaux d’audit sont append-only et ne peuvent pas être modifiés.');
+        });
+
+        static::deleting(function () {
+            throw new LogicException('Les journaux d’audit sont append-only et ne peuvent pas être supprimés.');
+        });
     }
 
     public function user(): BelongsTo

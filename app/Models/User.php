@@ -62,6 +62,12 @@ class User extends Authenticatable
         if ($this->can('admin.access')) {
             return [
                 ['action' => 'manage', 'subject' => 'all'],
+                ['action' => 'manage', 'subject' => 'Structure'],
+                ['action' => 'manage', 'subject' => 'User'],
+                ['action' => 'manage', 'subject' => 'Role'],
+                ['action' => 'manage', 'subject' => 'DocumentType'],
+                ['action' => 'read', 'subject' => 'AuditLog'],
+                ['action' => 'read', 'subject' => 'Notification'],
             ];
         }
 
@@ -69,6 +75,7 @@ class User extends Authenticatable
             ['action' => 'read', 'subject' => 'Parapheur'],
             ['action' => 'read', 'subject' => 'Auth'],
             ['action' => 'read', 'subject' => 'Document'],
+            ['action' => 'read', 'subject' => 'Notification'],
         ];
 
         if ($this->can('documents.create')) {
@@ -84,6 +91,10 @@ class User extends Authenticatable
             $rules[] = ['action' => 'read', 'subject' => 'DashboardDg'];
         }
 
+        if ($this->can('dashboard.direction')) {
+            $rules[] = ['action' => 'read', 'subject' => 'DashboardDirection'];
+        }
+
         if ($this->can('instructions.manage')) {
             $rules[] = ['action' => 'manage', 'subject' => 'Instruction'];
             $rules[] = ['action' => 'read', 'subject' => 'Instruction'];
@@ -96,6 +107,11 @@ class User extends Authenticatable
 
         if ($this->can('reporting.view')) {
             $rules[] = ['action' => 'read', 'subject' => 'Reporting'];
+        }
+
+        if ($this->can('delegations.manage')) {
+            $rules[] = ['action' => 'manage', 'subject' => 'Delegation'];
+            $rules[] = ['action' => 'read', 'subject' => 'DashboardDg'];
         }
 
         return $rules;

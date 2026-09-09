@@ -1,36 +1,37 @@
 <script lang="ts" setup>
-import { useConfigStore } from '@core/stores/config';
-import { AppContentLayoutNav } from '@layouts/enums';
-import { switchToVerticalNavOnLtOverlayNavBreakpoint } from '@layouts/utils';
+import { useConfigStore } from '@core/stores/config'
+import { AppContentLayoutNav } from '@layouts/enums'
+import { switchToVerticalNavOnLtOverlayNavBreakpoint } from '@layouts/utils'
 
-const DefaultLayoutWithHorizontalNav = defineAsyncComponent(() => import('./components/DefaultLayoutWithHorizontalNav.vue'));
-const DefaultLayoutWithVerticalNav = defineAsyncComponent(() => import('./components/DefaultLayoutWithVerticalNav.vue'));
+const DefaultLayoutWithHorizontalNav = defineAsyncComponent(() => import('./components/DefaultLayoutWithHorizontalNav.vue'))
+const DefaultLayoutWithVerticalNav = defineAsyncComponent(() => import('./components/DefaultLayoutWithVerticalNav.vue'))
 
-const configStore = useConfigStore();
+const configStore = useConfigStore()
 
-// ℹ️ This will switch to vertical nav when define breakpoint is reached when in horizontal nav layout
-// Remove below composable usage if you are not using horizontal nav layout in your app
-switchToVerticalNavOnLtOverlayNavBreakpoint();
+// Force le menu horizontal (ignore un éventuel cookie de démo vertical)
+configStore.appContentLayoutNav = AppContentLayoutNav.Horizontal
 
-const { layoutAttrs, injectSkinClasses } = useSkins();
+// Sur petit écran, bascule temporairement en menu vertical overlay
+switchToVerticalNavOnLtOverlayNavBreakpoint()
 
-injectSkinClasses();
+const { layoutAttrs, injectSkinClasses } = useSkins()
 
-// SECTION: Loading Indicator
-const isFallbackStateActive = ref(false);
-const refLoadingIndicator = ref<any>(null);
+injectSkinClasses()
 
-// watching if the fallback state is active and the refLoadingIndicator component is available
+const isFallbackStateActive = ref(false)
+const refLoadingIndicator = ref<any>(null)
+
 watch(
   [isFallbackStateActive, refLoadingIndicator],
   () => {
-    if (isFallbackStateActive.value && refLoadingIndicator.value) refLoadingIndicator.value.fallbackHandle();
+    if (isFallbackStateActive.value && refLoadingIndicator.value)
+      refLoadingIndicator.value.fallbackHandle()
 
-    if (!isFallbackStateActive.value && refLoadingIndicator.value) refLoadingIndicator.value.resolveHandle();
+    if (!isFallbackStateActive.value && refLoadingIndicator.value)
+      refLoadingIndicator.value.resolveHandle()
   },
   { immediate: true },
-);
-// !SECTION
+)
 </script>
 
 <template>
@@ -41,7 +42,11 @@ watch(
     <AppLoadingIndicator ref="refLoadingIndicator" />
 
     <RouterView v-slot="{ Component }">
-      <Suspense :timeout="0" @fallback="isFallbackStateActive = true" @resolve="isFallbackStateActive = false">
+      <Suspense
+        :timeout="0"
+        @fallback="isFallbackStateActive = true"
+        @resolve="isFallbackStateActive = false"
+      >
         <Component :is="Component" />
       </Suspense>
     </RouterView>
@@ -49,6 +54,5 @@ watch(
 </template>
 
 <style lang="scss">
-// As we are using `layouts` plugin we need its styles to be imported
 @use '@layouts/styles/default-layout';
 </style>

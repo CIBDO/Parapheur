@@ -16,6 +16,7 @@ use App\Models\Instruction;
 use App\Models\User;
 use App\Models\Visa;
 use App\Models\WorkflowInstance;
+use App\Notifications\DocumentWorkflowNotification;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -136,6 +137,14 @@ class DocumentWorkflowService
                 'expected_action' => $expectedAction->value,
             ]);
 
+            $this->notifyUser(
+                $to,
+                $document,
+                'transmitted',
+                sprintf('%s vous a transmis un document pour %s.', $from->name, $expectedAction->label()),
+                $from->name,
+            );
+
             return $document->fresh(['type', 'structure', 'author', 'currentAssignee', 'latestVersion']);
         });
     }
@@ -160,12 +169,22 @@ class DocumentWorkflowService
 
         $this->audit->log('document.commented', $document, ['comment_id' => $comment->id]);
 
+        if ($document->author_id && (int) $document->author_id !== (int) $user->id) {
+            $this->notifyUser(
+                User::query()->find($document->author_id),
+                $document,
+                'commented',
+                sprintf('%s a ajouté un commentaire sur le dossier.', $user->name),
+                $user->name,
+            );
+        }
+
         return $comment->load('user');
     }
 
     public function returnForCorrection(Document $document, User $actor, string $comment): Document
     {
-        return $this->applyTerminalAction(
+        $result = $this->applyTerminalAction(
             $document,
             $actor,
             WorkflowActionType::RetourCorrection,
@@ -183,6 +202,18 @@ class DocumentWorkflowService
                 $doc->current_assignee_id = $doc->author_id;
             }
         );
+
+        if ($document->author_id) {
+            $this->notifyUser(
+                User::query()->find($document->author_id),
+                $document,
+                'returned',
+                sprintf('%s a retourné le document pour correction.', $actor->name),
+                $actor->name,
+            );
+        }
+
+        return $result;
     }
 
     public function vise(Document $document, User $actor, ?string $comment = null, ?User $delegator = null): Document
@@ -231,6 +262,16 @@ class DocumentWorkflowService
                 'comment' => $comment,
                 'decided_at' => now(),
             ]);
+
+            if ($document->author_id && (int) $document->author_id !== (int) $actor->id) {
+                $this->notifyUser(
+                    User::query()->find($document->author_id),
+                    $document,
+                    'validated',
+                    sprintf('%s a validé administrativement le document.', $actor->name),
+                    $actor->name,
+                );
+            }
 
             return $result;
         });
@@ -324,6 +365,14 @@ class DocumentWorkflowService
         );
 
         $this->audit->log('instruction.created', $instruction, ['document_id' => $document->id]);
+
+        $this->notifyUser(
+            $assignee,
+            $document,
+            'instruction',
+            sprintf('%s vous a assigné une instruction : %s', $issuer->name, $instruction->title),
+            $issuer->name,
+        );
 
         return $instruction->load(['assignee', 'issuer', 'document']);
     }
@@ -438,8 +487,22 @@ class DocumentWorkflowService
 
     private function generateReference(User $author): string
     {
-        $structure = $author->structure?->code ?? 'DGTCP';
+        $structure = $author->structure?->code ?? 'ORG';
 
         return sprintf('%s/%s/%04d', $structure, now()->format('Y'), random_int(1, 9999));
+    }
+
+    private function notifyUser(?User $user, Document $document, string $event, string $message, ?string $actorName = null): void
+    {
+        if (! $user) {
+            return;
+        }
+
+        $user->notify(new DocumentWorkflowNotification(
+            $document->withoutRelations(),
+            $event,
+            $message,
+            $actorName,
+        ));
     }
 }

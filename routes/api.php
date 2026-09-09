@@ -1,30 +1,68 @@
 <?php
 
+use App\Http\Controllers\Api\AuditLogController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\DelegationController;
 use App\Http\Controllers\Api\DocumentController;
+use App\Http\Controllers\Api\DocumentTypeController;
 use App\Http\Controllers\Api\InstructionController;
 use App\Http\Controllers\Api\MeetingController;
 use App\Http\Controllers\Api\MetaController;
+use App\Http\Controllers\Api\NotificationController;
+use App\Http\Controllers\Api\RolePermissionController;
+use App\Http\Controllers\Api\StructureController;
+use App\Http\Controllers\Api\UserController;
 use Illuminate\Support\Facades\Route;
 
-Route::post('/auth/login', [AuthController::class, 'login']);
-
-Route::get('/parapheur/documents/{document}/versions/{version}/download', [DocumentController::class, 'downloadVersion'])
-    ->name('documents.version.download')
-    ->middleware('signed');
-Route::get('/parapheur/documents/{document}/versions/{version}/stream', [DocumentController::class, 'streamVersion'])
-    ->name('documents.version.stream')
-    ->middleware('signed');
+Route::post('/auth/login', [AuthController::class, 'login'])
+    ->middleware('throttle:login');
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/auth/me', [AuthController::class, 'me']);
     Route::post('/auth/logout', [AuthController::class, 'logout']);
 
+    Route::get('/notifications', [NotificationController::class, 'index']);
+    Route::post('/notifications/read', [NotificationController::class, 'markRead']);
+    Route::post('/notifications/unread', [NotificationController::class, 'markUnread']);
+    Route::delete('/notifications/{id}', [NotificationController::class, 'destroy']);
+
     Route::get('/meta/document-types', [MetaController::class, 'documentTypes']);
     Route::get('/meta/structures', [MetaController::class, 'structures']);
     Route::get('/meta/users', [MetaController::class, 'users']);
+
+    Route::middleware('permission:admin.access')->group(function () {
+        Route::get('/structures', [StructureController::class, 'index']);
+        Route::post('/structures', [StructureController::class, 'store']);
+        Route::put('/structures/{structure}', [StructureController::class, 'update']);
+        Route::delete('/structures/{structure}', [StructureController::class, 'destroy']);
+        Route::get('/structure-types', [StructureController::class, 'types']);
+        Route::post('/structure-types', [StructureController::class, 'storeType']);
+        Route::put('/structure-types/{structureType}', [StructureController::class, 'updateType']);
+        Route::delete('/structure-types/{structureType}', [StructureController::class, 'destroyType']);
+
+        Route::get('/users', [UserController::class, 'index']);
+        Route::post('/users', [UserController::class, 'store']);
+        Route::get('/users/roles', [UserController::class, 'roles']);
+        Route::get('/users/{user}', [UserController::class, 'show']);
+        Route::put('/users/{user}', [UserController::class, 'update']);
+        Route::delete('/users/{user}', [UserController::class, 'destroy']);
+
+        Route::get('/roles', [RolePermissionController::class, 'roles']);
+        Route::post('/roles', [RolePermissionController::class, 'storeRole']);
+        Route::put('/roles/{role}', [RolePermissionController::class, 'updateRole']);
+        Route::delete('/roles/{role}', [RolePermissionController::class, 'destroyRole']);
+        Route::get('/permissions', [RolePermissionController::class, 'permissions']);
+        Route::post('/permissions', [RolePermissionController::class, 'storePermission']);
+        Route::delete('/permissions/{permission}', [RolePermissionController::class, 'destroyPermission']);
+
+        Route::get('/document-types', [DocumentTypeController::class, 'index']);
+        Route::post('/document-types', [DocumentTypeController::class, 'store']);
+        Route::put('/document-types/{documentType}', [DocumentTypeController::class, 'update']);
+        Route::delete('/document-types/{documentType}', [DocumentTypeController::class, 'destroy']);
+
+        Route::get('/audit-logs', [AuditLogController::class, 'index']);
+    });
 
     Route::get('/dashboard/dg', [DashboardController::class, 'dg']);
     Route::get('/dashboard/direction', [DashboardController::class, 'direction']);
@@ -54,4 +92,12 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/meetings', [MeetingController::class, 'store']);
     Route::get('/meetings/{meeting}', [MeetingController::class, 'show']);
     Route::post('/meetings/{meeting}/decisions', [MeetingController::class, 'addDecision']);
+});
+
+// Téléchargement via URL signée + contrôle d'accès métier (sans Bearer dans un nouvel onglet)
+Route::middleware('signed')->group(function () {
+    Route::get('/parapheur/documents/{document}/versions/{version}/download', [DocumentController::class, 'downloadVersion'])
+        ->name('documents.version.download');
+    Route::get('/parapheur/documents/{document}/versions/{version}/stream', [DocumentController::class, 'streamVersion'])
+        ->name('documents.version.stream');
 });

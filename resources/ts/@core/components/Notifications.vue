@@ -8,9 +8,9 @@ interface Props {
   location?: any;
 }
 interface Emit {
-  (e: 'read', value: number[]): void;
-  (e: 'unread', value: number[]): void;
-  (e: 'remove', value: number): void;
+  (e: 'read', value: Array<number | string>): void;
+  (e: 'unread', value: Array<number | string>): void;
+  (e: 'remove', value: number | string): void;
   (e: 'click:notification', value: Notification): void;
 }
 
@@ -36,7 +36,7 @@ const totalUnseenNotifications = computed(() => {
   return props.notifications.filter(item => item.isSeen === false).length;
 });
 
-const toggleReadUnread = (isSeen: boolean, Id: number) => {
+const toggleReadUnread = (isSeen: boolean, Id: number | string) => {
   if (isSeen) emit('unread', [Id]);
   else emit('read', [Id]);
 };

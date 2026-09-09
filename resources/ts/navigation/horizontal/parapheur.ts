@@ -1,5 +1,4 @@
 export default [
-  { heading: 'e-Parapheur' },
   {
     title: 'Administration',
     icon: { icon: 'tabler-shield-cog' },

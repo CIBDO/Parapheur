@@ -2,6 +2,8 @@
 
 namespace Database\Seeders;
 
+use App\Models\Document;
+use App\Models\DocumentTransmission;
 use App\Models\DocumentType;
 use App\Models\Structure;
 use App\Models\StructureType;
@@ -211,6 +213,134 @@ class DatabaseSeeder extends Seeder
                 ['step_order' => 2, 'name' => 'Directeur', 'role_name' => 'Directeur', 'expected_action' => 'validation'],
                 ['step_order' => 3, 'name' => 'Secrétariat DG', 'role_name' => 'Secrétariat DG', 'expected_action' => 'consultation'],
                 ['step_order' => 4, 'name' => 'Directeur Général', 'role_name' => 'Directeur Général', 'expected_action' => 'validation'],
+            ]);
+        }
+
+        $this->seedDemoDocuments();
+    }
+
+    private function seedDemoDocuments(): void
+    {
+        if (Document::query()->exists()) {
+            return;
+        }
+
+        $note = DocumentType::query()->where('code', 'NOTE')->first();
+        $rapport = DocumentType::query()->where('code', 'RAPPORT')->first();
+        $dsi = Structure::query()->where('code', 'DSI')->first();
+        $dfm = Structure::query()->where('code', 'DFM')->first();
+        $dgUser = User::query()->where('email', 'dg@dgtcp.local')->first();
+        $agent = User::query()->where('email', 'agent.dsi@dgtcp.local')->first();
+        $directeur = User::query()->where('email', 'directeur.dsi@dgtcp.local')->first();
+        $admin = User::query()->where('email', 'admin@dgtcp.local')->first();
+
+        if (! $note || ! $dsi || ! $dgUser || ! $agent) {
+            return;
+        }
+
+        $samples = [
+            [
+                'reference' => 'DSI-2026-001',
+                'object' => 'Note technique — migration messagerie',
+                'document_type_id' => $note->id,
+                'structure_id' => $dsi->id,
+                'author_id' => $agent->id,
+                'current_assignee_id' => $dgUser->id,
+                'status' => 'a_valider',
+                'priority' => 'urgente',
+                'expected_action' => 'validation',
+                'folder' => 'a_valider',
+                'to' => $dgUser,
+            ],
+            [
+                'reference' => 'DSI-2026-002',
+                'object' => 'Rapport trimestriel SI',
+                'document_type_id' => ($rapport ?? $note)->id,
+                'structure_id' => $dsi->id,
+                'author_id' => $directeur?->id ?? $agent->id,
+                'current_assignee_id' => $dgUser->id,
+                'status' => 'a_consulter',
+                'priority' => 'importante',
+                'expected_action' => 'consultation',
+                'folder' => 'a_consulter',
+                'to' => $dgUser,
+            ],
+            [
+                'reference' => 'DFM-2026-014',
+                'object' => 'Projet de décision — acquisition matériel',
+                'document_type_id' => $note->id,
+                'structure_id' => $dfm?->id ?? $dsi->id,
+                'author_id' => $agent->id,
+                'current_assignee_id' => $directeur?->id ?? $dgUser->id,
+                'status' => 'a_viser',
+                'priority' => 'normale',
+                'expected_action' => 'visa',
+                'folder' => 'a_viser',
+                'to' => $directeur ?? $dgUser,
+            ],
+            [
+                'reference' => 'DSI-2026-003',
+                'object' => 'Demande de correction — procédure backup',
+                'document_type_id' => $note->id,
+                'structure_id' => $dsi->id,
+                'author_id' => $agent->id,
+                'current_assignee_id' => $agent->id,
+                'status' => 'a_corriger',
+                'priority' => 'tres_urgente',
+                'expected_action' => 'observations',
+                'folder' => 'retournes',
+                'to' => $agent,
+            ],
+            [
+                'reference' => 'DG-2026-008',
+                'object' => 'Note validée — organisation réunion cabinet',
+                'document_type_id' => $note->id,
+                'structure_id' => $dsi->id,
+                'author_id' => $agent->id,
+                'current_assignee_id' => $dgUser->id,
+                'status' => 'valide',
+                'priority' => 'normale',
+                'expected_action' => 'validation',
+                'folder' => 'traites',
+                'to' => $dgUser,
+            ],
+            [
+                'reference' => 'ADM-2026-001',
+                'object' => 'Suivi paramétrage e-Parapheur',
+                'document_type_id' => $note->id,
+                'structure_id' => $dsi->id,
+                'author_id' => $admin?->id ?? $agent->id,
+                'current_assignee_id' => $admin?->id ?? $agent->id,
+                'status' => 'transmis',
+                'priority' => 'importante',
+                'expected_action' => 'information',
+                'folder' => 'a_traiter',
+                'to' => $admin ?? $agent,
+            ],
+        ];
+
+        foreach ($samples as $sample) {
+            $to = $sample['to'];
+            $folder = $sample['folder'];
+            unset($sample['to'], $sample['folder']);
+
+            $document = Document::query()->create([
+                ...$sample,
+                'confidentiality' => 'normal',
+                'document_date' => now()->toDateString(),
+                'due_date' => now()->addDays(5)->toDateString(),
+                'current_version' => 1,
+                'submitted_at' => now()->subDays(2),
+            ]);
+
+            DocumentTransmission::query()->create([
+                'document_id' => $document->id,
+                'from_user_id' => $sample['author_id'],
+                'to_user_id' => $to->id,
+                'folder' => $folder,
+                'status' => in_array($folder, ['traites', 'archives'], true) ? 'done' : 'pending',
+                'expected_action' => $sample['expected_action'],
+                'message' => 'Document de démonstration',
             ]);
         }
     }

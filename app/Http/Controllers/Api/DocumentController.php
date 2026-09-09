@@ -8,13 +8,14 @@ use App\Models\Comment;
 use App\Models\Document;
 use App\Models\DocumentVersion;
 use App\Models\User;
+use App\Services\DocumentAccessService;
 use App\Services\DocumentWorkflowService;
 use App\Services\ParapheurService;
 use App\Services\PrivateDocumentStorage;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\URL;
 use Illuminate\Validation\Rule;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -24,6 +25,7 @@ class DocumentController extends Controller
         private readonly DocumentWorkflowService $workflow,
         private readonly ParapheurService $parapheur,
         private readonly PrivateDocumentStorage $storage,
+        private readonly DocumentAccessService $access,
     ) {}
 
     public function index(Request $request): JsonResponse
@@ -82,8 +84,10 @@ class DocumentController extends Controller
         return response()->json($document, 201);
     }
 
-    public function show(Document $document): JsonResponse
+    public function show(Request $request, Document $document): JsonResponse
     {
+        $this->access->authorize($request->user(), $document);
+
         $document->load([
             'type',
             'structure',
@@ -102,17 +106,22 @@ class DocumentController extends Controller
             'workflowInstance',
         ]);
 
-        $document->setAttribute('versions', $document->versions->map(function (DocumentVersion $version) use ($document) {
+        $document->setAttribute('versions', $document->versions->map(function (DocumentVersion $version) use ($document, $request) {
             $payload = $version->toArray();
+            $params = [
+                'document' => $document->id,
+                'version' => $version->id,
+                'user' => $request->user()->id,
+            ];
             $payload['download_url'] = URL::temporarySignedRoute(
                 'documents.version.download',
                 now()->addMinutes(30),
-                ['document' => $document->id, 'version' => $version->id]
+                $params
             );
             $payload['stream_url'] = URL::temporarySignedRoute(
                 'documents.version.stream',
                 now()->addMinutes(30),
-                ['document' => $document->id, 'version' => $version->id]
+                $params
             );
 
             return $payload;
@@ -254,6 +263,8 @@ class DocumentController extends Controller
     public function downloadVersion(Request $request, Document $document, DocumentVersion $version): StreamedResponse
     {
         abort_unless($version->document_id === $document->id, 404);
+        $user = User::query()->findOrFail($request->integer('user'));
+        $this->access->authorize($user, $document);
         abort_unless($this->storage->exists($version->disk, $version->path), 404);
 
         return Storage::disk($version->disk)->download($version->path, $version->original_name);
@@ -262,6 +273,8 @@ class DocumentController extends Controller
     public function streamVersion(Request $request, Document $document, DocumentVersion $version): StreamedResponse
     {
         abort_unless($version->document_id === $document->id, 404);
+        $user = User::query()->findOrFail($request->integer('user'));
+        $this->access->authorize($user, $document);
         abort_unless($this->storage->exists($version->disk, $version->path), 404);
 
         return Storage::disk($version->disk)->response($version->path, $version->original_name, [
