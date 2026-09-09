@@ -7,6 +7,7 @@ enum WorkflowActionType: string
     case PriseConnaissance = 'prise_connaissance';
     case Commenter = 'commenter';
     case Avis = 'avis';
+    case Recommandation = 'recommandation';
     case Instruction = 'instruction';
     case DemandeComplement = 'demande_complement';
     case RetourCorrection = 'retour_correction';
@@ -25,6 +26,7 @@ enum WorkflowActionType: string
             self::PriseConnaissance => 'Prise de connaissance',
             self::Commenter => 'Commenter',
             self::Avis => 'Émettre un avis',
+            self::Recommandation => 'Recommander',
             self::Instruction => 'Donner une instruction',
             self::DemandeComplement => 'Demander un complément',
             self::RetourCorrection => 'Retourner pour correction',

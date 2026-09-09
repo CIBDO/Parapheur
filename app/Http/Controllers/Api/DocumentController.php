@@ -3,13 +3,18 @@
 namespace App\Http\Controllers\Api;
 
 use App\Contracts\DocumentPreviewDriver;
+use App\Enums\DocumentConfidentiality;
+use App\Enums\DocumentPriority;
+use App\Enums\DocumentStatus;
 use App\Enums\ExpectedAction;
 use App\Http\Controllers\Controller;
+use App\Enums\ParapheurFolder;
 use App\Models\Comment;
 use App\Models\Document;
 use App\Models\DocumentAttachment;
 use App\Models\DocumentVersion;
 use App\Models\User;
+use App\Services\ArchivePackService;
 use App\Services\DocumentAccessService;
 use App\Services\DocumentWorkflowService;
 use App\Services\ParapheurService;
@@ -29,15 +34,60 @@ class DocumentController extends Controller
         private readonly PrivateDocumentStorage $storage,
         private readonly DocumentAccessService $access,
         private readonly DocumentPreviewDriver $preview,
+        private readonly ArchivePackService $archivePack,
     ) {}
 
     public function index(Request $request): JsonResponse
     {
         /** @var User $user */
         $user = $request->user();
-        $folder = $request->string('folder')->toString() ?: null;
 
-        return response()->json($this->parapheur->listFolder($user, $folder));
+        $data = $request->validate([
+            'folder' => [
+                'nullable',
+                'string',
+                Rule::in(array_map(fn ($c) => $c->value, ParapheurFolder::cases())),
+            ],
+
+            // Recherche native (sans moteur externe) — filtres sur métadonnées.
+            'q' => ['nullable', 'string', 'max:500'],
+            'reference' => ['nullable', 'string', 'max:100'],
+            'object' => ['nullable', 'string', 'max:500'],
+
+            // Alias UI possible : `type_id` ↔ `document_type_id`
+            'document_type_id' => ['nullable', 'exists:document_types,id'],
+            'type_id' => ['nullable', 'exists:document_types,id'],
+
+            'structure_id' => ['nullable', 'exists:structures,id'],
+            'author_id' => ['nullable', 'exists:users,id'],
+
+            'status' => ['nullable', Rule::in(array_map(fn ($c) => $c->value, DocumentStatus::cases()))],
+            'priority' => ['nullable', Rule::in(array_map(fn ($c) => $c->value, DocumentPriority::cases()))],
+            'confidentiality' => [
+                'nullable',
+                Rule::in(array_map(fn ($c) => $c->value, DocumentConfidentiality::cases())),
+            ],
+
+            'keywords' => ['nullable', 'string'],
+            'document_date_from' => ['nullable', 'date'],
+            'document_date_to' => ['nullable', 'date'],
+            'due_date_from' => ['nullable', 'date'],
+            'due_date_to' => ['nullable', 'date'],
+
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:50'],
+        ]);
+
+        $folder = $data['folder'] ?? null;
+        $perPage = $data['per_page'] ?? 15;
+
+        // Normalisation des alias UI (type_id ↔ document_type_id).
+        if (! empty($data['type_id']) && empty($data['document_type_id'])) {
+            $data['document_type_id'] = $data['type_id'];
+        }
+
+        unset($data['folder'], $data['per_page'], $data['type_id']);
+
+        return response()->json($this->parapheur->listFolder($user, $folder, $data, $perPage));
     }
 
     public function counts(Request $request): JsonResponse
@@ -175,6 +225,7 @@ class DocumentController extends Controller
     public function transmit(Request $request, Document $document): JsonResponse
     {
         $this->access->authorize($request->user(), $document);
+        abort_unless($request->user()->can('documents.act') || $request->user()->can('admin.access'), 403);
 
         $data = $request->validate([
             'to_user_id' => ['nullable', 'exists:users,id'],
@@ -202,6 +253,7 @@ class DocumentController extends Controller
     public function reassign(Request $request, Document $document): JsonResponse
     {
         $this->access->authorize($request->user(), $document);
+        abort_unless($request->user()->can('documents.act') || $request->user()->can('admin.access'), 403);
 
         $data = $request->validate([
             'to_user_id' => ['required', 'exists:users,id'],
@@ -223,6 +275,7 @@ class DocumentController extends Controller
     public function acknowledge(Request $request, Document $document): JsonResponse
     {
         $this->access->authorize($request->user(), $document);
+        abort_unless($request->user()->can('documents.act') || $request->user()->can('admin.access'), 403);
         $data = $request->validate(['comment' => ['nullable', 'string']]);
 
         return response()->json(
@@ -233,6 +286,7 @@ class DocumentController extends Controller
     public function hold(Request $request, Document $document): JsonResponse
     {
         $this->access->authorize($request->user(), $document);
+        abort_unless($request->user()->can('documents.act') || $request->user()->can('admin.access'), 403);
         $data = $request->validate(['comment' => ['nullable', 'string']]);
 
         return response()->json(
@@ -243,6 +297,7 @@ class DocumentController extends Controller
     public function classify(Request $request, Document $document): JsonResponse
     {
         $this->access->authorize($request->user(), $document);
+        abort_unless($request->user()->can('documents.act') || $request->user()->can('admin.access'), 403);
         $data = $request->validate(['comment' => ['nullable', 'string']]);
 
         return response()->json(
@@ -253,18 +308,23 @@ class DocumentController extends Controller
     public function comment(Request $request, Document $document): JsonResponse
     {
         $this->access->authorize($request->user(), $document);
+        abort_unless($request->user()->can('documents.act') || $request->user()->can('admin.access'), 403);
 
         $data = $request->validate([
             'body' => ['required', 'string'],
-            'kind' => ['nullable', Rule::in(['general', 'avis', 'observation'])],
+            'kind' => ['nullable', Rule::in(['general', 'avis', 'observation', 'recommandation'])],
         ]);
 
-        $comment = $this->workflow->addComment(
-            $document,
-            $request->user(),
-            $data['body'],
-            $data['kind'] ?? 'general',
-        );
+        try {
+            $comment = $this->workflow->addComment(
+                $document,
+                $request->user(),
+                $data['body'],
+                $data['kind'] ?? 'general',
+            );
+        } catch (\InvalidArgumentException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
 
         return response()->json($comment, 201);
     }
@@ -272,6 +332,7 @@ class DocumentController extends Controller
     public function returnCorrection(Request $request, Document $document): JsonResponse
     {
         $this->access->authorize($request->user(), $document);
+        abort_unless($request->user()->can('documents.act') || $request->user()->can('admin.access'), 403);
         $data = $request->validate(['comment' => ['required', 'string']]);
 
         return response()->json(
@@ -279,9 +340,21 @@ class DocumentController extends Controller
         );
     }
 
+    public function requestComplement(Request $request, Document $document): JsonResponse
+    {
+        $this->access->authorize($request->user(), $document);
+        abort_unless($request->user()->can('documents.act') || $request->user()->can('admin.access'), 403);
+        $data = $request->validate(['comment' => ['required', 'string']]);
+
+        return response()->json(
+            $this->workflow->requestComplement($document, $request->user(), $data['comment'])
+        );
+    }
+
     public function vise(Request $request, Document $document): JsonResponse
     {
         $this->access->authorize($request->user(), $document);
+        abort_unless($request->user()->can('documents.vise') || $request->user()->can('admin.access'), 403);
         $data = $request->validate(['comment' => ['nullable', 'string']]);
 
         return response()->json(
@@ -292,6 +365,7 @@ class DocumentController extends Controller
     public function validateAction(Request $request, Document $document): JsonResponse
     {
         $this->access->authorize($request->user(), $document);
+        abort_unless($request->user()->can('documents.validate') || $request->user()->can('admin.access'), 403);
         $data = $request->validate(['comment' => ['nullable', 'string']]);
 
         return response()->json(
@@ -302,6 +376,13 @@ class DocumentController extends Controller
     public function reject(Request $request, Document $document): JsonResponse
     {
         $this->access->authorize($request->user(), $document);
+        abort_unless(
+            $request->user()->can('documents.validate')
+            || $request->user()->can('documents.vise')
+            || $request->user()->can('documents.act')
+            || $request->user()->can('admin.access'),
+            403
+        );
         $data = $request->validate(['comment' => ['required', 'string']]);
 
         return response()->json(
@@ -312,11 +393,28 @@ class DocumentController extends Controller
     public function archive(Request $request, Document $document): JsonResponse
     {
         $this->access->authorize($request->user(), $document);
+        abort_unless($request->user()->can('documents.act') || $request->user()->can('admin.access'), 403);
         $data = $request->validate(['comment' => ['nullable', 'string']]);
 
         return response()->json(
             $this->workflow->archive($document, $request->user(), $data['comment'] ?? null)
         );
+    }
+
+    public function downloadArchivePack(Request $request, Document $document): \Symfony\Component\HttpFoundation\BinaryFileResponse
+    {
+        $this->access->authorize($request->user(), $document);
+        abort_unless($request->user()->can('documents.act') || $request->user()->can('admin.access') || $request->user()->can('reporting.view'), 403);
+
+        try {
+            $pack = $this->archivePack->build($document, $request->user());
+        } catch (\InvalidArgumentException $e) {
+            abort(422, $e->getMessage());
+        }
+
+        return response()->download($pack['path'], $pack['filename'], [
+            'Content-Type' => 'application/zip',
+        ])->deleteFileAfterSend(true);
     }
 
     public function addVersion(Request $request, Document $document): JsonResponse
@@ -360,6 +458,10 @@ class DocumentController extends Controller
     public function createInstruction(Request $request, Document $document): JsonResponse
     {
         $this->access->authorize($request->user(), $document);
+        abort_unless(
+            $request->user()->can('instructions.manage') || $request->user()->can('admin.access'),
+            403
+        );
 
         $data = $request->validate([
             'comment_id' => ['nullable', 'exists:comments,id'],

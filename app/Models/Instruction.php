@@ -25,6 +25,7 @@ class Instruction extends Model
         'due_date',
         'completed_at',
         'closed_at',
+        'last_reminded_at',
     ];
 
     protected function casts(): array
@@ -34,6 +35,7 @@ class Instruction extends Model
             'due_date' => 'date',
             'completed_at' => 'datetime',
             'closed_at' => 'datetime',
+            'last_reminded_at' => 'datetime',
         ];
     }
 

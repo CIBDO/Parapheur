@@ -88,6 +88,15 @@ class User extends Authenticatable
         if ($this->can('documents.act')) {
             $rules[] = ['action' => 'update', 'subject' => 'Document'];
             $rules[] = ['action' => 'manage', 'subject' => 'Document'];
+            $rules[] = ['action' => 'act', 'subject' => 'Document'];
+        }
+
+        if ($this->can('documents.vise')) {
+            $rules[] = ['action' => 'vise', 'subject' => 'Document'];
+        }
+
+        if ($this->can('documents.validate')) {
+            $rules[] = ['action' => 'validate', 'subject' => 'Document'];
         }
 
         if ($this->can('dashboard.dg')) {

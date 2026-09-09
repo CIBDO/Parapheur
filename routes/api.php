@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\InstructionController;
 use App\Http\Controllers\Api\MeetingController;
 use App\Http\Controllers\Api\MetaController;
 use App\Http\Controllers\Api\NotificationController;
+use App\Http\Controllers\Api\ReportingController;
 use App\Http\Controllers\Api\RolePermissionController;
 use App\Http\Controllers\Api\StructureController;
 use App\Http\Controllers\Api\UserController;
@@ -89,10 +90,12 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/parapheur/documents/{document}/classify', [DocumentController::class, 'classify']);
     Route::post('/parapheur/documents/{document}/comments', [DocumentController::class, 'comment']);
     Route::post('/parapheur/documents/{document}/return', [DocumentController::class, 'returnCorrection']);
+    Route::post('/parapheur/documents/{document}/complement', [DocumentController::class, 'requestComplement']);
     Route::post('/parapheur/documents/{document}/vise', [DocumentController::class, 'vise']);
     Route::post('/parapheur/documents/{document}/validate', [DocumentController::class, 'validateAction']);
     Route::post('/parapheur/documents/{document}/reject', [DocumentController::class, 'reject']);
     Route::post('/parapheur/documents/{document}/archive', [DocumentController::class, 'archive']);
+    Route::get('/parapheur/documents/{document}/archive-pack', [DocumentController::class, 'downloadArchivePack']);
     Route::post('/parapheur/documents/{document}/versions', [DocumentController::class, 'addVersion']);
     Route::post('/parapheur/documents/{document}/attachments', [DocumentController::class, 'addAttachment']);
     Route::post('/parapheur/documents/{document}/instructions', [DocumentController::class, 'createInstruction']);
@@ -107,7 +110,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/meetings', [MeetingController::class, 'index']);
     Route::post('/meetings', [MeetingController::class, 'store']);
     Route::get('/meetings/{meeting}', [MeetingController::class, 'show']);
+    Route::put('/meetings/{meeting}', [MeetingController::class, 'update']);
     Route::post('/meetings/{meeting}/decisions', [MeetingController::class, 'addDecision']);
+
+    Route::get('/reporting/export', [ReportingController::class, 'export']);
 });
 
 // Téléchargement via URL signée + contrôle d'accès métier (sans Bearer dans un nouvel onglet)

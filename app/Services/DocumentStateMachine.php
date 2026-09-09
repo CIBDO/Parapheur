@@ -154,6 +154,7 @@ class DocumentStateMachine
             WorkflowActionType::Classer => DocumentStatus::Classe,
             WorkflowActionType::Archiver => DocumentStatus::Archive,
             WorkflowActionType::Transmettre, WorkflowActionType::Reaffecter => DocumentStatus::Transmis,
+            WorkflowActionType::Commenter, WorkflowActionType::Avis, WorkflowActionType::Recommandation, WorkflowActionType::Instruction => $current,
             default => $current,
         };
     }

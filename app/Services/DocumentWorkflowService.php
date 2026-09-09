@@ -30,6 +30,7 @@ class DocumentWorkflowService
         private readonly DocumentStateMachine $stateMachine,
         private readonly PrivateDocumentStorage $storage,
         private readonly AuditLogger $audit,
+        private readonly DelegationResolver $delegations,
     ) {}
 
     public function createDraft(User $author, array $data, ?UploadedFile $mainFile = null, array $attachments = []): Document
@@ -408,6 +409,12 @@ class DocumentWorkflowService
 
     public function addComment(Document $document, User $user, string $body, string $kind = 'general'): Comment
     {
+        if (in_array($document->status, [DocumentStatus::Archive, DocumentStatus::Annule], true)) {
+            throw new InvalidArgumentException('Document figé : commentaire impossible.');
+        }
+
+        $kind = in_array($kind, ['general', 'avis', 'observation', 'recommandation'], true) ? $kind : 'general';
+
         $comment = Comment::query()->create([
             'document_id' => $document->id,
             'user_id' => $user->id,
@@ -415,28 +422,79 @@ class DocumentWorkflowService
             'body' => $body,
         ]);
 
+        $actionType = match ($kind) {
+            'avis' => WorkflowActionType::Avis,
+            'recommandation' => WorkflowActionType::Recommandation,
+            default => WorkflowActionType::Commenter,
+        };
+
         $this->recordAction(
             $document,
             $user,
-            WorkflowActionType::Commenter,
+            $actionType,
             $document->status,
             $document->status,
             $body,
         );
 
-        $this->audit->log('document.commented', $document, ['comment_id' => $comment->id]);
+        $this->audit->log('document.commented', $document, [
+            'comment_id' => $comment->id,
+            'kind' => $kind,
+        ]);
 
         if ($document->author_id && (int) $document->author_id !== (int) $user->id) {
+            $label = match ($kind) {
+                'avis' => 'un avis',
+                'recommandation' => 'une recommandation',
+                'observation' => 'une observation',
+                default => 'un commentaire',
+            };
             $this->notifyUser(
                 User::query()->find($document->author_id),
                 $document,
                 'commented',
-                sprintf('%s a ajouté un commentaire sur le dossier.', $user->name),
+                sprintf('%s a ajouté %s sur le dossier.', $user->name, $label),
                 $user->name,
             );
         }
 
         return $comment->load('user');
+    }
+
+    public function requestComplement(Document $document, User $actor, string $comment): Document
+    {
+        $result = DB::transaction(function () use ($document, $actor, $comment) {
+            return $this->applyTerminalAction(
+                $document,
+                $actor,
+                WorkflowActionType::DemandeComplement,
+                $comment,
+                function (Document $doc) use ($actor, $comment) {
+                    DocumentTransmission::query()->create([
+                        'document_id' => $doc->id,
+                        'from_user_id' => $actor->id,
+                        'to_user_id' => $doc->author_id,
+                        'expected_action' => ExpectedAction::Observations,
+                        'folder' => ParapheurFolder::Retournes,
+                        'status' => 'pending',
+                        'message' => $comment,
+                    ]);
+                    $doc->current_assignee_id = $doc->author_id;
+                }
+            );
+        });
+
+        if ($document->author_id) {
+            $this->notifyUser(
+                User::query()->find($document->author_id),
+                $document,
+                'returned',
+                sprintf('%s a demandé un complément sur le document.', $actor->name),
+                $actor->name,
+            );
+        }
+
+        return $result;
     }
 
     public function returnForCorrection(Document $document, User $actor, string $comment): Document
@@ -477,6 +535,8 @@ class DocumentWorkflowService
 
     public function vise(Document $document, User $actor, ?string $comment = null, ?User $delegator = null): Document
     {
+        $delegator ??= $this->delegations->resolveDelegator($actor, $document, 'vise');
+
         return DB::transaction(function () use ($document, $actor, $comment, $delegator) {
             $result = $this->applyTerminalAction(
                 $document,
@@ -519,6 +579,8 @@ class DocumentWorkflowService
 
     public function validateDocument(Document $document, User $actor, ?string $comment = null, ?User $delegator = null): Document
     {
+        $delegator ??= $this->delegations->resolveDelegator($actor, $document, 'validate');
+
         return DB::transaction(function () use ($document, $actor, $comment, $delegator) {
             $result = $this->applyTerminalAction(
                 $document,
@@ -541,12 +603,16 @@ class DocumentWorkflowService
                 'decided_at' => now(),
             ]);
 
+            $suffix = $delegator
+                ? sprintf(' (par délégation de %s)', $delegator->name)
+                : '';
+
             if ($document->author_id && (int) $document->author_id !== (int) $actor->id) {
                 $this->notifyUser(
                     User::query()->find($document->author_id),
                     $document,
                     'validated',
-                    sprintf('%s a validé administrativement le document.', $actor->name),
+                    sprintf('%s a validé administrativement le document%s.', $actor->name, $suffix),
                     $actor->name,
                 );
             }
@@ -670,6 +736,9 @@ class DocumentWorkflowService
         User $assignee,
         array $data,
     ): Instruction {
+        if (in_array($document->status, [DocumentStatus::Archive, DocumentStatus::Annule], true)) {
+            throw new InvalidArgumentException('Document figé : instruction impossible.');
+        }
         $instruction = Instruction::query()->create([
             'document_id' => $document->id,
             'issuer_id' => $issuer->id,

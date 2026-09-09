@@ -1,5 +1,6 @@
 <script setup lang="ts">
 const route = useRoute('parapheur-id')
+const ability = useAbility()
 
 definePage({
   meta: {
@@ -11,6 +12,7 @@ definePage({
 const document = ref<any>(null)
 const loading = ref(true)
 const actionComment = ref('')
+const actionError = ref('')
 const busy = ref(false)
 const users = ref<Array<{ id: number; name: string }>>([])
 const workflows = ref<Array<{ id: number; name: string; code: string; steps?: any[] }>>([])
@@ -20,6 +22,7 @@ const attachmentFile = ref<File[]>([])
 const attachmentKind = ref('piece_jointe')
 
 const transmitForm = ref({
+  intent: 'transmit' as 'transmit' | 'reassign',
   mode: 'libre' as 'libre' | 'predefini',
   to_user_id: null as number | null,
   workflow_id: null as number | null,
@@ -44,6 +47,12 @@ const expectedActions = [
   { title: 'Pour validation', value: 'validation' },
 ]
 
+const canAct = computed(() => ability.can('act', 'Document') || ability.can('manage', 'Document') || ability.can('manage', 'all'))
+const canVise = computed(() => ability.can('vise', 'Document') || ability.can('manage', 'all'))
+const canValidate = computed(() => ability.can('validate', 'Document') || ability.can('manage', 'all'))
+const canInstruct = computed(() => ability.can('manage', 'Instruction') || ability.can('manage', 'all'))
+const canMutate = computed(() => canAct.value && !['archive', 'annule'].includes(document.value?.status))
+
 const load = async () => {
   loading.value = true
   try {
@@ -65,6 +74,18 @@ onMounted(async () => {
 })
 
 const runAction = async (path: string, body: Record<string, unknown> = {}) => {
+  actionError.value = ''
+  if (['return', 'complement', 'reject'].includes(path) && !actionComment.value.trim() && !body.comment && !body.body) {
+    actionError.value = 'Un commentaire / motif est obligatoire pour cette action.'
+
+    return
+  }
+  if (['comments'].includes(path) && !actionComment.value.trim() && !body.body) {
+    actionError.value = 'Saisissez un texte avant d\'envoyer.'
+
+    return
+  }
+
   busy.value = true
   try {
     await $api(`/parapheur/documents/${route.params.id}/${path}`, {
@@ -74,6 +95,9 @@ const runAction = async (path: string, body: Record<string, unknown> = {}) => {
     actionComment.value = ''
     await load()
   }
+  catch (e: any) {
+    actionError.value = e?.data?.message || 'Action refusée ou en échec'
+  }
   finally {
     busy.value = false
   }
@@ -81,12 +105,16 @@ const runAction = async (path: string, body: Record<string, unknown> = {}) => {
 
 const createInstruction = async () => {
   busy.value = true
+  actionError.value = ''
   try {
     await $api(`/parapheur/documents/${route.params.id}/instructions`, {
       method: 'POST',
       body: instructionForm.value,
     })
     await load()
+  }
+  catch (e: any) {
+    actionError.value = e?.data?.message || 'Impossible de créer l\'instruction'
   }
   finally {
     busy.value = false
@@ -129,20 +157,63 @@ const uploadAttachment = async () => {
   }
 }
 
-const transmit = async () => {
+const transmitOrReassign = async () => {
+  actionError.value = ''
   busy.value = true
   try {
-    const body: Record<string, unknown> = {
-      expected_action: transmitForm.value.expected_action,
-      message: transmitForm.value.message || undefined,
-    }
-    if (transmitForm.value.mode === 'predefini')
-      body.workflow_id = transmitForm.value.workflow_id
-    else
-      body.to_user_id = transmitForm.value.to_user_id
+    if (transmitForm.value.intent === 'reassign') {
+      if (!transmitForm.value.to_user_id) {
+        actionError.value = 'Destinataire requis pour la réaffectation.'
 
-    await $api(`/parapheur/documents/${route.params.id}/transmit`, { method: 'POST', body })
+        return
+      }
+      await $api(`/parapheur/documents/${route.params.id}/reassign`, {
+        method: 'POST',
+        body: {
+          to_user_id: transmitForm.value.to_user_id,
+          expected_action: transmitForm.value.expected_action,
+          message: transmitForm.value.message || undefined,
+        },
+      })
+    }
+    else {
+      const body: Record<string, unknown> = {
+        expected_action: transmitForm.value.expected_action,
+        message: transmitForm.value.message || undefined,
+      }
+      if (transmitForm.value.mode === 'predefini')
+        body.workflow_id = transmitForm.value.workflow_id
+      else
+        body.to_user_id = transmitForm.value.to_user_id
+
+      await $api(`/parapheur/documents/${route.params.id}/transmit`, { method: 'POST', body })
+    }
     await load()
+  }
+  catch (e: any) {
+    actionError.value = e?.data?.message || 'Transmission / réaffectation en échec'
+  }
+  finally {
+    busy.value = false
+  }
+}
+
+const downloadArchivePack = async () => {
+  busy.value = true
+  actionError.value = ''
+  try {
+    const blob = await $api(`/parapheur/documents/${route.params.id}/archive-pack`, {
+      responseType: 'blob',
+    }) as Blob
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `dossier_${document.value?.reference || route.params.id}.zip`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+  catch (e: any) {
+    actionError.value = e?.data?.message || 'Export pack impossible'
   }
   finally {
     busy.value = false
@@ -168,7 +239,15 @@ const circuitSteps = computed(() => {
   }))
 })
 
-const canMutate = computed(() => !['archive', 'annule'].includes(document.value?.status))
+const kindLabel = (kind: string) => {
+  const map: Record<string, string> = {
+    general: 'commentaire',
+    avis: 'avis',
+    observation: 'observation',
+    recommandation: 'recommandation',
+  }
+  return map[kind] || kind
+}
 </script>
 
 <template>
@@ -190,12 +269,28 @@ const canMutate = computed(() => !['archive', 'annule'].includes(document.value?
         <VChip label>
           {{ document.status }}
         </VChip>
-        <VChip label color="warning">
+        <VChip
+          label
+          color="warning"
+        >
           {{ document.priority }}
         </VChip>
-        <VChip label color="info">
+        <VChip
+          label
+          color="info"
+        >
           {{ document.expected_action }}
         </VChip>
+        <VBtn
+          v-if="document.status === 'archive'"
+          color="primary"
+          variant="tonal"
+          prepend-icon="tabler-package-export"
+          :loading="busy"
+          @click="downloadArchivePack"
+        >
+          Export pack
+        </VBtn>
       </div>
     </div>
 
@@ -410,22 +505,47 @@ const canMutate = computed(() => !['archive', 'annule'].includes(document.value?
               class="mb-4"
             >
               <div class="font-weight-medium">
-                {{ comment.user?.name }} · {{ comment.kind }}
+                {{ comment.user?.name }} · {{ kindLabel(comment.kind) }}
               </div>
               <div>{{ comment.body }}</div>
             </div>
+            <VAlert
+              v-if="actionError"
+              type="error"
+              variant="tonal"
+              class="mb-4"
+            >
+              {{ actionError }}
+            </VAlert>
             <AppTextarea
               v-model="actionComment"
               label="Commentaire / motif d'action"
               rows="3"
               class="mb-4"
             />
-            <div class="d-flex flex-wrap gap-2">
+            <div
+              v-if="canAct"
+              class="d-flex flex-wrap gap-2"
+            >
               <VBtn
                 :loading="busy"
                 @click="runAction('comments', { body: actionComment, kind: 'general' })"
               >
                 Commenter
+              </VBtn>
+              <VBtn
+                variant="tonal"
+                :loading="busy"
+                @click="runAction('comments', { body: actionComment, kind: 'avis' })"
+              >
+                Avis
+              </VBtn>
+              <VBtn
+                variant="tonal"
+                :loading="busy"
+                @click="runAction('comments', { body: actionComment, kind: 'recommandation' })"
+              >
+                Recommander
               </VBtn>
               <VBtn
                 color="secondary"
@@ -442,6 +562,15 @@ const canMutate = computed(() => !['archive', 'annule'].includes(document.value?
                 Retourner
               </VBtn>
               <VBtn
+                color="warning"
+                variant="tonal"
+                :loading="busy"
+                @click="runAction('complement')"
+              >
+                Demander complément
+              </VBtn>
+              <VBtn
+                v-if="canVise"
                 color="info"
                 :loading="busy"
                 @click="runAction('vise')"
@@ -449,6 +578,7 @@ const canMutate = computed(() => !['archive', 'annule'].includes(document.value?
                 Viser
               </VBtn>
               <VBtn
+                v-if="canValidate"
                 color="success"
                 :loading="busy"
                 @click="runAction('validate')"
@@ -456,6 +586,7 @@ const canMutate = computed(() => !['archive', 'annule'].includes(document.value?
                 Valider
               </VBtn>
               <VBtn
+                v-if="canVise || canValidate"
                 color="error"
                 :loading="busy"
                 @click="runAction('reject')"
@@ -484,6 +615,17 @@ const canMutate = computed(() => !['archive', 'annule'].includes(document.value?
                 Archiver
               </VBtn>
             </div>
+            <VAlert
+              v-else
+              type="info"
+              variant="tonal"
+              class="mt-2"
+            >
+              Consultation uniquement — vous n'avez pas les droits d'action sur ce dossier.
+            </VAlert>
+            <p class="text-caption text-medium-emphasis mt-3 mb-0">
+              Les actes de visa et de validation sont administratifs (pas de signature électronique).
+            </p>
           </VCardText>
         </VCard>
       </VCol>
@@ -562,6 +704,21 @@ const canMutate = computed(() => !['archive', 'annule'].includes(document.value?
           <VCardTitle>Transmettre / réaffecter</VCardTitle>
           <VCardText>
             <VBtnToggle
+              v-model="transmitForm.intent"
+              mandatory
+              density="compact"
+              class="mb-3"
+            >
+              <VBtn value="transmit">
+                Transmettre
+              </VBtn>
+              <VBtn value="reassign">
+                Réaffecter
+              </VBtn>
+            </VBtnToggle>
+
+            <VBtnToggle
+              v-if="transmitForm.intent === 'transmit'"
               v-model="transmitForm.mode"
               mandatory
               density="compact"
@@ -576,7 +733,7 @@ const canMutate = computed(() => !['archive', 'annule'].includes(document.value?
             </VBtnToggle>
 
             <AppSelect
-              v-if="transmitForm.mode === 'libre'"
+              v-if="transmitForm.intent === 'reassign' || transmitForm.mode === 'libre'"
               v-model="transmitForm.to_user_id"
               :items="users"
               item-title="name"
@@ -608,9 +765,9 @@ const canMutate = computed(() => !['archive', 'annule'].includes(document.value?
               block
               color="primary"
               :loading="busy"
-              @click="transmit"
+              @click="transmitOrReassign"
             >
-              Transmettre
+              {{ transmitForm.intent === 'reassign' ? 'Réaffecter' : 'Transmettre' }}
             </VBtn>
           </VCardText>
         </VCard>
@@ -642,7 +799,7 @@ const canMutate = computed(() => !['archive', 'annule'].includes(document.value?
           </VCardText>
         </VCard>
 
-        <VCard>
+        <VCard v-if="canInstruct">
           <VCardTitle>Créer une instruction</VCardTitle>
           <VCardText>
             <AppTextField

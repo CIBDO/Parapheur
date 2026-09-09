@@ -61,8 +61,44 @@ class MeetingController extends Controller
     public function show(Meeting $meeting): JsonResponse
     {
         return response()->json(
-            $meeting->load(['chair', 'creator', 'participants', 'documents.type', 'decisions.assignee'])
+            $meeting->load(['chair', 'creator', 'participants', 'documents.type', 'decisions.assignee', 'decisions.instruction'])
         );
+    }
+
+    public function update(Request $request, Meeting $meeting): JsonResponse
+    {
+        $data = $request->validate([
+            'title' => ['sometimes', 'string', 'max:255'],
+            'meeting_date' => ['sometimes', 'date'],
+            'meeting_time' => ['nullable', 'date_format:H:i'],
+            'location' => ['nullable', 'string', 'max:255'],
+            'chair_id' => ['nullable', 'exists:users,id'],
+            'agenda' => ['nullable', 'string'],
+            'notes' => ['nullable', 'string'],
+            'status' => ['nullable', 'string', 'max:50'],
+            'participant_ids' => ['nullable', 'array'],
+            'participant_ids.*' => ['exists:users,id'],
+            'document_ids' => ['nullable', 'array'],
+            'document_ids.*' => ['exists:documents,id'],
+        ]);
+
+        $meeting->update(collect($data)->except(['participant_ids', 'document_ids'])->all());
+
+        if (array_key_exists('participant_ids', $data)) {
+            $meeting->participants()->sync($data['participant_ids'] ?? []);
+        }
+
+        if (array_key_exists('document_ids', $data)) {
+            $sync = [];
+            foreach ($data['document_ids'] ?? [] as $i => $id) {
+                $sync[$id] = ['sort_order' => $i + 1];
+            }
+            $meeting->documents()->sync($sync);
+        }
+
+        $this->audit->log('meeting.updated', $meeting);
+
+        return response()->json($meeting->load(['chair', 'participants', 'documents', 'decisions.assignee']));
     }
 
     public function addDecision(Request $request, Meeting $meeting): JsonResponse
@@ -91,6 +127,8 @@ class MeetingController extends Controller
             ]);
         }
 
-        return response()->json($decision->load('assignee'), 201);
+        $this->audit->log('meeting.decision_created', $decision);
+
+        return response()->json($decision->load(['assignee', 'instruction']), 201);
     }
 }

@@ -246,7 +246,7 @@ const loadDashboard = async () => {
   try {
     const [statsRes, docsRes] = await Promise.all([
       $api('/dashboard/dg'),
-      $api('/parapheur/documents', { query: { folder: 'a_valider' } }),
+      $api('/parapheur/documents', { query: { folder: 'a_traiter' } }),
     ])
 
     stats.value = statsRes
@@ -257,7 +257,69 @@ const loadDashboard = async () => {
   }
 }
 
-onMounted(loadDashboard)
+const actionBusy = ref<number | null>(null)
+const quickComment = ref('')
+const instructDialog = ref(false)
+const instructDocId = ref<number | null>(null)
+const users = ref<Array<{ id: number; name: string }>>([])
+const instructForm = ref({
+  assignee_id: null as number | null,
+  title: 'Instruction DG',
+  body: '',
+  due_date: '',
+})
+
+const runQuickAction = async (docId: number, path: string, body: Record<string, unknown> = {}) => {
+  actionBusy.value = docId
+  try {
+    await $api(`/parapheur/documents/${docId}/${path}`, {
+      method: 'POST',
+      body: {
+        comment: quickComment.value || undefined,
+        ...body,
+      },
+    })
+    quickComment.value = ''
+    await loadDashboard()
+  }
+  finally {
+    actionBusy.value = null
+  }
+}
+
+const openInstruct = (docId: number) => {
+  instructDocId.value = docId
+  instructForm.value = {
+    assignee_id: null,
+    title: 'Instruction DG',
+    body: quickComment.value || '',
+    due_date: '',
+  }
+  instructDialog.value = true
+}
+
+const submitInstruct = async () => {
+  if (!instructDocId.value)
+    return
+  actionBusy.value = instructDocId.value
+  try {
+    await $api(`/parapheur/documents/${instructDocId.value}/instructions`, {
+      method: 'POST',
+      body: instructForm.value,
+    })
+    instructDialog.value = false
+    quickComment.value = ''
+    await loadDashboard()
+  }
+  finally {
+    actionBusy.value = null
+  }
+}
+
+onMounted(async () => {
+  users.value = await $api('/meta/users').catch(() => [])
+  await loadDashboard()
+})
 </script>
 
 <template>
@@ -573,21 +635,121 @@ onMounted(loadDashboard)
         </VCard>
       </VCol>
 
-      <!-- Documents à valider -->
+      <!-- Documents à traiter — UI tablette -->
+      <VCol cols="12">
+        <VCard>
+          <VCardItem>
+            <VCardTitle>Documents à traiter</VCardTitle>
+            <VCardSubtitle>Actions rapides DG — Commenter · Retourner · Valider · Instruire · Viser</VCardSubtitle>
+          </VCardItem>
+          <VDivider />
+          <VCardText>
+            <AppTextarea
+              v-model="quickComment"
+              label="Commentaire / motif (utilisé par les actions)"
+              rows="2"
+              class="mb-4"
+            />
+
+            <div
+              v-if="!documents.length"
+              class="text-center text-medium-emphasis py-8"
+            >
+              Aucun document à traiter
+            </div>
+
+            <div
+              v-for="doc in documents.slice(0, 12)"
+              :key="doc.id"
+              class="pa-4 mb-3 rounded border"
+            >
+              <div class="d-flex flex-wrap justify-space-between gap-3 mb-3">
+                <div class="min-w-0">
+                  <div class="text-h6 text-truncate">
+                    {{ doc.object }}
+                  </div>
+                  <div class="text-caption text-medium-emphasis">
+                    {{ doc.reference || 'Sans référence' }}
+                    · {{ doc.structure?.code || '—' }}
+                    · {{ actionLabel(doc.expected_action) }}
+                  </div>
+                </div>
+                <VChip
+                  size="small"
+                  label
+                  :color="priorityColor(doc.priority)"
+                >
+                  {{ priorityLabel(doc.priority) }}
+                </VChip>
+              </div>
+              <div class="d-flex flex-wrap gap-2">
+                <VBtn
+                  size="small"
+                  :loading="actionBusy === doc.id"
+                  @click="runQuickAction(doc.id, 'comments', { body: quickComment || 'Prise de connaissance DG', kind: 'observation' })"
+                >
+                  Commenter
+                </VBtn>
+                <VBtn
+                  size="small"
+                  color="warning"
+                  :loading="actionBusy === doc.id"
+                  @click="runQuickAction(doc.id, 'return')"
+                >
+                  Retourner
+                </VBtn>
+                <VBtn
+                  size="small"
+                  color="success"
+                  :loading="actionBusy === doc.id"
+                  @click="runQuickAction(doc.id, 'validate')"
+                >
+                  Valider
+                </VBtn>
+                <VBtn
+                  size="small"
+                  color="info"
+                  :loading="actionBusy === doc.id"
+                  @click="runQuickAction(doc.id, 'vise')"
+                >
+                  Viser
+                </VBtn>
+                <VBtn
+                  size="small"
+                  color="primary"
+                  variant="tonal"
+                  @click="openInstruct(doc.id)"
+                >
+                  Instruire
+                </VBtn>
+                <VBtn
+                  size="small"
+                  variant="text"
+                  :to="{ name: 'parapheur-id', params: { id: doc.id } }"
+                >
+                  Ouvrir
+                </VBtn>
+              </div>
+            </div>
+          </VCardText>
+        </VCard>
+      </VCol>
+
+      <!-- Ancienne liste courte conservée en synthèse -->
       <VCol
         cols="12"
         md="7"
       >
         <VCard>
           <VCardItem>
-            <VCardTitle>Documents à valider</VCardTitle>
-            <VCardSubtitle>Priorité d’intervention immédiate</VCardSubtitle>
+            <VCardTitle>File de priorité</VCardTitle>
+            <VCardSubtitle>Synthèse des dossiers en attente</VCardSubtitle>
             <template #append>
               <VBtn
                 size="small"
                 variant="text"
                 color="primary"
-                :to="{ name: 'parapheur', query: { folder: 'a_valider' } }"
+                :to="{ name: 'parapheur', query: { folder: 'a_traiter' } }"
               >
                 Tout voir
               </VBtn>
@@ -611,7 +773,7 @@ onMounted(loadDashboard)
                   colspan="4"
                   class="text-center text-medium-emphasis py-8"
                 >
-                  Aucun document à valider
+                  Aucun document à traiter
                 </td>
               </tr>
               <tr
@@ -730,6 +892,53 @@ onMounted(loadDashboard)
         </VCard>
       </VCol>
     </VRow>
+
+    <VDialog
+      v-model="instructDialog"
+      max-width="520"
+    >
+      <VCard>
+        <VCardTitle>Instruction DG</VCardTitle>
+        <VCardText>
+          <AppTextField
+            v-model="instructForm.title"
+            label="Titre"
+            class="mb-3"
+          />
+          <AppTextarea
+            v-model="instructForm.body"
+            label="Instruction"
+            class="mb-3"
+          />
+          <AppSelect
+            v-model="instructForm.assignee_id"
+            :items="users"
+            item-title="name"
+            item-value="id"
+            label="Responsable"
+            class="mb-3"
+          />
+          <AppTextField
+            v-model="instructForm.due_date"
+            type="date"
+            label="Échéance"
+          />
+        </VCardText>
+        <VCardActions>
+          <VSpacer />
+          <VBtn @click="instructDialog = false">
+            Annuler
+          </VBtn>
+          <VBtn
+            color="primary"
+            :loading="actionBusy !== null"
+            @click="submitInstruct"
+          >
+            Enregistrer
+          </VBtn>
+        </VCardActions>
+      </VCard>
+    </VDialog>
   </div>
 </template>
 
