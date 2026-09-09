@@ -1,0 +1,26 @@
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/JetBrainsMono-Regular.ttf') format('truetype');
+}
+
+:root {
+  --font-family-app: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+}
+
+html,
+body,
+#app,
+.v-application {
+  font-family: var(--font-family-app);
+}
+
+/* Ne pas forcer la police sur les icônes */
+.v-icon,
+.iconify,
+[class^='tabler-'],
+[class*=' tabler-'] {
+  font-family: inherit;
+}

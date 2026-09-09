@@ -1,0 +1,52 @@
+export default [
+  { heading: 'e-Parapheur' },
+  {
+    title: 'Mon parapheur',
+    icon: { icon: 'tabler-briefcase' },
+    to: 'parapheur',
+    action: 'read',
+    subject: 'Parapheur',
+  },
+  {
+    title: 'Nouveau document',
+    icon: { icon: 'tabler-file-plus' },
+    to: 'parapheur-nouveau',
+    action: 'create',
+    subject: 'Document',
+  },
+  {
+    title: 'Bureau DG',
+    icon: { icon: 'tabler-layout-dashboard' },
+    to: 'parapheur-dg',
+    action: 'read',
+    subject: 'DashboardDg',
+  },
+  {
+    title: 'Instructions',
+    icon: { icon: 'tabler-list-check' },
+    to: 'parapheur-instructions',
+    action: 'manage',
+    subject: 'Instruction',
+  },
+  {
+    title: 'Réunions',
+    icon: { icon: 'tabler-users-group' },
+    to: 'parapheur-reunions',
+    action: 'manage',
+    subject: 'Meeting',
+  },
+  {
+    title: 'Reporting',
+    icon: { icon: 'tabler-chart-bar' },
+    to: 'parapheur-reporting',
+    action: 'read',
+    subject: 'Reporting',
+  },
+  {
+    title: 'Délégations',
+    icon: { icon: 'tabler-user-share' },
+    to: 'parapheur-delegations',
+    action: 'read',
+    subject: 'DashboardDg',
+  },
+];
