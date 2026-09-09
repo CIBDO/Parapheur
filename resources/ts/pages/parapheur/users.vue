@@ -200,6 +200,12 @@ const removeUser = async (item: UserItem) => {
 }
 
 const toggleActive = async (item: UserItem) => {
+  const nextActive = !item.is_active
+  const label = nextActive ? 'activer' : 'désactiver'
+
+  if (!confirm(`Voulez-vous vraiment ${label} le compte « ${item.name} » ?`))
+    return
+
   errorMessage.value = ''
   successMessage.value = ''
 
@@ -215,10 +221,10 @@ const toggleActive = async (item: UserItem) => {
         position_title: item.position_title,
         structure_id: item.structure_id,
         role: item.role || item.roles?.[0],
-        is_active: !item.is_active,
+        is_active: nextActive,
       },
     })
-    successMessage.value = !item.is_active ? 'Compte activé' : 'Compte désactivé'
+    successMessage.value = nextActive ? 'Compte activé' : 'Compte désactivé'
     await load()
   }
   catch (e: any) {
@@ -402,8 +408,6 @@ onMounted(async () => {
             size="small"
             label
             :color="item.is_active ? 'success' : 'secondary'"
-            class="cursor-pointer"
-            @click="toggleActive(item)"
           >
             {{ item.is_active ? 'Actif' : 'Inactif' }}
           </VChip>
@@ -411,15 +415,43 @@ onMounted(async () => {
 
         <template #item.actions="{ item }">
           <div class="d-flex justify-end gap-1">
-            <IconBtn @click="openEdit(item)">
-              <VIcon icon="tabler-edit" />
-            </IconBtn>
-            <IconBtn
-              color="error"
-              @click="removeUser(item)"
-            >
-              <VIcon icon="tabler-trash" />
-            </IconBtn>
+            <VTooltip location="top">
+              <template #activator="{ props: tip }">
+                <IconBtn
+                  v-bind="tip"
+                  :color="item.is_active ? 'warning' : 'success'"
+                  @click="toggleActive(item)"
+                >
+                  <VIcon :icon="item.is_active ? 'tabler-user-off' : 'tabler-user-check'" />
+                </IconBtn>
+              </template>
+              <span>{{ item.is_active ? 'Désactiver le compte' : 'Activer le compte' }}</span>
+            </VTooltip>
+
+            <VTooltip location="top">
+              <template #activator="{ props: tip }">
+                <IconBtn
+                  v-bind="tip"
+                  @click="openEdit(item)"
+                >
+                  <VIcon icon="tabler-edit" />
+                </IconBtn>
+              </template>
+              <span>Modifier</span>
+            </VTooltip>
+
+            <VTooltip location="top">
+              <template #activator="{ props: tip }">
+                <IconBtn
+                  v-bind="tip"
+                  color="error"
+                  @click="removeUser(item)"
+                >
+                  <VIcon icon="tabler-trash" />
+                </IconBtn>
+              </template>
+              <span>Supprimer</span>
+            </VTooltip>
           </div>
         </template>
       </VDataTable>

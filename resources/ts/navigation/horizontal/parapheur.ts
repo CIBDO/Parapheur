@@ -1,47 +1,5 @@
 export default [
   {
-    title: 'Administration',
-    icon: { icon: 'tabler-shield-cog' },
-    to: 'parapheur-admin',
-    action: 'manage',
-    subject: 'all',
-  },
-  {
-    title: 'Structures',
-    icon: { icon: 'tabler-building-community' },
-    to: 'parapheur-structures',
-    action: 'manage',
-    subject: 'Structure',
-  },
-  {
-    title: 'Utilisateurs',
-    icon: { icon: 'tabler-users' },
-    to: 'parapheur-users',
-    action: 'manage',
-    subject: 'User',
-  },
-  {
-    title: 'Rôles & permissions',
-    icon: { icon: 'tabler-lock-access' },
-    to: 'parapheur-roles',
-    action: 'manage',
-    subject: 'Role',
-  },
-  {
-    title: 'Types de documents',
-    icon: { icon: 'tabler-file-description' },
-    to: 'parapheur-document-types',
-    action: 'manage',
-    subject: 'DocumentType',
-  },
-  {
-    title: 'Journal d’audit',
-    icon: { icon: 'tabler-history' },
-    to: 'parapheur-audit',
-    action: 'read',
-    subject: 'AuditLog',
-  },
-  {
     title: 'Mon parapheur',
     icon: { icon: 'tabler-briefcase' },
     to: 'parapheur',
@@ -61,6 +19,13 @@ export default [
     to: 'parapheur-dg',
     action: 'read',
     subject: 'DashboardDg',
+  },
+  {
+    title: 'Administration',
+    icon: { icon: 'tabler-shield-cog' },
+    to: 'parapheur-admin',
+    action: 'manage',
+    subject: 'all',
   },
   {
     title: 'Instructions',
@@ -89,5 +54,46 @@ export default [
     to: 'parapheur-delegations',
     action: 'read',
     subject: 'DashboardDg',
+  },
+  {
+    title: 'Paramètres',
+    icon: { icon: 'tabler-settings' },
+    children: [
+      {
+        title: 'Structures',
+        icon: { icon: 'tabler-building-community' },
+        to: 'parapheur-structures',
+        action: 'manage',
+        subject: 'Structure',
+      },
+      {
+        title: 'Utilisateurs',
+        icon: { icon: 'tabler-users' },
+        to: 'parapheur-users',
+        action: 'manage',
+        subject: 'User',
+      },
+      {
+        title: 'Rôles & permissions',
+        icon: { icon: 'tabler-lock-access' },
+        to: 'parapheur-roles',
+        action: 'manage',
+        subject: 'Role',
+      },
+      {
+        title: 'Types de documents',
+        icon: { icon: 'tabler-file-description' },
+        to: 'parapheur-document-types',
+        action: 'manage',
+        subject: 'DocumentType',
+      },
+      {
+        title: 'Journal d’audit',
+        icon: { icon: 'tabler-history' },
+        to: 'parapheur-audit',
+        action: 'read',
+        subject: 'AuditLog',
+      },
+    ],
   },
 ]

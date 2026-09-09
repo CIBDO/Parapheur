@@ -40,14 +40,15 @@ class DatabaseSeeder extends Seeder
 
         $roles = [
             'Administrateur' => $permissions,
-            'Directeur Général' => ['documents.act', 'documents.vise', 'documents.validate', 'dashboard.dg', 'instructions.manage', 'meetings.manage', 'reporting.view', 'delegations.manage'],
-            'DGA' => ['documents.act', 'documents.vise', 'documents.validate', 'dashboard.dg', 'instructions.manage', 'meetings.manage', 'reporting.view'],
-            'Conseiller' => ['documents.act', 'reporting.view'],
+            'Directeur Général' => ['documents.create', 'documents.act', 'documents.vise', 'documents.validate', 'dashboard.dg', 'instructions.manage', 'meetings.manage', 'reporting.view', 'delegations.manage'],
+            'DGA' => ['documents.create', 'documents.act', 'documents.vise', 'documents.validate', 'dashboard.dg', 'instructions.manage', 'meetings.manage', 'reporting.view'],
+            'Conseiller' => ['documents.create', 'documents.act', 'reporting.view'],
             'Secrétariat DG' => ['documents.create', 'documents.act', 'meetings.manage', 'reporting.view'],
             'Directeur' => ['documents.create', 'documents.act', 'documents.vise', 'documents.validate', 'dashboard.direction', 'reporting.view', 'meetings.manage'],
             'Chef de division' => ['documents.create', 'documents.act'],
             'Chef de section' => ['documents.create', 'documents.act'],
             'Agent' => ['documents.create', 'documents.act'],
+            // Consultation uniquement (cahier des charges §6)
             'Lecteur' => [],
         ];
 

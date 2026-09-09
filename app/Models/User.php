@@ -62,12 +62,14 @@ class User extends Authenticatable
         if ($this->can('admin.access')) {
             return [
                 ['action' => 'manage', 'subject' => 'all'],
+                ['action' => 'create', 'subject' => 'Document'],
                 ['action' => 'manage', 'subject' => 'Structure'],
                 ['action' => 'manage', 'subject' => 'User'],
                 ['action' => 'manage', 'subject' => 'Role'],
                 ['action' => 'manage', 'subject' => 'DocumentType'],
                 ['action' => 'read', 'subject' => 'AuditLog'],
                 ['action' => 'read', 'subject' => 'Notification'],
+                ['action' => 'read', 'subject' => 'Parapheur'],
             ];
         }
 
@@ -78,13 +80,14 @@ class User extends Authenticatable
             ['action' => 'read', 'subject' => 'Notification'],
         ];
 
+        // Tous les profils métier peuvent créer (permission documents.create)
         if ($this->can('documents.create')) {
             $rules[] = ['action' => 'create', 'subject' => 'Document'];
-            $rules[] = ['action' => 'manage', 'subject' => 'Document'];
         }
 
         if ($this->can('documents.act')) {
             $rules[] = ['action' => 'update', 'subject' => 'Document'];
+            $rules[] = ['action' => 'manage', 'subject' => 'Document'];
         }
 
         if ($this->can('dashboard.dg')) {
