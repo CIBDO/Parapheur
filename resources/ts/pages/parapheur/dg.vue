@@ -64,41 +64,51 @@ const greeting = computed(() => {
   return 'Bonsoir'
 })
 
-const kpiCards = computed(() => {
-  if (!stats.value)
-    return []
+const kpiCards = computed(() => [
+  {
+    title: 'À traiter',
+    value: stats.value?.to_process ?? 0,
+    icon: 'tabler-inbox',
+    color: 'primary',
+  },
+  {
+    title: 'Urgents',
+    value: stats.value?.urgent ?? 0,
+    icon: 'tabler-alert-triangle',
+    color: 'error',
+  },
+  {
+    title: 'En retard',
+    value: stats.value?.overdue ?? 0,
+    icon: 'tabler-clock-exclamation',
+    color: 'warning',
+  },
+  {
+    title: 'Validés',
+    value: stats.value?.validated ?? 0,
+    icon: 'tabler-circle-check',
+    color: 'success',
+  },
+  {
+    title: 'Retournés',
+    value: stats.value?.returned ?? 0,
+    icon: 'tabler-arrow-back-up',
+    color: 'secondary',
+  },
+  {
+    title: 'Reçus',
+    value: stats.value?.received ?? 0,
+    icon: 'tabler-files',
+    color: 'info',
+  },
+])
 
-  return [
-    {
-      title: 'À traiter',
-      value: stats.value.to_process,
-      subtitle: 'En attente d’action',
-      icon: 'tabler-inbox',
-      color: 'primary',
-    },
-    {
-      title: 'Urgents',
-      value: stats.value.urgent,
-      subtitle: 'Priorité haute',
-      icon: 'tabler-alert-triangle',
-      color: 'error',
-    },
-    {
-      title: 'En retard',
-      value: stats.value.overdue,
-      subtitle: 'Échéance dépassée',
-      icon: 'tabler-clock-exclamation',
-      color: 'warning',
-    },
-    {
-      title: 'Validés',
-      value: stats.value.validated,
-      subtitle: 'Dossiers clos',
-      icon: 'tabler-circle-check',
-      color: 'success',
-    },
-  ]
-})
+const formatTime = (value?: string | null) => {
+  if (!value)
+    return '—'
+
+  return new Date(value).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+}
 
 const statusLabels: Record<string, string> = {
   brouillon: 'Brouillon',
@@ -163,8 +173,8 @@ const structureChartOptions = computed(() => {
     },
     plotOptions: {
       bar: {
-        borderRadius: 6,
-        columnWidth: '32%',
+        borderRadius: 4,
+        columnWidth: '40%',
         distributed: true,
       },
     },
@@ -176,10 +186,10 @@ const structureChartOptions = computed(() => {
       currentTheme.error,
     ],
     grid: {
-      strokeDashArray: 6,
+      strokeDashArray: 4,
       borderColor: `rgba(${hexToRgb(String(variableTheme['border-color']))}, ${variableTheme['border-opacity']})`,
       xaxis: { lines: { show: false } },
-      padding: { top: -10, left: -10, right: -10, bottom: -10 },
+      padding: { top: -10, left: -8, right: -8, bottom: -8 },
     },
     dataLabels: { enabled: false },
     legend: { show: false },
@@ -188,14 +198,10 @@ const structureChartOptions = computed(() => {
       categories,
       axisBorder: { show: false },
       axisTicks: { show: false },
-      labels: {
-        style: { colors: labelColor, fontSize: '13px' },
-      },
+      labels: { style: { colors: labelColor, fontSize: '12px' } },
     },
     yaxis: {
-      labels: {
-        style: { colors: labelColor, fontSize: '13px' },
-      },
+      labels: { style: { colors: labelColor, fontSize: '12px' } },
     },
   }
 })
@@ -227,30 +233,6 @@ const statusColor = (status: string) => {
 
   return 'secondary'
 }
-
-const sparkSeries = computed(() => [{
-  name: 'Volume',
-  data: Object.values(stats.value?.by_status ?? { a: 2, b: 4, c: 3, d: 6, e: 5, f: 8, g: 4 }),
-}])
-
-const sparkOptions = computed(() => {
-  const currentTheme = vuetifyTheme.current.value.colors
-
-  return {
-    chart: {
-      type: 'area',
-      sparkline: { enabled: true },
-      toolbar: { show: false },
-    },
-    stroke: { curve: 'smooth', width: 2 },
-    fill: {
-      type: 'gradient',
-      gradient: { opacityFrom: 0.45, opacityTo: 0.05 },
-    },
-    colors: [currentTheme.primary],
-    tooltip: { enabled: false },
-  }
-})
 
 const loadError = ref('')
 
@@ -348,7 +330,7 @@ onMounted(async () => {
   <div>
     <ParapheurPageHeader
       :title="`${greeting}${userData?.fullName ? `, ${userData.fullName}` : ''}`"
-      subtitle="Bureau du Directeur Général — vue orientée action"
+      subtitle="Bureau du Directeur Général"
       icon="tabler-layout-dashboard"
     >
       <template #actions>
@@ -375,148 +357,75 @@ onMounted(async () => {
       v-if="loadError"
       type="error"
       variant="tonal"
-      class="mb-6"
+      class="mb-4"
       closable
       @click:close="loadError = ''"
     >
       {{ loadError }}
     </VAlert>
 
-    <VRow class="match-height">
-      <!-- KPI cards style CRM -->
+    <VRow dense class="mb-4">
       <VCol
         v-for="card in kpiCards"
         :key="card.title"
-        cols="12"
-        sm="6"
-        md="3"
+        cols="6"
+        sm="4"
+        md="2"
       >
-        <VCard>
-          <VCardText>
-            <div class="d-flex align-center justify-space-between mb-2">
-              <VAvatar
-                :color="card.color"
-                variant="tonal"
-                rounded
-                size="42"
-              >
-                <VIcon
-                  :icon="card.icon"
-                  size="26"
-                />
-              </VAvatar>
-              <VChip
-                v-if="card.color === 'error' && card.value > 0"
-                :color="card.color"
-                label
-                size="small"
-              >
-                Action
-              </VChip>
-            </div>
-
-            <h5 class="text-h5">
-              {{ card.title }}
-            </h5>
-            <p class="mb-1 text-medium-emphasis">
-              {{ card.subtitle }}
-            </p>
-            <p class="text-h4 mb-0 text-high-emphasis">
-              {{ card.value }}
-            </p>
-          </VCardText>
-        </VCard>
-      </VCol>
-
-      <!-- Mini volume -->
-      <VCol
-        cols="12"
-        md="4"
-        sm="6"
-      >
-        <VCard>
-          <VCardItem class="pb-2">
-            <VCardTitle>Volume reçu</VCardTitle>
-            <VCardSubtitle>Dossiers soumis</VCardSubtitle>
-          </VCardItem>
-          <VCardText>
-            <VueApexCharts
-              v-if="stats"
-              :options="sparkOptions"
-              :series="sparkSeries"
-              :height="72"
-            />
-            <div class="d-flex align-center justify-space-between mt-3">
-              <h4 class="text-h4 mb-0">
-                {{ stats?.received ?? '—' }}
-              </h4>
-              <span class="text-sm text-success">Circuit actif</span>
-            </div>
-          </VCardText>
-        </VCard>
-      </VCol>
-
-      <!-- Instructions -->
-      <VCol
-        cols="12"
-        md="4"
-        sm="6"
-      >
-        <VCard>
-          <VCardText>
-            <div class="d-flex align-center justify-space-between mb-4">
-              <div>
-                <VCardTitle class="pa-0 mb-1">
-                  Instructions
-                </VCardTitle>
-                <VCardSubtitle class="pa-0">
-                  Suivi des consignes
-                </VCardSubtitle>
+        <VCard class="dash-kpi">
+          <VCardText class="d-flex align-center gap-3 pa-3">
+            <VAvatar
+              :color="card.color"
+              variant="tonal"
+              rounded
+              size="36"
+            >
+              <VIcon
+                :icon="card.icon"
+                size="20"
+              />
+            </VAvatar>
+            <div class="min-w-0">
+              <div class="text-h5 font-weight-semibold lh-1 mb-1">
+                {{ card.value }}
               </div>
-              <VAvatar
-                color="info"
-                variant="tonal"
-                rounded
-                size="42"
-              >
-                <VIcon
-                  icon="tabler-list-check"
-                  size="26"
-                />
-              </VAvatar>
+              <div class="text-caption text-medium-emphasis text-truncate">
+                {{ card.title }}
+              </div>
             </div>
+          </VCardText>
+        </VCard>
+      </VCol>
+    </VRow>
 
+    <VRow dense class="match-height">
+      <VCol
+        cols="12"
+        sm="4"
+      >
+        <VCard class="h-100">
+          <VCardItem class="pb-0">
+            <VCardTitle class="text-subtitle-1">
+              Instructions
+            </VCardTitle>
+          </VCardItem>
+          <VCardText class="pt-3">
             <div class="d-flex align-center justify-space-between mb-3">
               <span class="text-body-2">Ouvertes</span>
-              <span class="text-h5">{{ stats?.instructions_open ?? 0 }}</span>
+              <span class="text-body-1 font-weight-medium">{{ stats?.instructions_open ?? 0 }}</span>
             </div>
-            <VProgressLinear
-              :model-value="stats ? Math.min(100, (stats.instructions_open || 0) * 10) : 0"
-              color="info"
-              height="8"
-              rounded
-              class="mb-4"
-            />
-
-            <div class="d-flex align-center justify-space-between mb-3">
+            <div class="d-flex align-center justify-space-between mb-4">
               <span class="text-body-2">En retard</span>
-              <span class="text-h5 text-error">{{ stats?.instructions_late ?? 0 }}</span>
+              <span class="text-body-1 font-weight-medium text-error">{{ stats?.instructions_late ?? 0 }}</span>
             </div>
-            <VProgressLinear
-              :model-value="stats ? Math.min(100, (stats.instructions_late || 0) * 20) : 0"
-              color="error"
-              height="8"
-              rounded
-              class="mb-4"
-            />
-
             <VBtn
-              block
+              size="small"
               variant="tonal"
               color="primary"
+              block
               :to="{ name: 'parapheur-instructions' }"
             >
-              Voir les instructions
+              Voir
             </VBtn>
           </VCardText>
         </VCard>
@@ -524,55 +433,39 @@ onMounted(async () => {
 
       <VCol
         cols="12"
-        md="4"
-        sm="6"
+        sm="4"
       >
-        <VCard>
-          <VCardText>
-            <div class="d-flex align-center justify-space-between mb-4">
-              <div>
-                <VCardTitle class="pa-0 mb-1">
-                  Réunions
-                </VCardTitle>
-                <VCardSubtitle class="pa-0">
-                  Séances et décisions
-                </VCardSubtitle>
-              </div>
-              <VAvatar
-                color="primary"
-                variant="tonal"
-                rounded
-                size="42"
-              >
-                <VIcon
-                  icon="tabler-users-group"
-                  size="26"
-                />
-              </VAvatar>
-            </div>
+        <VCard class="h-100">
+          <VCardItem class="pb-0">
+            <VCardTitle class="text-subtitle-1">
+              Réunions
+            </VCardTitle>
+          </VCardItem>
+          <VCardText class="pt-3">
             <div class="d-flex align-center justify-space-between mb-2">
               <span class="text-body-2">Aujourd’hui</span>
-              <span class="text-h5">{{ stats?.meetings_today ?? 0 }}</span>
+              <span class="text-body-1 font-weight-medium">{{ stats?.meetings_today ?? 0 }}</span>
             </div>
             <div class="d-flex align-center justify-space-between mb-2">
               <span class="text-body-2">Cette semaine</span>
-              <span class="text-h5">{{ stats?.meetings_this_week ?? 0 }}</span>
+              <span class="text-body-1 font-weight-medium">{{ stats?.meetings_this_week ?? 0 }}</span>
             </div>
             <div class="d-flex align-center justify-space-between mb-2">
-              <span class="text-body-2">Décisions en cours</span>
-              <span class="text-h5">{{ stats?.meeting_decisions_open ?? 0 }}</span>
+              <span class="text-body-2">Décisions ouvertes</span>
+              <span class="text-body-1 font-weight-medium">{{ stats?.meeting_decisions_open ?? 0 }}</span>
             </div>
             <div class="d-flex align-center justify-space-between mb-4">
               <span class="text-body-2">Décisions en retard</span>
-              <span class="text-h5 text-error">{{ stats?.meeting_decisions_late ?? 0 }}</span>
+              <span class="text-body-1 font-weight-medium text-error">{{ stats?.meeting_decisions_late ?? 0 }}</span>
             </div>
             <VBtn
-              block
+              size="small"
               variant="tonal"
               color="primary"
+              block
               :to="{ name: 'parapheur-reunions' }"
             >
-              Ouvrir les réunions
+              Voir
             </VBtn>
           </VCardText>
         </VCard>
@@ -580,63 +473,46 @@ onMounted(async () => {
 
       <VCol
         cols="12"
-        md="4"
-        sm="6"
+        sm="4"
       >
-        <VCard>
-          <VCardText>
-            <div class="d-flex align-center justify-space-between mb-4">
-              <div>
-                <VCardTitle class="pa-0 mb-1">
-                  Agenda
-                </VCardTitle>
-                <VCardSubtitle class="pa-0">
-                  Audiences et rendez-vous
-                </VCardSubtitle>
-              </div>
-              <VAvatar
-                color="warning"
-                variant="tonal"
-                rounded
-                size="42"
-              >
-                <VIcon
-                  icon="tabler-calendar-event"
-                  size="26"
-                />
-              </VAvatar>
-            </div>
+        <VCard class="h-100">
+          <VCardItem class="pb-0">
+            <VCardTitle class="text-subtitle-1">
+              Agenda
+            </VCardTitle>
+          </VCardItem>
+          <VCardText class="pt-3">
             <div class="d-flex align-center justify-space-between mb-2">
-              <span class="text-body-2">Aujourd’hui</span>
-              <span class="text-h5">{{ stats?.appointments_today ?? 0 }}</span>
+              <span class="text-body-2">RDV aujourd’hui</span>
+              <span class="text-body-1 font-weight-medium">{{ stats?.appointments_today ?? 0 }}</span>
             </div>
             <div class="d-flex align-center justify-space-between mb-2">
               <span class="text-body-2">Audiences</span>
-              <span class="text-h5">{{ stats?.audiences_today ?? 0 }}</span>
+              <span class="text-body-1 font-weight-medium">{{ stats?.audiences_today ?? 0 }}</span>
             </div>
             <div class="d-flex align-center justify-space-between mb-2">
-              <span class="text-body-2">Prochain RDV</span>
-              <span class="text-h5">
-                {{ stats?.appointments_next_at ? new Date(stats.appointments_next_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '—' }}
-              </span>
+              <span class="text-body-2">Prochain</span>
+              <span class="text-body-1 font-weight-medium">{{ formatTime(stats?.appointments_next_at) }}</span>
             </div>
             <div class="d-flex align-center justify-space-between mb-4">
               <span class="text-body-2">À valider</span>
-              <span class="text-h5 text-warning">{{ stats?.appointments_to_validate ?? 0 }}</span>
+              <span class="text-body-1 font-weight-medium text-warning">{{ stats?.appointments_to_validate ?? 0 }}</span>
             </div>
             <div class="d-flex gap-2">
               <VBtn
-                block
+                size="small"
                 variant="tonal"
                 color="primary"
+                block
                 :to="{ name: 'parapheur-agenda' }"
               >
                 Agenda
               </VBtn>
               <VBtn
                 v-if="(stats?.appointments_to_validate || 0) > 0"
-                block
+                size="small"
                 color="warning"
+                block
                 :to="{ name: 'parapheur-agenda-avalider' }"
               >
                 Valider
@@ -646,96 +522,27 @@ onMounted(async () => {
         </VCard>
       </VCol>
 
-      <!-- Retours / validés -->
-      <VCol
-        cols="12"
-        md="4"
-      >
-        <VCard>
-          <VCardText>
-            <div class="d-flex align-center justify-space-between mb-6">
-              <div>
-                <h5 class="text-h5 mb-1">
-                  Synthèse décisionnelle
-                </h5>
-                <p class="mb-0 text-medium-emphasis">
-                  Validations et retours
-                </p>
-              </div>
-            </div>
-
-            <div class="d-flex align-center justify-space-between mb-4">
-              <div class="d-flex align-center gap-3">
-                <VAvatar
-                  color="success"
-                  variant="tonal"
-                  rounded
-                  size="40"
-                >
-                  <VIcon icon="tabler-checks" />
-                </VAvatar>
-                <div>
-                  <div class="text-body-1 font-weight-medium">
-                    Validés
-                  </div>
-                  <div class="text-caption text-medium-emphasis">
-                    Décisions favorables
-                  </div>
-                </div>
-              </div>
-              <div class="text-h5 text-success">
-                {{ stats?.validated ?? 0 }}
-              </div>
-            </div>
-
-            <div class="d-flex align-center justify-space-between">
-              <div class="d-flex align-center gap-3">
-                <VAvatar
-                  color="error"
-                  variant="tonal"
-                  rounded
-                  size="40"
-                >
-                  <VIcon icon="tabler-arrow-back-up" />
-                </VAvatar>
-                <div>
-                  <div class="text-body-1 font-weight-medium">
-                    Retournés
-                  </div>
-                  <div class="text-caption text-medium-emphasis">
-                    À corriger
-                  </div>
-                </div>
-              </div>
-              <div class="text-h5 text-error">
-                {{ stats?.returned ?? 0 }}
-              </div>
-            </div>
-          </VCardText>
-        </VCard>
-      </VCol>
-
-      <!-- Répartition structures -->
       <VCol
         cols="12"
         md="8"
       >
         <VCard>
-          <VCardItem>
-            <VCardTitle>Répartition par structure</VCardTitle>
-            <VCardSubtitle>Volume de dossiers par direction</VCardSubtitle>
+          <VCardItem class="pb-0">
+            <VCardTitle class="text-subtitle-1">
+              Répartition par structure
+            </VCardTitle>
           </VCardItem>
           <VCardText>
             <div
               v-if="!Object.keys(stats?.by_structure ?? {}).length"
-              class="text-medium-emphasis py-8 text-center"
+              class="text-medium-emphasis py-6 text-center"
             >
-              Aucune donnée de structure pour le moment
+              Aucune donnée de structure
             </div>
             <VueApexCharts
               v-else
               type="bar"
-              height="280"
+              height="220"
               :options="structureChartOptions"
               :series="structureSeries"
             />
@@ -743,43 +550,36 @@ onMounted(async () => {
         </VCard>
       </VCol>
 
-      <!-- Statuts -->
       <VCol
         cols="12"
         md="4"
       >
-        <VCard title="États des dossiers">
+        <VCard class="h-100">
+          <VCardItem class="pb-0">
+            <VCardTitle class="text-subtitle-1">
+              États des dossiers
+            </VCardTitle>
+          </VCardItem>
           <VCardText>
             <div
               v-if="!statusBreakdown.length"
-              class="text-medium-emphasis text-center py-6"
+              class="text-medium-emphasis text-center py-4"
             >
-              Aucun statut disponible
+              Aucun statut
             </div>
-
             <div
               v-for="item in statusBreakdown"
               :key="item.status"
-              class="mb-4"
+              class="mb-3"
             >
               <div class="d-flex align-center justify-space-between mb-1">
-                <div class="d-flex align-center gap-2">
-                  <VChip
-                    :color="statusColor(item.status)"
-                    size="small"
-                    label
-                  >
-                    {{ item.label }}
-                  </VChip>
-                </div>
-                <span class="text-body-2 font-weight-medium">
-                  {{ item.count }} · {{ item.percent }}%
-                </span>
+                <span class="text-body-2">{{ item.label }}</span>
+                <span class="text-caption font-weight-medium">{{ item.count }} · {{ item.percent }}%</span>
               </div>
               <VProgressLinear
                 :model-value="item.percent"
                 :color="statusColor(item.status)"
-                height="6"
+                height="4"
                 rounded
               />
             </div>
@@ -787,306 +587,41 @@ onMounted(async () => {
         </VCard>
       </VCol>
 
-      <!-- Agenda du jour -->
-      <VCol cols="12">
+      <VCol
+        cols="12"
+        lg="8"
+      >
         <VCard>
           <VCardItem>
-            <VCardTitle>Mes rendez-vous aujourd’hui</VCardTitle>
-            <VCardSubtitle>Priorité bureau DG — ouvrir le dossier préparatoire</VCardSubtitle>
-            <template #append>
-              <VBtn
-                variant="tonal"
-                size="small"
-                :to="{ name: 'parapheur-agenda-calendrier' }"
-                prepend-icon="tabler-calendar"
-              >
-                Agenda complet
-              </VBtn>
-            </template>
-          </VCardItem>
-          <VDivider />
-          <VCardText>
-            <div
-              v-if="!agendaToday.length"
-              class="text-medium-emphasis py-4"
-            >
-              Aucun rendez-vous planifié aujourd’hui.
-            </div>
-            <VList
-              v-else
-              lines="two"
-            >
-              <VListItem
-                v-for="item in agendaToday"
-                :key="item.id"
-                :to="{ name: 'parapheur-agenda-id', params: { id: item.id } }"
-              >
-                <template #prepend>
-                  <div
-                    class="text-subtitle-1 font-weight-bold me-4"
-                    style="min-inline-size: 3.5rem"
-                  >
-                    {{ item.start_at ? new Date(item.start_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '—' }}
-                  </div>
-                </template>
-                <VListItemTitle>{{ item.subject }}</VListItemTitle>
-                <VListItemSubtitle>
-                  {{ item.requester_name || item.requester_organization || '—' }}
-                  · {{ item.duration_minutes || '—' }} min
-                  <span v-if="item.location"> · {{ item.location }}</span>
-                </VListItemSubtitle>
-                <template #append>
-                  <VBtn
-                    size="small"
-                    color="primary"
-                    variant="tonal"
-                    :to="{ name: 'parapheur-agenda-id', params: { id: item.id } }"
-                  >
-                    Ouvrir le dossier
-                  </VBtn>
-                </template>
-              </VListItem>
-            </VList>
-          </VCardText>
-        </VCard>
-      </VCol>
-
-      <!-- Documents à traiter — UI tablette -->
-      <VCol cols="12">
-        <VCard>
-          <VCardItem>
-            <VCardTitle>Documents à traiter</VCardTitle>
-            <VCardSubtitle>Actions rapides DG — Commenter · Retourner · Valider · Instruire · Viser</VCardSubtitle>
+            <VCardTitle class="text-subtitle-1">
+              À traiter
+            </VCardTitle>
+            <VCardSubtitle>Actions rapides</VCardSubtitle>
           </VCardItem>
           <VDivider />
           <VCardText>
             <AppTextarea
               v-model="quickComment"
-              label="Commentaire / motif (utilisé par les actions)"
+              label="Commentaire / motif"
               rows="2"
-              class="mb-4"
+              class="mb-3"
             />
 
             <div
               v-if="!documents.length"
-              class="text-center text-medium-emphasis py-8"
+              class="text-center text-medium-emphasis py-6"
             >
               Aucun document à traiter
             </div>
 
             <div
-              v-for="doc in documents.slice(0, 12)"
+              v-for="doc in documents.slice(0, 10)"
               :key="doc.id"
-              class="pa-4 mb-3 rounded border"
+              class="dash-doc-row d-flex flex-wrap align-center justify-space-between gap-2 py-3"
             >
-              <div class="d-flex flex-wrap justify-space-between gap-3 mb-3">
-                <div class="min-w-0">
-                  <div class="text-h6 text-truncate">
-                    {{ doc.object }}
-                  </div>
-                  <div class="text-caption text-medium-emphasis">
-                    {{ doc.reference || 'Sans référence' }}
-                    · {{ doc.structure?.code || '—' }}
-                    · {{ actionLabel(doc.expected_action) }}
-                  </div>
-                </div>
-                <VChip
-                  size="small"
-                  label
-                  :color="priorityColor(doc.priority)"
-                >
-                  {{ priorityLabel(doc.priority) }}
-                </VChip>
-              </div>
-              <div class="d-flex flex-wrap gap-2">
-                <VBtn
-                  size="small"
-                  :loading="actionBusy === doc.id"
-                  @click="runQuickAction(doc.id, 'comments', { body: quickComment || 'Prise de connaissance DG', kind: 'observation' })"
-                >
-                  Commenter
-                </VBtn>
-                <VBtn
-                  size="small"
-                  color="warning"
-                  :loading="actionBusy === doc.id"
-                  @click="runQuickAction(doc.id, 'return')"
-                >
-                  Retourner
-                </VBtn>
-                <VBtn
-                  size="small"
-                  color="success"
-                  :loading="actionBusy === doc.id"
-                  @click="runQuickAction(doc.id, 'validate')"
-                >
-                  Valider
-                </VBtn>
-                <VBtn
-                  size="small"
-                  color="info"
-                  :loading="actionBusy === doc.id"
-                  @click="runQuickAction(doc.id, 'vise')"
-                >
-                  Viser
-                </VBtn>
-                <VBtn
-                  size="small"
-                  color="primary"
-                  variant="tonal"
-                  @click="openInstruct(doc.id)"
-                >
-                  Instruire
-                </VBtn>
-                <VBtn
-                  size="small"
-                  variant="text"
-                  :to="{ name: 'parapheur-id', params: { id: doc.id } }"
-                >
-                  Ouvrir
-                </VBtn>
-              </div>
-            </div>
-          </VCardText>
-        </VCard>
-      </VCol>
-
-      <!-- Ancienne liste courte conservée en synthèse -->
-      <VCol
-        cols="12"
-        md="7"
-      >
-        <VCard>
-          <VCardItem>
-            <VCardTitle>File de priorité</VCardTitle>
-            <VCardSubtitle>Synthèse des dossiers en attente</VCardSubtitle>
-            <template #append>
-              <VBtn
-                size="small"
-                variant="text"
-                color="primary"
-                :to="{ name: 'parapheur', query: { folder: 'a_traiter' } }"
-              >
-                Tout voir
-              </VBtn>
-            </template>
-          </VCardItem>
-
-          <VDivider />
-
-          <VTable class="text-no-wrap">
-            <thead>
-              <tr>
-                <th>DOCUMENT</th>
-                <th>ACTION</th>
-                <th>PRIORITÉ</th>
-                <th />
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-if="!documents.length">
-                <td
-                  colspan="4"
-                  class="text-center text-medium-emphasis py-8"
-                >
-                  Aucun document à traiter
-                </td>
-              </tr>
-              <tr
-                v-for="doc in documents.slice(0, 8)"
-                :key="doc.id"
-              >
-                <td style="padding-block: 1rem;">
-                  <div class="d-flex align-center gap-3">
-                    <VAvatar
-                      color="primary"
-                      variant="tonal"
-                      rounded
-                      size="38"
-                    >
-                      <VIcon icon="tabler-file-text" />
-                    </VAvatar>
-                    <div class="min-w-0">
-                      <div class="font-weight-medium text-truncate">
-                        {{ doc.structure?.code || '—' }} — {{ doc.object }}
-                      </div>
-                      <div class="text-caption text-medium-emphasis">
-                        {{ doc.reference || doc.type?.name || 'Sans référence' }}
-                        <span v-if="doc.author"> · {{ doc.author.name }}</span>
-                      </div>
-                    </div>
-                  </div>
-                </td>
-                <td>
-                  <span class="text-body-2">{{ actionLabel(doc.expected_action) }}</span>
-                </td>
-                <td>
-                  <VChip
-                    size="small"
-                    label
-                    :color="priorityColor(doc.priority)"
-                  >
-                    {{ priorityLabel(doc.priority) }}
-                  </VChip>
-                </td>
-                <td class="text-end">
-                  <VBtn
-                    size="small"
-                    color="primary"
-                    variant="tonal"
-                    :to="{ name: 'parapheur-id', params: { id: doc.id } }"
-                  >
-                    Ouvrir
-                  </VBtn>
-                </td>
-              </tr>
-            </tbody>
-          </VTable>
-        </VCard>
-      </VCol>
-
-      <!-- Timeline activité -->
-      <VCol
-        cols="12"
-        md="5"
-      >
-        <VCard>
-          <VCardItem>
-            <template #prepend>
-              <VIcon
-                icon="tabler-list-details"
-                size="20"
-                class="me-1"
-              />
-            </template>
-            <VCardTitle>Activité récente</VCardTitle>
-          </VCardItem>
-
-          <VCardText>
-            <VTimeline
-              v-if="documents.length"
-              side="end"
-              align="start"
-              line-inset="8"
-              truncate-line="start"
-              density="compact"
-            >
-              <VTimelineItem
-                v-for="(doc, index) in documents.slice(0, 5)"
-                :key="doc.id"
-                size="x-small"
-                :dot-color="priorityColor(doc.priority) === 'secondary' ? 'primary' : priorityColor(doc.priority)"
-              >
-                <div class="d-flex justify-space-between align-center gap-2 flex-wrap mb-1">
-                  <span class="app-timeline-title">
-                    {{ doc.structure?.code || 'Dossier' }} — {{ actionLabel(doc.expected_action) }}
-                  </span>
-                  <span class="app-timeline-meta">#{{ index + 1 }}</span>
-                </div>
-                <div class="app-timeline-text">
-                  {{ doc.object }}
-                </div>
-                <div class="mt-2">
+              <div class="min-w-0 flex-grow-1">
+                <div class="d-flex align-center gap-2 mb-1">
+                  <span class="font-weight-medium text-truncate">{{ doc.object }}</span>
                   <VChip
                     size="x-small"
                     label
@@ -1095,14 +630,141 @@ onMounted(async () => {
                     {{ priorityLabel(doc.priority) }}
                   </VChip>
                 </div>
-              </VTimelineItem>
-            </VTimeline>
+                <div class="text-caption text-medium-emphasis">
+                  {{ doc.reference || 'Sans référence' }}
+                  · {{ doc.structure?.code || '—' }}
+                  · {{ actionLabel(doc.expected_action) }}
+                </div>
+              </div>
 
+              <div class="d-flex align-center gap-1 flex-shrink-0">
+                <VTooltip location="top">
+                  <template #activator="{ props: tip }">
+                    <IconBtn
+                      v-bind="tip"
+                      :loading="actionBusy === doc.id"
+                      @click="runQuickAction(doc.id, 'comments', { body: quickComment || 'Prise de connaissance DG', kind: 'observation' })"
+                    >
+                      <VIcon icon="tabler-message" />
+                    </IconBtn>
+                  </template>
+                  <span>Commenter</span>
+                </VTooltip>
+                <VTooltip location="top">
+                  <template #activator="{ props: tip }">
+                    <IconBtn
+                      v-bind="tip"
+                      color="warning"
+                      :loading="actionBusy === doc.id"
+                      @click="runQuickAction(doc.id, 'return')"
+                    >
+                      <VIcon icon="tabler-arrow-back-up" />
+                    </IconBtn>
+                  </template>
+                  <span>Retourner</span>
+                </VTooltip>
+                <VTooltip location="top">
+                  <template #activator="{ props: tip }">
+                    <IconBtn
+                      v-bind="tip"
+                      color="success"
+                      :loading="actionBusy === doc.id"
+                      @click="runQuickAction(doc.id, 'validate')"
+                    >
+                      <VIcon icon="tabler-circle-check" />
+                    </IconBtn>
+                  </template>
+                  <span>Valider</span>
+                </VTooltip>
+                <VTooltip location="top">
+                  <template #activator="{ props: tip }">
+                    <IconBtn
+                      v-bind="tip"
+                      color="info"
+                      :loading="actionBusy === doc.id"
+                      @click="runQuickAction(doc.id, 'vise')"
+                    >
+                      <VIcon icon="tabler-stamp" />
+                    </IconBtn>
+                  </template>
+                  <span>Viser</span>
+                </VTooltip>
+                <VTooltip location="top">
+                  <template #activator="{ props: tip }">
+                    <IconBtn
+                      v-bind="tip"
+                      color="primary"
+                      @click="openInstruct(doc.id)"
+                    >
+                      <VIcon icon="tabler-list-check" />
+                    </IconBtn>
+                  </template>
+                  <span>Instruire</span>
+                </VTooltip>
+                <VTooltip location="top">
+                  <template #activator="{ props: tip }">
+                    <IconBtn
+                      v-bind="tip"
+                      :to="{ name: 'parapheur-id', params: { id: doc.id } }"
+                    >
+                      <VIcon icon="tabler-eye" />
+                    </IconBtn>
+                  </template>
+                  <span>Ouvrir</span>
+                </VTooltip>
+              </div>
+            </div>
+          </VCardText>
+        </VCard>
+      </VCol>
+
+      <VCol
+        cols="12"
+        lg="4"
+      >
+        <VCard class="h-100">
+          <VCardItem>
+            <VCardTitle class="text-subtitle-1">
+              Agenda du jour
+            </VCardTitle>
+            <template #append>
+              <IconBtn :to="{ name: 'parapheur-agenda-calendrier' }">
+                <VIcon icon="tabler-calendar" />
+              </IconBtn>
+            </template>
+          </VCardItem>
+          <VDivider />
+          <VCardText>
             <div
-              v-else
-              class="text-medium-emphasis text-center py-8"
+              v-if="!agendaToday.length"
+              class="text-medium-emphasis py-4"
             >
-              Pas d’activité récente à afficher
+              Aucun rendez-vous aujourd’hui
+            </div>
+            <div
+              v-for="item in agendaToday"
+              :key="item.id"
+              class="dash-doc-row py-3"
+            >
+              <div class="d-flex align-start gap-3">
+                <div class="text-body-2 font-weight-bold text-primary"
+                     style="min-inline-size: 3rem"
+                >
+                  {{ formatTime(item.start_at) }}
+                </div>
+                <div class="min-w-0 flex-grow-1">
+                  <RouterLink
+                    class="text-body-2 font-weight-medium text-high-emphasis text-decoration-none"
+                    :to="{ name: 'parapheur-agenda-id', params: { id: item.id } }"
+                  >
+                    {{ item.subject }}
+                  </RouterLink>
+                  <div class="text-caption text-medium-emphasis">
+                    {{ item.requester_name || item.requester_organization || '—' }}
+                    <span v-if="item.duration_minutes"> · {{ item.duration_minutes }} min</span>
+                  </div>
+                </div>
+              </div>
             </div>
           </VCardText>
         </VCard>
@@ -1160,4 +822,14 @@ onMounted(async () => {
 
 <style lang="scss">
 @use "@core-scss/template/libs/apex-chart";
+
+.dash-kpi {
+  .v-card-text {
+    min-block-size: 4.25rem;
+  }
+}
+
+.dash-doc-row + .dash-doc-row {
+  border-block-start: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
+}
 </style>
