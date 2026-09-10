@@ -7,7 +7,15 @@ use App\Http\Controllers\Api\DelegationController;
 use App\Http\Controllers\Api\DocumentController;
 use App\Http\Controllers\Api\DocumentTypeController;
 use App\Http\Controllers\Api\InstructionController;
+use App\Http\Controllers\Api\MeetingAgendaController;
 use App\Http\Controllers\Api\MeetingController;
+use App\Http\Controllers\Api\MeetingDecisionController;
+use App\Http\Controllers\Api\MeetingDocumentController;
+use App\Http\Controllers\Api\MeetingMinutesController;
+use App\Http\Controllers\Api\MeetingNoteController;
+use App\Http\Controllers\Api\MeetingParticipantController;
+use App\Http\Controllers\Api\MeetingTemplateController;
+use App\Http\Controllers\Api\MeetingTypeController;
 use App\Http\Controllers\Api\MetaController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\ReportingController;
@@ -68,6 +76,16 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('/document-types/{documentType}', [DocumentTypeController::class, 'update']);
         Route::delete('/document-types/{documentType}', [DocumentTypeController::class, 'destroy']);
 
+        Route::get('/meeting-types', [MeetingTypeController::class, 'index']);
+        Route::post('/meeting-types', [MeetingTypeController::class, 'store']);
+        Route::put('/meeting-types/{meetingType}', [MeetingTypeController::class, 'update']);
+        Route::delete('/meeting-types/{meetingType}', [MeetingTypeController::class, 'destroy']);
+
+        Route::get('/meeting-templates', [MeetingTemplateController::class, 'index']);
+        Route::post('/meeting-templates', [MeetingTemplateController::class, 'store']);
+        Route::put('/meeting-templates/{meetingTemplate}', [MeetingTemplateController::class, 'update']);
+        Route::delete('/meeting-templates/{meetingTemplate}', [MeetingTemplateController::class, 'destroy']);
+
         Route::get('/audit-logs', [AuditLogController::class, 'index']);
 
         Route::get('/workflows', [WorkflowController::class, 'index']);
@@ -107,11 +125,57 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/delegations', [DelegationController::class, 'store']);
     Route::patch('/delegations/{delegation}', [DelegationController::class, 'update']);
 
+    Route::get('/meetings/dashboard', [MeetingController::class, 'dashboard']);
+    Route::get('/meetings/calendar', [MeetingController::class, 'calendar']);
+    Route::get('/meetings/types', [MeetingController::class, 'types']);
+    Route::get('/meetings/decisions', [MeetingDecisionController::class, 'index']);
+    Route::get('/meetings/decisions/export', [MeetingController::class, 'exportDecisionsCsv']);
+
     Route::get('/meetings', [MeetingController::class, 'index']);
     Route::post('/meetings', [MeetingController::class, 'store']);
     Route::get('/meetings/{meeting}', [MeetingController::class, 'show']);
     Route::put('/meetings/{meeting}', [MeetingController::class, 'update']);
-    Route::post('/meetings/{meeting}/decisions', [MeetingController::class, 'addDecision']);
+    Route::delete('/meetings/{meeting}', [MeetingController::class, 'destroy']);
+    Route::post('/meetings/{meeting}/transition', [MeetingController::class, 'transition']);
+    Route::post('/meetings/{meeting}/postpone', [MeetingController::class, 'postpone']);
+    Route::post('/meetings/{meeting}/cancel', [MeetingController::class, 'cancel']);
+    Route::get('/meetings/{meeting}/audit', [MeetingController::class, 'audit']);
+    Route::get('/meetings/{meeting}/export/{kind}', [MeetingController::class, 'export']);
+
+    Route::post('/meetings/{meeting}/agenda', [MeetingAgendaController::class, 'store']);
+    Route::put('/meetings/{meeting}/agenda/{agendaItem}', [MeetingAgendaController::class, 'update']);
+    Route::delete('/meetings/{meeting}/agenda/{agendaItem}', [MeetingAgendaController::class, 'destroy']);
+    Route::post('/meetings/{meeting}/agenda/reorder', [MeetingAgendaController::class, 'reorder']);
+    Route::post('/meetings/{meeting}/agenda/{agendaItem}/current', [MeetingAgendaController::class, 'setCurrent']);
+
+    Route::post('/meetings/{meeting}/participants', [MeetingParticipantController::class, 'store']);
+    Route::delete('/meetings/{meeting}/participants/{participant}', [MeetingParticipantController::class, 'destroy']);
+    Route::post('/meetings/{meeting}/confirm', [MeetingParticipantController::class, 'confirm']);
+    Route::post('/meetings/{meeting}/participants/{participant}/attendance', [MeetingParticipantController::class, 'attendance']);
+
+    Route::post('/meetings/{meeting}/documents', [MeetingDocumentController::class, 'store']);
+    Route::delete('/meetings/{meeting}/documents/{meetingDocument}', [MeetingDocumentController::class, 'destroy']);
+
+    Route::post('/meetings/{meeting}/notes', [MeetingNoteController::class, 'store']);
+    Route::put('/meetings/{meeting}/notes/{note}', [MeetingNoteController::class, 'update']);
+    Route::delete('/meetings/{meeting}/notes/{note}', [MeetingNoteController::class, 'destroy']);
+
+    Route::post('/meetings/{meeting}/decisions', [MeetingDecisionController::class, 'store']);
+    Route::put('/meetings/{meeting}/decisions/{decision}', [MeetingDecisionController::class, 'update']);
+    Route::post('/meetings/{meeting}/decisions/{decision}/validate-execution', [MeetingDecisionController::class, 'validateExecution']);
+    Route::post('/meetings/{meeting}/recommendations', [MeetingDecisionController::class, 'storeRecommendation']);
+    Route::post('/meetings/{meeting}/recommendations/{recommendation}/convert', [MeetingDecisionController::class, 'convertRecommendation']);
+
+    Route::post('/meetings/{meeting}/convocation', [MeetingMinutesController::class, 'generateConvocation']);
+    Route::post('/meetings/{meeting}/convocation/submit', [MeetingMinutesController::class, 'submitConvocation']);
+    Route::post('/meetings/{meeting}/send-invitations', [MeetingMinutesController::class, 'sendInvitations'])
+        ->middleware('throttle:10,1');
+    Route::post('/meetings/{meeting}/minutes', [MeetingMinutesController::class, 'generate']);
+    Route::put('/meetings/{meeting}/minutes/{minute}', [MeetingMinutesController::class, 'update']);
+    Route::post('/meetings/{meeting}/minutes/{minute}/submit', [MeetingMinutesController::class, 'submit']);
+    Route::post('/meetings/{meeting}/minutes/{minute}/validate', [MeetingMinutesController::class, 'validateMinute']);
+    Route::post('/meetings/{meeting}/minutes/{minute}/diffuse', [MeetingMinutesController::class, 'diffuse']);
+    Route::get('/meetings/{meeting}/minutes/{minute}/preview', [MeetingMinutesController::class, 'preview']);
 
     Route::get('/reporting/export', [ReportingController::class, 'export']);
 });

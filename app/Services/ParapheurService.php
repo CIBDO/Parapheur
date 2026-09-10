@@ -308,6 +308,11 @@ class ParapheurService
             'deadline_respect_rate' => $validatedOrTreated > 0 ? round(($onTime / $validatedOrTreated) * 100, 1) : 0,
             'decision_execution_rate' => $decisionsTotal > 0 ? round(($decisionsDone / $decisionsTotal) * 100, 1) : 0,
             'volume_by_structure' => $byStructure->all(),
+            'meetings_today' => DB::table('meetings')->whereNull('deleted_at')->whereDate('meeting_date', now()->toDateString())->whereNotIn('status', ['annulee'])->count(),
+            'meetings_this_week' => DB::table('meetings')->whereNull('deleted_at')->whereBetween('meeting_date', [now()->toDateString(), now()->endOfWeek()->toDateString()])->whereNotIn('status', ['annulee'])->count(),
+            'meeting_decisions_open' => DB::table('meeting_decisions')->whereIn('status', ['a_faire', 'planifiee', 'en_cours', 'en_attente', 'bloquee', 'partiellement_executee', 'en_retard'])->count(),
+            'meeting_decisions_late' => DB::table('meeting_decisions')->whereNotNull('due_date')->whereDate('due_date', '<', now())->whereNotIn('status', ['executee', 'cloturee', 'annulee'])->count(),
+            'meeting_minutes_to_validate' => DB::table('meetings')->whereNull('deleted_at')->where('status', 'cr_en_validation')->count(),
         ];
     }
 }

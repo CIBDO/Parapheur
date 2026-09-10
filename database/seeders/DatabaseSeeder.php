@@ -29,7 +29,24 @@ class DatabaseSeeder extends Seeder
             'dashboard.dg',
             'dashboard.direction',
             'instructions.manage',
+            'meetings.view',
+            'meetings.create',
+            'meetings.update',
+            'meetings.delete',
             'meetings.manage',
+            'meetings.manage_participants',
+            'meetings.manage_agenda',
+            'meetings.send_invitations',
+            'meetings.start',
+            'meetings.manage_attendance',
+            'meetings.take_official_notes',
+            'meetings.create_decision',
+            'meetings.manage_decisions',
+            'meetings.generate_minutes',
+            'meetings.validate_minutes',
+            'meetings.close',
+            'meetings.archive',
+            'meetings.view_reports',
             'reporting.view',
             'delegations.manage',
         ];
@@ -42,14 +59,14 @@ class DatabaseSeeder extends Seeder
             'Administrateur' => $permissions,
             'Directeur Général' => ['documents.create', 'documents.act', 'documents.vise', 'documents.validate', 'dashboard.dg', 'instructions.manage', 'meetings.manage', 'reporting.view', 'delegations.manage'],
             'DGA' => ['documents.create', 'documents.act', 'documents.vise', 'documents.validate', 'dashboard.dg', 'instructions.manage', 'meetings.manage', 'reporting.view'],
-            'Conseiller' => ['documents.create', 'documents.act', 'reporting.view'],
-            'Secrétariat DG' => ['documents.create', 'documents.act', 'meetings.manage', 'reporting.view'],
-            'Directeur' => ['documents.create', 'documents.act', 'documents.vise', 'documents.validate', 'dashboard.direction', 'reporting.view', 'meetings.manage'],
-            'Chef de division' => ['documents.create', 'documents.act'],
-            'Chef de section' => ['documents.create', 'documents.act'],
-            'Agent' => ['documents.create', 'documents.act'],
+            'Conseiller' => ['documents.create', 'documents.act', 'reporting.view', 'meetings.view'],
+            'Secrétariat DG' => ['documents.create', 'documents.act', 'meetings.manage', 'meetings.view', 'meetings.create', 'meetings.take_official_notes', 'meetings.generate_minutes', 'reporting.view'],
+            'Directeur' => ['documents.create', 'documents.act', 'documents.vise', 'documents.validate', 'dashboard.direction', 'reporting.view', 'meetings.manage', 'meetings.view'],
+            'Chef de division' => ['documents.create', 'documents.act', 'meetings.view'],
+            'Chef de section' => ['documents.create', 'documents.act', 'meetings.view'],
+            'Agent' => ['documents.create', 'documents.act', 'meetings.view'],
             // Consultation uniquement (cahier des charges §6)
-            'Lecteur' => [],
+            'Lecteur' => ['meetings.view'],
         ];
 
         foreach ($roles as $roleName => $perms) {
@@ -113,6 +130,7 @@ class DatabaseSeeder extends Seeder
             ['code' => 'CR', 'name' => 'Compte rendu', 'sort_order' => 5],
             ['code' => 'LETTRE', 'name' => 'Projet de lettre', 'sort_order' => 6],
             ['code' => 'DOSSIER_REUNION', 'name' => 'Dossier de réunion', 'sort_order' => 7],
+            ['code' => 'CONVOCATION', 'name' => 'Convocation', 'sort_order' => 8],
         ];
 
         foreach ($docTypes as $type) {
@@ -218,6 +236,7 @@ class DatabaseSeeder extends Seeder
         }
 
         $this->seedDemoDocuments();
+        $this->call(MeetingSeeder::class);
     }
 
     private function seedDemoDocuments(): void

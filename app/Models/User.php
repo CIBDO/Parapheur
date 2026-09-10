@@ -57,6 +57,11 @@ class User extends Authenticatable
         return $this->hasMany(DocumentTransmission::class, 'to_user_id');
     }
 
+    public function meetingParticipations(): HasMany
+    {
+        return $this->hasMany(MeetingParticipant::class);
+    }
+
     public function abilityRules(): array
     {
         if ($this->can('admin.access')) {
@@ -67,6 +72,8 @@ class User extends Authenticatable
                 ['action' => 'manage', 'subject' => 'User'],
                 ['action' => 'manage', 'subject' => 'Role'],
                 ['action' => 'manage', 'subject' => 'DocumentType'],
+                ['action' => 'manage', 'subject' => 'MeetingType'],
+                ['action' => 'manage', 'subject' => 'MeetingTemplate'],
                 ['action' => 'read', 'subject' => 'AuditLog'],
                 ['action' => 'read', 'subject' => 'Notification'],
                 ['action' => 'read', 'subject' => 'Parapheur'],
@@ -112,9 +119,16 @@ class User extends Authenticatable
             $rules[] = ['action' => 'read', 'subject' => 'Instruction'];
         }
 
+        if ($this->can('meetings.view') || $this->can('meetings.manage') || $this->can('meetings.create')) {
+            $rules[] = ['action' => 'read', 'subject' => 'Meeting'];
+        }
+
+        if ($this->can('meetings.create') || $this->can('meetings.manage')) {
+            $rules[] = ['action' => 'create', 'subject' => 'Meeting'];
+        }
+
         if ($this->can('meetings.manage')) {
             $rules[] = ['action' => 'manage', 'subject' => 'Meeting'];
-            $rules[] = ['action' => 'read', 'subject' => 'Meeting'];
         }
 
         if ($this->can('reporting.view')) {

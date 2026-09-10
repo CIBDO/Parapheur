@@ -41,6 +41,21 @@ class InstructionController extends Controller
         }
         $instruction->save();
 
+        if ($instruction->meeting_decision_id && $data['status'] === 'executee') {
+            $instruction->meetingDecision?->update([
+                'status' => 'executee',
+                'executed_at' => now(),
+                'execution_declared_by' => $request->user()->id,
+            ]);
+        }
+        if ($instruction->meeting_decision_id && $data['status'] === 'cloturee') {
+            $instruction->meetingDecision?->update([
+                'status' => 'cloturee',
+                'execution_validated_by' => $request->user()->id,
+                'execution_validated_at' => now(),
+            ]);
+        }
+
         if (! empty($data['body'])) {
             $instruction->updates()->create([
                 'user_id' => $request->user()->id,

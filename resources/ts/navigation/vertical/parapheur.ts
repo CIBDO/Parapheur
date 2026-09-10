@@ -38,9 +38,31 @@ export default [
   {
     title: 'Réunions',
     icon: { icon: 'tabler-users-group' },
-    to: 'parapheur-reunions',
-    action: 'manage',
+    action: 'read',
     subject: 'Meeting',
+    children: [
+      {
+        title: 'Tableau de bord',
+        icon: { icon: 'tabler-layout-dashboard' },
+        to: 'parapheur-reunions',
+        action: 'read',
+        subject: 'Meeting',
+      },
+      {
+        title: 'Calendrier',
+        icon: { icon: 'tabler-calendar' },
+        to: 'parapheur-reunions-calendrier',
+        action: 'read',
+        subject: 'Meeting',
+      },
+      {
+        title: 'Décisions',
+        icon: { icon: 'tabler-gavel' },
+        to: 'parapheur-reunions-decisions',
+        action: 'read',
+        subject: 'Meeting',
+      },
+    ],
   },
   {
     title: 'Reporting',
@@ -88,6 +110,20 @@ export default [
         to: 'parapheur-document-types',
         action: 'manage',
         subject: 'DocumentType',
+      },
+      {
+        title: 'Types de réunions',
+        icon: { icon: 'tabler-category' },
+        to: 'parapheur-meeting-types',
+        action: 'manage',
+        subject: 'MeetingType',
+      },
+      {
+        title: 'Modèles réunions',
+        icon: { icon: 'tabler-template' },
+        to: 'parapheur-meeting-templates',
+        action: 'manage',
+        subject: 'MeetingTemplate',
       },
       {
         title: 'Circuits',

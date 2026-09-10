@@ -12,3 +12,8 @@ Schedule::command('parapheur:remind-overdue-instructions')
     ->dailyAt('08:00')
     ->withoutOverlapping()
     ->appendOutputTo(storage_path('logs/instruction-reminders.log'));
+
+Schedule::command('parapheur:remind-meetings')
+    ->hourly()
+    ->withoutOverlapping()
+    ->appendOutputTo(storage_path('logs/meeting-reminders.log'));

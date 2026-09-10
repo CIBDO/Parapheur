@@ -44,6 +44,11 @@ class Instruction extends Model
         return $this->belongsTo(Document::class);
     }
 
+    public function meetingDecision(): BelongsTo
+    {
+        return $this->belongsTo(MeetingDecision::class);
+    }
+
     public function issuer(): BelongsTo
     {
         return $this->belongsTo(User::class, 'issuer_id');

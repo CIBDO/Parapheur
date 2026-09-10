@@ -35,6 +35,11 @@ interface DgStats {
   instructions_late: number
   by_status: Record<string, number>
   by_structure: Record<string, number>
+  meetings_today?: number
+  meetings_this_week?: number
+  meeting_decisions_open?: number
+  meeting_decisions_late?: number
+  meeting_minutes_to_validate?: number
 }
 
 const vuetifyTheme = useTheme()
@@ -504,6 +509,62 @@ onMounted(async () => {
               :to="{ name: 'parapheur-instructions' }"
             >
               Voir les instructions
+            </VBtn>
+          </VCardText>
+        </VCard>
+      </VCol>
+
+      <VCol
+        cols="12"
+        md="4"
+        sm="6"
+      >
+        <VCard>
+          <VCardText>
+            <div class="d-flex align-center justify-space-between mb-4">
+              <div>
+                <VCardTitle class="pa-0 mb-1">
+                  Réunions
+                </VCardTitle>
+                <VCardSubtitle class="pa-0">
+                  Séances et décisions
+                </VCardSubtitle>
+              </div>
+              <VAvatar
+                color="primary"
+                variant="tonal"
+                rounded
+                size="42"
+              >
+                <VIcon
+                  icon="tabler-users-group"
+                  size="26"
+                />
+              </VAvatar>
+            </div>
+            <div class="d-flex align-center justify-space-between mb-2">
+              <span class="text-body-2">Aujourd’hui</span>
+              <span class="text-h5">{{ stats?.meetings_today ?? 0 }}</span>
+            </div>
+            <div class="d-flex align-center justify-space-between mb-2">
+              <span class="text-body-2">Cette semaine</span>
+              <span class="text-h5">{{ stats?.meetings_this_week ?? 0 }}</span>
+            </div>
+            <div class="d-flex align-center justify-space-between mb-2">
+              <span class="text-body-2">Décisions en cours</span>
+              <span class="text-h5">{{ stats?.meeting_decisions_open ?? 0 }}</span>
+            </div>
+            <div class="d-flex align-center justify-space-between mb-4">
+              <span class="text-body-2">Décisions en retard</span>
+              <span class="text-h5 text-error">{{ stats?.meeting_decisions_late ?? 0 }}</span>
+            </div>
+            <VBtn
+              block
+              variant="tonal"
+              color="primary"
+              :to="{ name: 'parapheur-reunions' }"
+            >
+              Ouvrir les réunions
             </VBtn>
           </VCardText>
         </VCard>

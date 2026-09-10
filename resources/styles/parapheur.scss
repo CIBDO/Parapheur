@@ -57,3 +57,8 @@
 .parapheur-doc-row:hover {
   background: rgba(var(--v-theme-primary), 0.04);
 }
+
+.meeting-seance-nav {
+  position: sticky;
+  inset-block-start: 0.75rem;
+}

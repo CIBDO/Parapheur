@@ -25,6 +25,26 @@ class PrivateDocumentStorage
         ];
     }
 
+    public function storeContent(string $contents, string $originalName, string $mimeType, string $directory = 'documents'): array
+    {
+        $safeName = Str::uuid()->toString().'_'.Str::slug(pathinfo($originalName, PATHINFO_FILENAME));
+        $extension = pathinfo($originalName, PATHINFO_EXTENSION);
+        $filename = $extension ? "{$safeName}.{$extension}" : $safeName;
+        $path = $directory.'/'.now()->format('Y/m').'/'.$filename;
+
+        Storage::disk('local')->put($path, $contents);
+        $full = Storage::disk('local')->path($path);
+
+        return [
+            'disk' => 'local',
+            'path' => $path,
+            'original_name' => $originalName,
+            'mime_type' => $mimeType,
+            'size' => strlen($contents),
+            'checksum' => is_file($full) ? hash_file('sha256', $full) : hash('sha256', $contents),
+        ];
+    }
+
     public function absolutePath(string $disk, string $path): string
     {
         return Storage::disk($disk)->path($path);

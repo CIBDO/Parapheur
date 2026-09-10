@@ -14,6 +14,7 @@ declare global {
   const alphaDashValidator: typeof import('./resources/ts/@core/utils/validators')['alphaDashValidator']
   const alphaValidator: typeof import('./resources/ts/@core/utils/validators')['alphaValidator']
   const asyncComputed: typeof import('@vueuse/core')['asyncComputed']
+  const attendanceLabels: typeof import('./resources/ts/utils/meetingsUi')['attendanceLabels']
   const autoResetRef: typeof import('@vueuse/core')['autoResetRef']
   const avatarText: typeof import('./resources/ts/@core/utils/formatters')['avatarText']
   const betweenValidator: typeof import('./resources/ts/@core/utils/validators')['betweenValidator']
@@ -44,14 +45,18 @@ declare global {
   const customRef: typeof import('vue')['customRef']
   const debouncedRef: typeof import('@vueuse/core')['debouncedRef']
   const debouncedWatch: typeof import('@vueuse/core')['debouncedWatch']
+  const decisionStatusLabels: typeof import('./resources/ts/utils/meetingsUi')['decisionStatusLabels']
   const defineAsyncComponent: typeof import('vue')['defineAsyncComponent']
   const defineComponent: typeof import('vue')['defineComponent']
   const definePage: typeof import('unplugin-vue-router/runtime')['definePage']
   const defineStore: typeof import('pinia')['defineStore']
+  const documentKindLabels: typeof import('./resources/ts/utils/meetingsUi')['documentKindLabels']
+  const downloadMeetingHtml: typeof import('./resources/ts/utils/meetingsUi')['downloadMeetingHtml']
   const eagerComputed: typeof import('@vueuse/core')['eagerComputed']
   const effectScope: typeof import('vue')['effectScope']
   const emailValidator: typeof import('./resources/ts/@core/utils/validators')['emailValidator']
   const expectedActionOptions: typeof import('./resources/ts/utils/parapheurUi')['expectedActionOptions']
+  const exportKindLabels: typeof import('./resources/ts/utils/meetingsUi')['exportKindLabels']
   const extendRef: typeof import('@vueuse/core')['extendRef']
   const folderMeta: typeof import('./resources/ts/utils/parapheurUi')['folderMeta']
   const formatDate: typeof import('./resources/ts/@core/utils/formatters')['formatDate']
@@ -90,6 +95,8 @@ declare global {
   const mapStores: typeof import('pinia')['mapStores']
   const mapWritableState: typeof import('pinia')['mapWritableState']
   const markRaw: typeof import('vue')['markRaw']
+  const meetingStatusColor: typeof import('./resources/ts/utils/meetingsUi')['meetingStatusColor']
+  const meetingStatusLabels: typeof import('./resources/ts/utils/meetingsUi')['meetingStatusLabels']
   const nextTick: typeof import('vue')['nextTick']
   const onActivated: typeof import('vue')['onActivated']
   const onBeforeMount: typeof import('vue')['onBeforeMount']
@@ -112,7 +119,9 @@ declare global {
   const onUnmounted: typeof import('vue')['onUnmounted']
   const onUpdated: typeof import('vue')['onUpdated']
   const onWatcherCleanup: typeof import('vue')['onWatcherCleanup']
+  const openMeetingHtml: typeof import('./resources/ts/utils/meetingsUi')['openMeetingHtml']
   const paginationMeta: typeof import('./resources/ts/utils/paginationMeta')['paginationMeta']
+  const participationTypeLabels: typeof import('./resources/ts/utils/meetingsUi')['participationTypeLabels']
   const passwordValidator: typeof import('./resources/ts/@core/utils/validators')['passwordValidator']
   const pausableWatch: typeof import('@vueuse/core')['pausableWatch']
   const prefixWithPlus: typeof import('./resources/ts/@core/utils/formatters')['prefixWithPlus']
@@ -393,6 +402,7 @@ declare module 'vue' {
     readonly alphaDashValidator: UnwrapRef<typeof import('./resources/ts/@core/utils/validators')['alphaDashValidator']>
     readonly alphaValidator: UnwrapRef<typeof import('./resources/ts/@core/utils/validators')['alphaValidator']>
     readonly asyncComputed: UnwrapRef<typeof import('@vueuse/core')['asyncComputed']>
+    readonly attendanceLabels: UnwrapRef<typeof import('./resources/ts/utils/meetingsUi')['attendanceLabels']>
     readonly autoResetRef: UnwrapRef<typeof import('@vueuse/core')['autoResetRef']>
     readonly avatarText: UnwrapRef<typeof import('./resources/ts/@core/utils/formatters')['avatarText']>
     readonly betweenValidator: UnwrapRef<typeof import('./resources/ts/@core/utils/validators')['betweenValidator']>
@@ -423,14 +433,18 @@ declare module 'vue' {
     readonly customRef: UnwrapRef<typeof import('vue')['customRef']>
     readonly debouncedRef: UnwrapRef<typeof import('@vueuse/core')['debouncedRef']>
     readonly debouncedWatch: UnwrapRef<typeof import('@vueuse/core')['debouncedWatch']>
+    readonly decisionStatusLabels: UnwrapRef<typeof import('./resources/ts/utils/meetingsUi')['decisionStatusLabels']>
     readonly defineAsyncComponent: UnwrapRef<typeof import('vue')['defineAsyncComponent']>
     readonly defineComponent: UnwrapRef<typeof import('vue')['defineComponent']>
     readonly definePage: UnwrapRef<typeof import('unplugin-vue-router/runtime')['definePage']>
     readonly defineStore: UnwrapRef<typeof import('pinia')['defineStore']>
+    readonly documentKindLabels: UnwrapRef<typeof import('./resources/ts/utils/meetingsUi')['documentKindLabels']>
+    readonly downloadMeetingHtml: UnwrapRef<typeof import('./resources/ts/utils/meetingsUi')['downloadMeetingHtml']>
     readonly eagerComputed: UnwrapRef<typeof import('@vueuse/core')['eagerComputed']>
     readonly effectScope: UnwrapRef<typeof import('vue')['effectScope']>
     readonly emailValidator: UnwrapRef<typeof import('./resources/ts/@core/utils/validators')['emailValidator']>
     readonly expectedActionOptions: UnwrapRef<typeof import('./resources/ts/utils/parapheurUi')['expectedActionOptions']>
+    readonly exportKindLabels: UnwrapRef<typeof import('./resources/ts/utils/meetingsUi')['exportKindLabels']>
     readonly extendRef: UnwrapRef<typeof import('@vueuse/core')['extendRef']>
     readonly folderMeta: UnwrapRef<typeof import('./resources/ts/utils/parapheurUi')['folderMeta']>
     readonly formatDate: UnwrapRef<typeof import('./resources/ts/@core/utils/formatters')['formatDate']>
@@ -469,6 +483,8 @@ declare module 'vue' {
     readonly mapStores: UnwrapRef<typeof import('pinia')['mapStores']>
     readonly mapWritableState: UnwrapRef<typeof import('pinia')['mapWritableState']>
     readonly markRaw: UnwrapRef<typeof import('vue')['markRaw']>
+    readonly meetingStatusColor: UnwrapRef<typeof import('./resources/ts/utils/meetingsUi')['meetingStatusColor']>
+    readonly meetingStatusLabels: UnwrapRef<typeof import('./resources/ts/utils/meetingsUi')['meetingStatusLabels']>
     readonly nextTick: UnwrapRef<typeof import('vue')['nextTick']>
     readonly onActivated: UnwrapRef<typeof import('vue')['onActivated']>
     readonly onBeforeMount: UnwrapRef<typeof import('vue')['onBeforeMount']>
@@ -491,7 +507,9 @@ declare module 'vue' {
     readonly onUnmounted: UnwrapRef<typeof import('vue')['onUnmounted']>
     readonly onUpdated: UnwrapRef<typeof import('vue')['onUpdated']>
     readonly onWatcherCleanup: UnwrapRef<typeof import('vue')['onWatcherCleanup']>
+    readonly openMeetingHtml: UnwrapRef<typeof import('./resources/ts/utils/meetingsUi')['openMeetingHtml']>
     readonly paginationMeta: UnwrapRef<typeof import('./resources/ts/utils/paginationMeta')['paginationMeta']>
+    readonly participationTypeLabels: UnwrapRef<typeof import('./resources/ts/utils/meetingsUi')['participationTypeLabels']>
     readonly passwordValidator: UnwrapRef<typeof import('./resources/ts/@core/utils/validators')['passwordValidator']>
     readonly pausableWatch: UnwrapRef<typeof import('@vueuse/core')['pausableWatch']>
     readonly prefixWithPlus: UnwrapRef<typeof import('./resources/ts/@core/utils/formatters')['prefixWithPlus']>
