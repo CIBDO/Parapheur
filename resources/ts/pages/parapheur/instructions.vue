@@ -232,29 +232,45 @@ onMounted(load)
           </VChip>
         </template>
         <template #item.actions="{ item }">
-          <div class="d-flex flex-wrap gap-1">
-            <VBtn
-              size="small"
-              variant="tonal"
-              @click="setStatus(item.id, 'en_cours')"
-            >
-              En cours
-            </VBtn>
-            <VBtn
-              size="small"
-              color="success"
-              variant="tonal"
-              @click="setStatus(item.id, 'executee')"
-            >
-              Exécutée
-            </VBtn>
-            <VBtn
-              size="small"
-              variant="text"
-              @click="setStatus(item.id, 'cloturee')"
-            >
-              Clôturer
-            </VBtn>
+          <div class="d-flex gap-1">
+            <VTooltip location="top">
+              <template #activator="{ props: tip }">
+                <IconBtn
+                  v-bind="tip"
+                  color="info"
+                  @click="setStatus(item.id, 'en_cours')"
+                >
+                  <VIcon icon="tabler-player-play" />
+                </IconBtn>
+              </template>
+              <span>En cours</span>
+            </VTooltip>
+
+            <VTooltip location="top">
+              <template #activator="{ props: tip }">
+                <IconBtn
+                  v-bind="tip"
+                  color="success"
+                  @click="setStatus(item.id, 'executee')"
+                >
+                  <VIcon icon="tabler-circle-check" />
+                </IconBtn>
+              </template>
+              <span>Exécutée</span>
+            </VTooltip>
+
+            <VTooltip location="top">
+              <template #activator="{ props: tip }">
+                <IconBtn
+                  v-bind="tip"
+                  color="secondary"
+                  @click="setStatus(item.id, 'cloturee')"
+                >
+                  <VIcon icon="tabler-lock" />
+                </IconBtn>
+              </template>
+              <span>Clôturer</span>
+            </VTooltip>
           </div>
         </template>
       </VDataTable>
