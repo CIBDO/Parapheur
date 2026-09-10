@@ -8,6 +8,9 @@ use App\Services\Preview\NativeDocumentPreviewDriver;
 use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
+use App\Models\Appointment;
+use App\Policies\AppointmentPolicy;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 
@@ -20,6 +23,8 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        Gate::policy(Appointment::class, AppointmentPolicy::class);
+
         RateLimiter::for('login', function (Request $request) {
             $email = (string) $request->input('email');
 

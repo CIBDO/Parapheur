@@ -1,5 +1,7 @@
 <?php
 
+use App\Http\Controllers\Api\AppointmentController;
+use App\Http\Controllers\Api\AppointmentTypeController;
 use App\Http\Controllers\Api\AuditLogController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\DashboardController;
@@ -86,6 +88,11 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('/meeting-templates/{meetingTemplate}', [MeetingTemplateController::class, 'update']);
         Route::delete('/meeting-templates/{meetingTemplate}', [MeetingTemplateController::class, 'destroy']);
 
+        Route::get('/appointment-types', [AppointmentTypeController::class, 'index']);
+        Route::post('/appointment-types', [AppointmentTypeController::class, 'store']);
+        Route::put('/appointment-types/{appointmentType}', [AppointmentTypeController::class, 'update']);
+        Route::delete('/appointment-types/{appointmentType}', [AppointmentTypeController::class, 'destroy']);
+
         Route::get('/audit-logs', [AuditLogController::class, 'index']);
 
         Route::get('/workflows', [WorkflowController::class, 'index']);
@@ -124,6 +131,42 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/delegations', [DelegationController::class, 'index']);
     Route::post('/delegations', [DelegationController::class, 'store']);
     Route::patch('/delegations/{delegation}', [DelegationController::class, 'update']);
+
+    Route::get('/appointments/dashboard', [AppointmentController::class, 'dashboard']);
+    Route::get('/appointments/calendar', [AppointmentController::class, 'calendar']);
+    Route::get('/appointments/types', [AppointmentController::class, 'types']);
+    Route::post('/appointments/check-conflicts', [AppointmentController::class, 'checkConflicts']);
+    Route::get('/appointments/unavailabilities', [AppointmentController::class, 'unavailabilities']);
+    Route::post('/appointments/unavailabilities', [AppointmentController::class, 'storeUnavailability']);
+    Route::delete('/appointments/unavailabilities/{unavailability}', [AppointmentController::class, 'destroyUnavailability']);
+
+    Route::get('/appointments', [AppointmentController::class, 'index']);
+    Route::post('/appointments', [AppointmentController::class, 'store']);
+    Route::get('/appointments/{appointment}', [AppointmentController::class, 'show']);
+    Route::put('/appointments/{appointment}', [AppointmentController::class, 'update']);
+    Route::delete('/appointments/{appointment}', [AppointmentController::class, 'destroy']);
+    Route::post('/appointments/{appointment}/propose-slot', [AppointmentController::class, 'proposeSlot']);
+    Route::post('/appointments/{appointment}/validate', [AppointmentController::class, 'validateAppointment']);
+    Route::post('/appointments/{appointment}/reject', [AppointmentController::class, 'reject']);
+    Route::post('/appointments/{appointment}/confirm', [AppointmentController::class, 'confirm']);
+    Route::post('/appointments/{appointment}/reschedule', [AppointmentController::class, 'reschedule']);
+    Route::post('/appointments/{appointment}/cancel', [AppointmentController::class, 'cancel']);
+    Route::post('/appointments/{appointment}/hold', [AppointmentController::class, 'hold']);
+    Route::post('/appointments/{appointment}/redirect', [AppointmentController::class, 'redirect']);
+    Route::post('/appointments/{appointment}/start', [AppointmentController::class, 'start']);
+    Route::post('/appointments/{appointment}/finish', [AppointmentController::class, 'finish']);
+    Route::post('/appointments/{appointment}/close', [AppointmentController::class, 'close']);
+    Route::post('/appointments/{appointment}/archive', [AppointmentController::class, 'archive']);
+    Route::post('/appointments/{appointment}/participants', [AppointmentController::class, 'storeParticipant']);
+    Route::delete('/appointments/{appointment}/participants/{participant}', [AppointmentController::class, 'destroyParticipant']);
+    Route::post('/appointments/{appointment}/documents', [AppointmentController::class, 'storeDocument']);
+    Route::delete('/appointments/{appointment}/documents/{appointmentDocument}', [AppointmentController::class, 'destroyDocument']);
+    Route::post('/appointments/{appointment}/notes', [AppointmentController::class, 'storeNote']);
+    Route::delete('/appointments/{appointment}/notes/{note}', [AppointmentController::class, 'destroyNote']);
+    Route::post('/appointments/{appointment}/followups', [AppointmentController::class, 'storeFollowup']);
+    Route::post('/appointments/{appointment}/convert-to-meeting', [AppointmentController::class, 'convertToMeeting']);
+    Route::get('/appointments/{appointment}/preparation', [AppointmentController::class, 'preparation']);
+    Route::get('/appointments/{appointment}/audit', [AppointmentController::class, 'audit']);
 
     Route::get('/meetings/dashboard', [MeetingController::class, 'dashboard']);
     Route::get('/meetings/calendar', [MeetingController::class, 'calendar']);

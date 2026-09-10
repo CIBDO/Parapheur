@@ -313,6 +313,23 @@ class ParapheurService
             'meeting_decisions_open' => DB::table('meeting_decisions')->whereIn('status', ['a_faire', 'planifiee', 'en_cours', 'en_attente', 'bloquee', 'partiellement_executee', 'en_retard'])->count(),
             'meeting_decisions_late' => DB::table('meeting_decisions')->whereNotNull('due_date')->whereDate('due_date', '<', now())->whereNotIn('status', ['executee', 'cloturee', 'annulee'])->count(),
             'meeting_minutes_to_validate' => DB::table('meetings')->whereNull('deleted_at')->where('status', 'cr_en_validation')->count(),
+            'appointments_today' => DB::table('appointments')->whereNull('deleted_at')->whereDate('start_at', now()->toDateString())->whereNotIn('status', ['annule', 'refuse', 'archive', 'brouillon'])->count(),
+            'appointments_to_validate' => DB::table('appointments')->whereNull('deleted_at')->where('status', 'a_valider')->count(),
+            'appointments_next_at' => optional(
+                DB::table('appointments')
+                    ->whereNull('deleted_at')
+                    ->whereIn('status', ['confirme', 'valide', 'pret'])
+                    ->where('start_at', '>=', now())
+                    ->orderBy('start_at')
+                    ->value('start_at')
+            ),
+            'audiences_today' => DB::table('appointments')
+                ->whereNull('appointments.deleted_at')
+                ->join('appointment_types', 'appointment_types.id', '=', 'appointments.appointment_type_id')
+                ->where('appointment_types.code', 'AUDIENCE')
+                ->whereDate('appointments.start_at', now()->toDateString())
+                ->whereNotIn('appointments.status', ['annule', 'refuse', 'archive'])
+                ->count(),
         ];
     }
 }

@@ -13,11 +13,14 @@ declare global {
   const actionLabels: typeof import('./resources/ts/utils/parapheurUi')['actionLabels']
   const alphaDashValidator: typeof import('./resources/ts/@core/utils/validators')['alphaDashValidator']
   const alphaValidator: typeof import('./resources/ts/@core/utils/validators')['alphaValidator']
+  const appointmentStatusColor: typeof import('./resources/ts/utils/appointmentsUi')['appointmentStatusColor']
+  const appointmentStatusLabel: typeof import('./resources/ts/utils/appointmentsUi')['appointmentStatusLabel']
   const asyncComputed: typeof import('@vueuse/core')['asyncComputed']
   const attendanceLabels: typeof import('./resources/ts/utils/meetingsUi')['attendanceLabels']
   const autoResetRef: typeof import('@vueuse/core')['autoResetRef']
   const avatarText: typeof import('./resources/ts/@core/utils/formatters')['avatarText']
   const betweenValidator: typeof import('./resources/ts/@core/utils/validators')['betweenValidator']
+  const calendarEventColor: typeof import('./resources/ts/utils/appointmentsUi')['calendarEventColor']
   const computed: typeof import('vue')['computed']
   const computedAsync: typeof import('@vueuse/core')['computedAsync']
   const computedEager: typeof import('@vueuse/core')['computedEager']
@@ -59,6 +62,7 @@ declare global {
   const exportKindLabels: typeof import('./resources/ts/utils/meetingsUi')['exportKindLabels']
   const extendRef: typeof import('@vueuse/core')['extendRef']
   const folderMeta: typeof import('./resources/ts/utils/parapheurUi')['folderMeta']
+  const formatAppointmentSlot: typeof import('./resources/ts/utils/appointmentsUi')['formatAppointmentSlot']
   const formatDate: typeof import('./resources/ts/@core/utils/formatters')['formatDate']
   const formatDateFr: typeof import('./resources/ts/utils/parapheurUi')['formatDateFr']
   const formatDateTimeFr: typeof import('./resources/ts/utils/parapheurUi')['formatDateTimeFr']
@@ -401,11 +405,14 @@ declare module 'vue' {
     readonly actionLabels: UnwrapRef<typeof import('./resources/ts/utils/parapheurUi')['actionLabels']>
     readonly alphaDashValidator: UnwrapRef<typeof import('./resources/ts/@core/utils/validators')['alphaDashValidator']>
     readonly alphaValidator: UnwrapRef<typeof import('./resources/ts/@core/utils/validators')['alphaValidator']>
+    readonly appointmentStatusColor: UnwrapRef<typeof import('./resources/ts/utils/appointmentsUi')['appointmentStatusColor']>
+    readonly appointmentStatusLabel: UnwrapRef<typeof import('./resources/ts/utils/appointmentsUi')['appointmentStatusLabel']>
     readonly asyncComputed: UnwrapRef<typeof import('@vueuse/core')['asyncComputed']>
     readonly attendanceLabels: UnwrapRef<typeof import('./resources/ts/utils/meetingsUi')['attendanceLabels']>
     readonly autoResetRef: UnwrapRef<typeof import('@vueuse/core')['autoResetRef']>
     readonly avatarText: UnwrapRef<typeof import('./resources/ts/@core/utils/formatters')['avatarText']>
     readonly betweenValidator: UnwrapRef<typeof import('./resources/ts/@core/utils/validators')['betweenValidator']>
+    readonly calendarEventColor: UnwrapRef<typeof import('./resources/ts/utils/appointmentsUi')['calendarEventColor']>
     readonly computed: UnwrapRef<typeof import('vue')['computed']>
     readonly computedAsync: UnwrapRef<typeof import('@vueuse/core')['computedAsync']>
     readonly computedEager: UnwrapRef<typeof import('@vueuse/core')['computedEager']>
@@ -447,6 +454,7 @@ declare module 'vue' {
     readonly exportKindLabels: UnwrapRef<typeof import('./resources/ts/utils/meetingsUi')['exportKindLabels']>
     readonly extendRef: UnwrapRef<typeof import('@vueuse/core')['extendRef']>
     readonly folderMeta: UnwrapRef<typeof import('./resources/ts/utils/parapheurUi')['folderMeta']>
+    readonly formatAppointmentSlot: UnwrapRef<typeof import('./resources/ts/utils/appointmentsUi')['formatAppointmentSlot']>
     readonly formatDate: UnwrapRef<typeof import('./resources/ts/@core/utils/formatters')['formatDate']>
     readonly formatDateFr: UnwrapRef<typeof import('./resources/ts/utils/parapheurUi')['formatDateFr']>
     readonly formatDateTimeFr: UnwrapRef<typeof import('./resources/ts/utils/parapheurUi')['formatDateTimeFr']>

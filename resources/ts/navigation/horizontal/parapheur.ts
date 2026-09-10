@@ -64,6 +64,42 @@ export default [
     ],
   },
   {
+    title: 'Agenda & RDV',
+    icon: { icon: 'tabler-calendar-event' },
+    action: 'read',
+    subject: 'Appointment',
+    children: [
+      {
+        title: 'Tableau de bord',
+        icon: { icon: 'tabler-layout-dashboard' },
+        to: 'parapheur-agenda',
+        action: 'read',
+        subject: 'Appointment',
+      },
+      {
+        title: 'Agenda',
+        icon: { icon: 'tabler-calendar' },
+        to: 'parapheur-agenda-calendrier',
+        action: 'read',
+        subject: 'Appointment',
+      },
+      {
+        title: 'Demandes',
+        icon: { icon: 'tabler-inbox' },
+        to: 'parapheur-agenda-demandes',
+        action: 'read',
+        subject: 'Appointment',
+      },
+      {
+        title: 'À valider',
+        icon: { icon: 'tabler-checks' },
+        to: 'parapheur-agenda-avalider',
+        action: 'validate',
+        subject: 'Appointment',
+      },
+    ],
+  },
+  {
     title: 'Reporting',
     icon: { icon: 'tabler-chart-bar' },
     to: 'parapheur-reporting',

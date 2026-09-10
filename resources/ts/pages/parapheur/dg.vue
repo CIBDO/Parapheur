@@ -40,6 +40,10 @@ interface DgStats {
   meeting_decisions_open?: number
   meeting_decisions_late?: number
   meeting_minutes_to_validate?: number
+  appointments_today?: number
+  appointments_to_validate?: number
+  appointments_next_at?: string | null
+  audiences_today?: number
 }
 
 const vuetifyTheme = useTheme()
@@ -47,6 +51,7 @@ const userData = useCookie<any>('userData')
 
 const stats = ref<DgStats | null>(null)
 const documents = ref<DocItem[]>([])
+const agendaToday = ref<any[]>([])
 const loading = ref(true)
 
 const greeting = computed(() => {
@@ -253,18 +258,21 @@ const loadDashboard = async () => {
   loading.value = true
   loadError.value = ''
   try {
-    const [statsRes, docsRes] = await Promise.all([
+    const [statsRes, docsRes, agendaRes] = await Promise.all([
       $api('/dashboard/dg'),
       $api('/parapheur/documents', { query: { folder: 'a_traiter' } }),
+      $api('/appointments/dashboard').catch(() => null),
     ])
 
     stats.value = statsRes
     documents.value = docsRes.data ?? docsRes
+    agendaToday.value = agendaRes?.today_list ?? []
   }
   catch (e: any) {
     loadError.value = e?.data?.message || e?.message || 'Impossible de charger le bureau DG'
     stats.value = null
     documents.value = []
+    agendaToday.value = []
   }
   finally {
     loading.value = false
@@ -570,6 +578,74 @@ onMounted(async () => {
         </VCard>
       </VCol>
 
+      <VCol
+        cols="12"
+        md="4"
+        sm="6"
+      >
+        <VCard>
+          <VCardText>
+            <div class="d-flex align-center justify-space-between mb-4">
+              <div>
+                <VCardTitle class="pa-0 mb-1">
+                  Agenda
+                </VCardTitle>
+                <VCardSubtitle class="pa-0">
+                  Audiences et rendez-vous
+                </VCardSubtitle>
+              </div>
+              <VAvatar
+                color="warning"
+                variant="tonal"
+                rounded
+                size="42"
+              >
+                <VIcon
+                  icon="tabler-calendar-event"
+                  size="26"
+                />
+              </VAvatar>
+            </div>
+            <div class="d-flex align-center justify-space-between mb-2">
+              <span class="text-body-2">Aujourd’hui</span>
+              <span class="text-h5">{{ stats?.appointments_today ?? 0 }}</span>
+            </div>
+            <div class="d-flex align-center justify-space-between mb-2">
+              <span class="text-body-2">Audiences</span>
+              <span class="text-h5">{{ stats?.audiences_today ?? 0 }}</span>
+            </div>
+            <div class="d-flex align-center justify-space-between mb-2">
+              <span class="text-body-2">Prochain RDV</span>
+              <span class="text-h5">
+                {{ stats?.appointments_next_at ? new Date(stats.appointments_next_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '—' }}
+              </span>
+            </div>
+            <div class="d-flex align-center justify-space-between mb-4">
+              <span class="text-body-2">À valider</span>
+              <span class="text-h5 text-warning">{{ stats?.appointments_to_validate ?? 0 }}</span>
+            </div>
+            <div class="d-flex gap-2">
+              <VBtn
+                block
+                variant="tonal"
+                color="primary"
+                :to="{ name: 'parapheur-agenda' }"
+              >
+                Agenda
+              </VBtn>
+              <VBtn
+                v-if="(stats?.appointments_to_validate || 0) > 0"
+                block
+                color="warning"
+                :to="{ name: 'parapheur-agenda-avalider' }"
+              >
+                Valider
+              </VBtn>
+            </div>
+          </VCardText>
+        </VCard>
+      </VCol>
+
       <!-- Retours / validés -->
       <VCol
         cols="12"
@@ -707,6 +783,70 @@ onMounted(async () => {
                 rounded
               />
             </div>
+          </VCardText>
+        </VCard>
+      </VCol>
+
+      <!-- Agenda du jour -->
+      <VCol cols="12">
+        <VCard>
+          <VCardItem>
+            <VCardTitle>Mes rendez-vous aujourd’hui</VCardTitle>
+            <VCardSubtitle>Priorité bureau DG — ouvrir le dossier préparatoire</VCardSubtitle>
+            <template #append>
+              <VBtn
+                variant="tonal"
+                size="small"
+                :to="{ name: 'parapheur-agenda-calendrier' }"
+                prepend-icon="tabler-calendar"
+              >
+                Agenda complet
+              </VBtn>
+            </template>
+          </VCardItem>
+          <VDivider />
+          <VCardText>
+            <div
+              v-if="!agendaToday.length"
+              class="text-medium-emphasis py-4"
+            >
+              Aucun rendez-vous planifié aujourd’hui.
+            </div>
+            <VList
+              v-else
+              lines="two"
+            >
+              <VListItem
+                v-for="item in agendaToday"
+                :key="item.id"
+                :to="{ name: 'parapheur-agenda-id', params: { id: item.id } }"
+              >
+                <template #prepend>
+                  <div
+                    class="text-subtitle-1 font-weight-bold me-4"
+                    style="min-inline-size: 3.5rem"
+                  >
+                    {{ item.start_at ? new Date(item.start_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '—' }}
+                  </div>
+                </template>
+                <VListItemTitle>{{ item.subject }}</VListItemTitle>
+                <VListItemSubtitle>
+                  {{ item.requester_name || item.requester_organization || '—' }}
+                  · {{ item.duration_minutes || '—' }} min
+                  <span v-if="item.location"> · {{ item.location }}</span>
+                </VListItemSubtitle>
+                <template #append>
+                  <VBtn
+                    size="small"
+                    color="primary"
+                    variant="tonal"
+                    :to="{ name: 'parapheur-agenda-id', params: { id: item.id } }"
+                  >
+                    Ouvrir le dossier
+                  </VBtn>
+                </template>
+              </VListItem>
+            </VList>
           </VCardText>
         </VCard>
       </VCol>

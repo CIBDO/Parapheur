@@ -74,6 +74,7 @@ class User extends Authenticatable
                 ['action' => 'manage', 'subject' => 'DocumentType'],
                 ['action' => 'manage', 'subject' => 'MeetingType'],
                 ['action' => 'manage', 'subject' => 'MeetingTemplate'],
+                ['action' => 'manage', 'subject' => 'AppointmentType'],
                 ['action' => 'read', 'subject' => 'AuditLog'],
                 ['action' => 'read', 'subject' => 'Notification'],
                 ['action' => 'read', 'subject' => 'Parapheur'],
@@ -129,6 +130,22 @@ class User extends Authenticatable
 
         if ($this->can('meetings.manage')) {
             $rules[] = ['action' => 'manage', 'subject' => 'Meeting'];
+        }
+
+        if ($this->can('appointments.view') || $this->can('appointments.create') || $this->can('appointments.manage_requests') || $this->can('appointments.validate')) {
+            $rules[] = ['action' => 'read', 'subject' => 'Appointment'];
+        }
+
+        if ($this->can('appointments.create') || $this->can('appointments.manage_requests')) {
+            $rules[] = ['action' => 'create', 'subject' => 'Appointment'];
+        }
+
+        if ($this->can('appointments.manage_requests') || $this->can('appointments.manage_calendar')) {
+            $rules[] = ['action' => 'manage', 'subject' => 'Appointment'];
+        }
+
+        if ($this->can('appointments.validate')) {
+            $rules[] = ['action' => 'validate', 'subject' => 'Appointment'];
         }
 
         if ($this->can('reporting.view')) {

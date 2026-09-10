@@ -17,3 +17,8 @@ Schedule::command('parapheur:remind-meetings')
     ->hourly()
     ->withoutOverlapping()
     ->appendOutputTo(storage_path('logs/meeting-reminders.log'));
+
+Schedule::command('parapheur:remind-appointments')
+    ->everyFifteenMinutes()
+    ->withoutOverlapping()
+    ->appendOutputTo(storage_path('logs/appointment-reminders.log'));

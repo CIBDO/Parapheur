@@ -47,6 +47,26 @@ class DatabaseSeeder extends Seeder
             'meetings.close',
             'meetings.archive',
             'meetings.view_reports',
+            'appointments.view',
+            'appointments.create',
+            'appointments.update',
+            'appointments.delete_draft',
+            'appointments.manage_requests',
+            'appointments.propose_slot',
+            'appointments.validate',
+            'appointments.reject',
+            'appointments.reschedule',
+            'appointments.cancel',
+            'appointments.confirm',
+            'appointments.manage_participants',
+            'appointments.manage_documents',
+            'appointments.manage_notes',
+            'appointments.manage_followups',
+            'appointments.view_calendar',
+            'appointments.manage_calendar',
+            'appointments.manage_unavailability',
+            'appointments.view_reports',
+            'appointments.archive',
             'reporting.view',
             'delegations.manage',
         ];
@@ -55,18 +75,49 @@ class DatabaseSeeder extends Seeder
             Permission::findOrCreate($permission);
         }
 
+        $appointmentManage = [
+            'appointments.view',
+            'appointments.create',
+            'appointments.update',
+            'appointments.delete_draft',
+            'appointments.manage_requests',
+            'appointments.propose_slot',
+            'appointments.validate',
+            'appointments.reject',
+            'appointments.reschedule',
+            'appointments.cancel',
+            'appointments.confirm',
+            'appointments.manage_participants',
+            'appointments.manage_documents',
+            'appointments.manage_notes',
+            'appointments.manage_followups',
+            'appointments.view_calendar',
+            'appointments.manage_calendar',
+            'appointments.manage_unavailability',
+            'appointments.view_reports',
+            'appointments.archive',
+        ];
+
         $roles = [
             'Administrateur' => $permissions,
-            'Directeur Général' => ['documents.create', 'documents.act', 'documents.vise', 'documents.validate', 'dashboard.dg', 'instructions.manage', 'meetings.manage', 'reporting.view', 'delegations.manage'],
-            'DGA' => ['documents.create', 'documents.act', 'documents.vise', 'documents.validate', 'dashboard.dg', 'instructions.manage', 'meetings.manage', 'reporting.view'],
-            'Conseiller' => ['documents.create', 'documents.act', 'reporting.view', 'meetings.view'],
-            'Secrétariat DG' => ['documents.create', 'documents.act', 'meetings.manage', 'meetings.view', 'meetings.create', 'meetings.take_official_notes', 'meetings.generate_minutes', 'reporting.view'],
-            'Directeur' => ['documents.create', 'documents.act', 'documents.vise', 'documents.validate', 'dashboard.direction', 'reporting.view', 'meetings.manage', 'meetings.view'],
-            'Chef de division' => ['documents.create', 'documents.act', 'meetings.view'],
-            'Chef de section' => ['documents.create', 'documents.act', 'meetings.view'],
-            'Agent' => ['documents.create', 'documents.act', 'meetings.view'],
-            // Consultation uniquement (cahier des charges §6)
-            'Lecteur' => ['meetings.view'],
+            'Directeur Général' => array_merge(
+                ['documents.create', 'documents.act', 'documents.vise', 'documents.validate', 'dashboard.dg', 'instructions.manage', 'meetings.manage', 'reporting.view', 'delegations.manage'],
+                $appointmentManage
+            ),
+            'DGA' => array_merge(
+                ['documents.create', 'documents.act', 'documents.vise', 'documents.validate', 'dashboard.dg', 'instructions.manage', 'meetings.manage', 'reporting.view'],
+                ['appointments.view', 'appointments.create', 'appointments.view_calendar', 'appointments.validate', 'appointments.manage_notes']
+            ),
+            'Conseiller' => ['documents.create', 'documents.act', 'reporting.view', 'meetings.view', 'appointments.view', 'appointments.create', 'appointments.view_calendar'],
+            'Secrétariat DG' => array_merge(
+                ['documents.create', 'documents.act', 'meetings.manage', 'meetings.view', 'meetings.create', 'meetings.take_official_notes', 'meetings.generate_minutes', 'reporting.view'],
+                $appointmentManage
+            ),
+            'Directeur' => ['documents.create', 'documents.act', 'documents.vise', 'documents.validate', 'dashboard.direction', 'reporting.view', 'meetings.manage', 'meetings.view', 'appointments.view', 'appointments.create', 'appointments.view_calendar'],
+            'Chef de division' => ['documents.create', 'documents.act', 'meetings.view', 'appointments.view', 'appointments.create'],
+            'Chef de section' => ['documents.create', 'documents.act', 'meetings.view', 'appointments.view', 'appointments.create'],
+            'Agent' => ['documents.create', 'documents.act', 'meetings.view', 'appointments.view', 'appointments.create'],
+            'Lecteur' => ['meetings.view', 'appointments.view', 'appointments.view_calendar'],
         ];
 
         foreach ($roles as $roleName => $perms) {
@@ -237,6 +288,7 @@ class DatabaseSeeder extends Seeder
 
         $this->seedDemoDocuments();
         $this->call(MeetingSeeder::class);
+        $this->call(AppointmentSeeder::class);
     }
 
     private function seedDemoDocuments(): void
