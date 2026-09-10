@@ -8,6 +8,7 @@ type AppNotification = Notification & {
 
 const router = useRouter()
 const notifications = ref<AppNotification[]>([])
+const unreadCount = ref(0)
 let pollTimer: ReturnType<typeof setInterval> | undefined
 
 const load = async () => {
@@ -23,21 +24,30 @@ const load = async () => {
       color: item.isSeen ? undefined : 'primary',
       url: item.url,
     }))
+    unreadCount.value = Number(res.unread_count ?? notifications.value.filter(n => !n.isSeen).length)
   }
   catch {
     notifications.value = []
+    unreadCount.value = 0
   }
 }
 
 const removeNotification = async (notificationId: number | string) => {
+  const wasUnread = notifications.value.find(item => item.id === notificationId && !item.isSeen)
   try {
     await $api(`/notifications/${notificationId}`, { method: 'DELETE' })
   }
   catch {}
   notifications.value = notifications.value.filter(item => item.id !== notificationId)
+  if (wasUnread)
+    unreadCount.value = Math.max(0, unreadCount.value - 1)
 }
 
 const markRead = async (notificationIds: Array<number | string>) => {
+  const unreadIds = notifications.value
+    .filter(item => notificationIds.includes(item.id) && !item.isSeen)
+    .map(item => item.id)
+
   try {
     await $api('/notifications/read', {
       method: 'POST',
@@ -49,9 +59,15 @@ const markRead = async (notificationIds: Array<number | string>) => {
     if (notificationIds.includes(item.id))
       item.isSeen = true
   })
+  unreadCount.value = Math.max(0, unreadCount.value - unreadIds.length)
 }
 
 const markUnRead = async (notificationIds: Array<number | string>) => {
+  const alreadyUnread = new Set(
+    notifications.value.filter(item => !item.isSeen).map(item => item.id),
+  )
+  const newlyUnread = notificationIds.filter(id => !alreadyUnread.has(id))
+
   try {
     await $api('/notifications/unread', {
       method: 'POST',
@@ -63,6 +79,7 @@ const markUnRead = async (notificationIds: Array<number | string>) => {
     if (notificationIds.includes(item.id))
       item.isSeen = false
   })
+  unreadCount.value += newlyUnread.length
 }
 
 const handleNotificationClick = async (notification: AppNotification) => {
@@ -87,6 +104,7 @@ onBeforeUnmount(() => {
 <template>
   <Notifications
     :notifications="notifications"
+    :unread-count="unreadCount"
     @remove="removeNotification"
     @read="markRead"
     @unread="markUnRead"

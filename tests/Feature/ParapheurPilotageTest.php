@@ -16,6 +16,36 @@ class ParapheurPilotageTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_dg_can_classify_from_en_consultation(): void
+    {
+        $this->seed(DatabaseSeeder::class);
+
+        $dg = User::query()->where('email', 'dg@dgtcp.local')->firstOrFail();
+        $agent = User::query()->where('email', 'agent.dsi@dgtcp.local')->firstOrFail();
+        $type = DocumentType::query()->firstOrFail();
+        $structure = Structure::query()->where('code', 'DSI')->firstOrFail();
+
+        $id = $this->actingAs($agent, 'sanctum')->postJson('/api/parapheur/documents', [
+            'object' => 'Note à classer après consultation',
+            'document_type_id' => $type->id,
+            'structure_id' => $structure->id,
+            'expected_action' => 'consultation',
+            'transmit_to' => $dg->id,
+        ])->assertCreated()->json('id');
+
+        $this->actingAs($dg, 'sanctum')
+            ->postJson("/api/parapheur/documents/{$id}/acknowledge")
+            ->assertOk()
+            ->assertJsonPath('status', 'en_consultation');
+
+        $this->actingAs($dg, 'sanctum')
+            ->postJson("/api/parapheur/documents/{$id}/classify", [
+                'comment' => 'Classement après consultation',
+            ])
+            ->assertOk()
+            ->assertJsonPath('status', 'classe');
+    }
+
     public function test_dg_dashboard_returns_stats(): void
     {
         $this->seed(DatabaseSeeder::class);
@@ -74,6 +104,35 @@ class ParapheurPilotageTest extends TestCase
         $this->actingAs($dg)
             ->get("/api/parapheur/documents/{$id}/archive-pack")
             ->assertOk();
+    }
+
+    public function test_recipient_is_notified_on_transmit(): void
+    {
+        Notification::fake();
+        $this->seed(DatabaseSeeder::class);
+
+        $agent = User::query()->where('email', 'agent.dsi@dgtcp.local')->firstOrFail();
+        $dg = User::query()->where('email', 'dg@dgtcp.local')->firstOrFail();
+        $type = DocumentType::query()->firstOrFail();
+        $structure = Structure::query()->where('code', 'DSI')->firstOrFail();
+
+        $this->actingAs($agent, 'sanctum')->postJson('/api/parapheur/documents', [
+            'object' => 'Note avec notification mail',
+            'document_type_id' => $type->id,
+            'structure_id' => $structure->id,
+            'expected_action' => 'validation',
+            'transmit_to' => $dg->id,
+        ])->assertCreated();
+
+        Notification::assertSentTo(
+            $dg,
+            \App\Notifications\DocumentWorkflowNotification::class,
+            function ($notification, $channels) {
+                return $notification->event === 'transmitted'
+                    && in_array('database', $channels, true)
+                    && in_array('mail', $channels, true);
+            }
+        );
     }
 
     public function test_instruction_reminder_command(): void

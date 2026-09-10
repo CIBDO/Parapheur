@@ -11,6 +11,9 @@ class DocumentWorkflowNotification extends Notification
 {
     use Queueable;
 
+    /** @var list<string>|null */
+    private ?array $forceChannels = null;
+
     public function __construct(
         public Document $document,
         public string $event,
@@ -18,8 +21,23 @@ class DocumentWorkflowNotification extends Notification
         public ?string $actorName = null,
     ) {}
 
+    /**
+     * @param  list<string>  $channels
+     */
+    public function viaChannels(array $channels): self
+    {
+        $this->forceChannels = $channels;
+
+        return $this;
+    }
+
     public function via(object $notifiable): array
     {
+        if ($this->forceChannels !== null) {
+            return $this->forceChannels;
+        }
+
+        // Toujours cloche in-app + e-mail (log/smtp/array selon .env)
         return ['database', 'mail'];
     }
 
@@ -33,8 +51,9 @@ class DocumentWorkflowNotification extends Notification
             ->line($this->message)
             ->line('Référence : '.($this->document->reference ?: '#'.$this->document->id))
             ->line('Objet : '.$this->document->object)
+            ->when($this->actorName, fn (MailMessage $mail) => $mail->line('Par : '.$this->actorName))
             ->action('Ouvrir le dossier', $url)
-            ->line('Ceci est une notification automatique du parapheur électronique.');
+            ->line('Ceci est une notification automatique du parapheur électronique DGTCP.');
     }
 
     public function toArray(object $notifiable): array
@@ -61,6 +80,8 @@ class DocumentWorkflowNotification extends Notification
             'rejected' => 'Document rejeté',
             'commented' => 'Nouveau commentaire',
             'instruction' => 'Nouvelle instruction',
+            'classified' => 'Document classé',
+            'archived' => 'Document archivé',
             default => 'Mise à jour de dossier',
         };
     }

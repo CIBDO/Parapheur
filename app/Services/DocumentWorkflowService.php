@@ -304,9 +304,7 @@ class DocumentWorkflowService
         return DB::transaction(function () use ($document, $user, $comment) {
             $from = $document->status;
             $to = $this->stateMachine->statusAfterAction(WorkflowActionType::PriseConnaissance, $from);
-            $this->stateMachine->assertCanTransition($from, $to);
-
-            $document->status = $to;
+            $this->transition($document, $to);
             $document->save();
 
             DocumentTransmission::query()
@@ -590,6 +588,16 @@ class DocumentWorkflowService
                 }
             }
 
+            if ($document->author_id && (int) $document->author_id !== (int) $actor->id) {
+                $this->notifyUser(
+                    User::query()->find($document->author_id),
+                    $document,
+                    'vised',
+                    sprintf('%s a visé le document.', $actor->name),
+                    $actor->name,
+                );
+            }
+
             return $result->fresh(['type', 'structure', 'author', 'currentAssignee', 'visas', 'approvals']);
         });
     }
@@ -678,6 +686,16 @@ class DocumentWorkflowService
                 'comment' => $comment,
                 'decided_at' => now(),
             ]);
+
+            if ($document->author_id && (int) $document->author_id !== (int) $actor->id) {
+                $this->notifyUser(
+                    User::query()->find($document->author_id),
+                    $document,
+                    'rejected',
+                    sprintf('%s a rejeté le document : %s', $actor->name, $comment),
+                    $actor->name,
+                );
+            }
 
             return $result;
         });
@@ -803,9 +821,10 @@ class DocumentWorkflowService
     ): Document {
         $from = $document->status;
         $to = $this->stateMachine->statusAfterAction($action, $from);
-        $this->stateMachine->assertCanTransition($from, $to);
 
-        $document->status = $to;
+        // Applique le chemin métier (étapes intermédiaires) jusqu’au statut cible.
+        $this->transition($document, $to);
+
         if ($mutator) {
             $mutator($document);
         }
@@ -830,6 +849,10 @@ class DocumentWorkflowService
         $this->audit->log('document.action.'.$action->value, $document, [
             'from' => $from->value,
             'to' => $to->value,
+            'path' => array_map(
+                fn (DocumentStatus $status) => $status->value,
+                $this->stateMachine->path($from, $to) ?? [$from, $to],
+            ),
             'delegator_id' => $delegator?->id,
         ]);
 
@@ -875,8 +898,11 @@ class DocumentWorkflowService
             return;
         }
 
-        $this->stateMachine->assertCanTransition($document->status, $to);
-        $document->status = $to;
+        $steps = $this->stateMachine->stepsTo($document->status, $to);
+        foreach ($steps as $step) {
+            $this->stateMachine->assertCanTransition($document->status, $step);
+            $document->status = $step;
+        }
     }
 
     private function resolveStepAssignee(WorkflowStep $step, Document $document, User $from): User
@@ -1002,11 +1028,52 @@ class DocumentWorkflowService
             return;
         }
 
-        $user->notify(new DocumentWorkflowNotification(
-            $document->withoutRelations(),
-            $event,
-            $message,
-            $actorName,
-        ));
+        $payload = [
+            'document' => $document->withoutRelations(),
+            'event' => $event,
+            'message' => $message,
+            'actorName' => $actorName,
+            'userId' => $user->id,
+        ];
+
+        $send = function () use ($payload) {
+            $user = User::query()->find($payload['userId']);
+            if (! $user) {
+                return;
+            }
+
+            $notification = new DocumentWorkflowNotification(
+                $payload['document'],
+                $payload['event'],
+                $payload['message'],
+                $payload['actorName'],
+            );
+
+            try {
+                $user->notify($notification);
+            } catch (\Throwable $e) {
+                report($e);
+
+                // L’échec SMTP ne doit pas faire perdre la notif in-app
+                try {
+                    $user->notify(
+                        (new DocumentWorkflowNotification(
+                            $payload['document'],
+                            $payload['event'],
+                            $payload['message'],
+                            $payload['actorName'],
+                        ))->viaChannels(['database'])
+                    );
+                } catch (\Throwable $fallbackError) {
+                    report($fallbackError);
+                }
+            }
+        };
+
+        if (\Illuminate\Support\Facades\DB::transactionLevel() > 0 && ! app()->runningUnitTests()) {
+            \Illuminate\Support\Facades\DB::afterCommit($send);
+        } else {
+            $send();
+        }
     }
 }
