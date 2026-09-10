@@ -105,6 +105,71 @@ class ParapheurWorkflowTest extends TestCase
         $this->assertSame(2, Document::query()->findOrFail($id)->current_version);
     }
 
+    public function test_main_file_can_be_added_when_document_was_created_without_one(): void
+    {
+        Storage::fake('local');
+        $this->seed(DatabaseSeeder::class);
+
+        $agent = User::query()->where('email', 'agent.dsi@dgtcp.local')->firstOrFail();
+        $type = DocumentType::query()->firstOrFail();
+        $structure = Structure::query()->where('code', 'DSI')->firstOrFail();
+        $token = $agent->createToken('test')->plainTextToken;
+
+        $created = $this->withToken($token)->postJson('/api/parapheur/documents', [
+            'object' => 'CR sans principal',
+            'document_type_id' => $type->id,
+            'structure_id' => $structure->id,
+            'attachments' => [UploadedFile::fake()->create('annexe.pdf', 50, 'application/pdf')],
+        ])->assertCreated();
+
+        $id = $created->json('id');
+        $this->assertSame(0, Document::query()->findOrFail($id)->current_version);
+        $this->assertCount(0, $this->withToken($token)->getJson("/api/parapheur/documents/{$id}")->json('versions'));
+        $this->assertCount(1, $this->withToken($token)->getJson("/api/parapheur/documents/{$id}")->json('attachments'));
+
+        $this->withToken($token)->post("/api/parapheur/documents/{$id}/versions", [
+            'file' => UploadedFile::fake()->create('compte-rendu.pdf', 80, 'application/pdf'),
+            'change_note' => 'Version initiale',
+        ])->assertCreated();
+
+        $show = $this->withToken($token)->getJson("/api/parapheur/documents/{$id}")->assertOk();
+        $this->assertCount(1, $show->json('versions'));
+        $this->assertSame('compte-rendu.pdf', $show->json('versions.0.original_name'));
+        $this->assertSame(1, Document::query()->findOrFail($id)->current_version);
+    }
+
+    public function test_creation_accepts_multiple_pieces_jointes_and_annexes(): void
+    {
+        Storage::fake('local');
+        $this->seed(DatabaseSeeder::class);
+
+        $agent = User::query()->where('email', 'agent.dsi@dgtcp.local')->firstOrFail();
+        $type = DocumentType::query()->firstOrFail();
+        $structure = Structure::query()->where('code', 'DSI')->firstOrFail();
+        $token = $agent->createToken('test')->plainTextToken;
+
+        $id = $this->withToken($token)->post('/api/parapheur/documents', [
+            'object' => 'Dossier multi PJ',
+            'document_type_id' => $type->id,
+            'structure_id' => $structure->id,
+            'main_file' => UploadedFile::fake()->create('principal.pdf', 100, 'application/pdf'),
+            'pieces_jointes' => [
+                UploadedFile::fake()->create('pj1.pdf', 40, 'application/pdf'),
+                UploadedFile::fake()->create('pj2.pdf', 45, 'application/pdf'),
+            ],
+            'annexes' => [
+                UploadedFile::fake()->create('annexe1.pdf', 30, 'application/pdf'),
+            ],
+        ])->assertCreated()->json('id');
+
+        $show = $this->withToken($token)->getJson("/api/parapheur/documents/{$id}")->assertOk();
+        $this->assertCount(1, $show->json('versions'));
+        $this->assertCount(3, $show->json('attachments'));
+
+        $kinds = collect($show->json('attachments'))->pluck('kind')->sort()->values()->all();
+        $this->assertSame(['annexe', 'piece_jointe', 'piece_jointe'], $kinds);
+    }
+
     public function test_admin_can_manage_workflows(): void
     {
         $this->seed(DatabaseSeeder::class);
@@ -124,5 +189,77 @@ class ParapheurWorkflowTest extends TestCase
         ])->assertCreated();
 
         $this->assertCount(2, $created->json('steps'));
+    }
+
+    public function test_initiator_sees_sent_documents_and_can_retransmit_after_return(): void
+    {
+        $this->seed(DatabaseSeeder::class);
+
+        $agent = User::query()->where('email', 'agent.dsi@dgtcp.local')->firstOrFail();
+        $dg = User::query()->where('email', 'dg@dgtcp.local')->firstOrFail();
+        $type = DocumentType::query()->firstOrFail();
+        $structure = Structure::query()->where('code', 'DSI')->firstOrFail();
+
+        $documentId = $this->actingAs($agent, 'sanctum')->postJson('/api/parapheur/documents', [
+            'object' => 'Note suivi envoyés',
+            'document_type_id' => $type->id,
+            'structure_id' => $structure->id,
+            'expected_action' => 'validation',
+            'transmit_to' => $dg->id,
+            'transmit_message' => 'Pour validation DG',
+        ])->assertCreated()->json('id');
+
+        $counts = $this->actingAs($agent, 'sanctum')->getJson('/api/parapheur/counts')->assertOk()->json();
+        $this->assertGreaterThanOrEqual(1, $counts['envoyes'] ?? 0);
+
+        $sent = $this->actingAs($agent, 'sanctum')
+            ->getJson('/api/parapheur/documents?folder=envoyes')
+            ->assertOk()
+            ->json('data');
+
+        $this->assertTrue(collect($sent)->contains(fn ($doc) => (int) $doc['id'] === (int) $documentId));
+
+        $dgSent = $this->actingAs($dg, 'sanctum')
+            ->getJson('/api/parapheur/documents?folder=envoyes')
+            ->assertOk()
+            ->json('data');
+
+        $this->assertFalse(collect($dgSent)->contains(fn ($doc) => (int) $doc['id'] === (int) $documentId));
+
+        $this->actingAs($dg, 'sanctum')
+            ->postJson("/api/parapheur/documents/{$documentId}/return", [
+                'comment' => 'Merci de préciser le chiffrage',
+            ])
+            ->assertOk();
+
+        $document = Document::query()->findOrFail($documentId);
+        $this->assertSame(DocumentStatus::ACorriger, $document->status);
+        $this->assertSame($agent->id, $document->current_assignee_id);
+
+        $returned = $this->actingAs($agent, 'sanctum')
+            ->getJson('/api/parapheur/documents?folder=retournes')
+            ->assertOk()
+            ->json('data');
+
+        $this->assertTrue(collect($returned)->contains(fn ($doc) => (int) $doc['id'] === (int) $documentId));
+
+        $stillSent = $this->actingAs($agent, 'sanctum')
+            ->getJson('/api/parapheur/documents?folder=envoyes')
+            ->assertOk()
+            ->json('data');
+
+        $this->assertTrue(collect($stillSent)->contains(fn ($doc) => (int) $doc['id'] === (int) $documentId));
+
+        $this->actingAs($agent, 'sanctum')
+            ->postJson("/api/parapheur/documents/{$documentId}/transmit", [
+                'to_user_id' => $dg->id,
+                'expected_action' => 'validation',
+                'message' => 'Version corrigée',
+            ])
+            ->assertOk();
+
+        $document->refresh();
+        $this->assertSame($dg->id, $document->current_assignee_id);
+        $this->assertNotSame(DocumentStatus::ACorriger, $document->status);
     }
 }

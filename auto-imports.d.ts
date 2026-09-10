@@ -10,6 +10,7 @@ declare global {
   const COOKIE_MAX_AGE_1_YEAR: typeof import('./resources/ts/utils/constants')['COOKIE_MAX_AGE_1_YEAR']
   const EffectScope: typeof import('vue')['EffectScope']
   const acceptHMRUpdate: typeof import('pinia')['acceptHMRUpdate']
+  const actionLabels: typeof import('./resources/ts/utils/parapheurUi')['actionLabels']
   const alphaDashValidator: typeof import('./resources/ts/@core/utils/validators')['alphaDashValidator']
   const alphaValidator: typeof import('./resources/ts/@core/utils/validators')['alphaValidator']
   const asyncComputed: typeof import('@vueuse/core')['asyncComputed']
@@ -21,6 +22,8 @@ declare global {
   const computedEager: typeof import('@vueuse/core')['computedEager']
   const computedInject: typeof import('@vueuse/core')['computedInject']
   const computedWithControl: typeof import('@vueuse/core')['computedWithControl']
+  const confidentialityLabels: typeof import('./resources/ts/utils/parapheurUi')['confidentialityLabels']
+  const confidentialityOptions: typeof import('./resources/ts/utils/parapheurUi')['confidentialityOptions']
   const confirmedValidator: typeof import('./resources/ts/@core/utils/validators')['confirmedValidator']
   const controlledComputed: typeof import('@vueuse/core')['controlledComputed']
   const controlledRef: typeof import('@vueuse/core')['controlledRef']
@@ -48,8 +51,12 @@ declare global {
   const eagerComputed: typeof import('@vueuse/core')['eagerComputed']
   const effectScope: typeof import('vue')['effectScope']
   const emailValidator: typeof import('./resources/ts/@core/utils/validators')['emailValidator']
+  const expectedActionOptions: typeof import('./resources/ts/utils/parapheurUi')['expectedActionOptions']
   const extendRef: typeof import('@vueuse/core')['extendRef']
+  const folderMeta: typeof import('./resources/ts/utils/parapheurUi')['folderMeta']
   const formatDate: typeof import('./resources/ts/@core/utils/formatters')['formatDate']
+  const formatDateFr: typeof import('./resources/ts/utils/parapheurUi')['formatDateFr']
+  const formatDateTimeFr: typeof import('./resources/ts/utils/parapheurUi')['formatDateTimeFr']
   const formatDateToMonthShort: typeof import('./resources/ts/@core/utils/formatters')['formatDateToMonthShort']
   const getActivePinia: typeof import('pinia')['getActivePinia']
   const getCurrentInstance: typeof import('vue')['getCurrentInstance']
@@ -71,6 +78,7 @@ declare global {
   const isRef: typeof import('vue')['isRef']
   const isToday: typeof import('./resources/ts/@core/utils/helpers')['isToday']
   const kFormatter: typeof import('./resources/ts/@core/utils/formatters')['kFormatter']
+  const labelOf: typeof import('./resources/ts/utils/parapheurUi')['labelOf']
   const lengthValidator: typeof import('./resources/ts/@core/utils/validators')['lengthValidator']
   const logicAnd: typeof import('@vueuse/math')['logicAnd']
   const logicNot: typeof import('@vueuse/math')['logicNot']
@@ -108,6 +116,9 @@ declare global {
   const passwordValidator: typeof import('./resources/ts/@core/utils/validators')['passwordValidator']
   const pausableWatch: typeof import('@vueuse/core')['pausableWatch']
   const prefixWithPlus: typeof import('./resources/ts/@core/utils/formatters')['prefixWithPlus']
+  const priorityColor: typeof import('./resources/ts/utils/parapheurUi')['priorityColor']
+  const priorityLabels: typeof import('./resources/ts/utils/parapheurUi')['priorityLabels']
+  const priorityOptions: typeof import('./resources/ts/utils/parapheurUi')['priorityOptions']
   const provide: typeof import('vue')['provide']
   const provideLocal: typeof import('@vueuse/core')['provideLocal']
   const reactify: typeof import('@vueuse/core')['reactify']
@@ -136,6 +147,9 @@ declare global {
   const shallowReactive: typeof import('vue')['shallowReactive']
   const shallowReadonly: typeof import('vue')['shallowReadonly']
   const shallowRef: typeof import('vue')['shallowRef']
+  const statusColor: typeof import('./resources/ts/utils/parapheurUi')['statusColor']
+  const statusLabels: typeof import('./resources/ts/utils/parapheurUi')['statusLabels']
+  const statusOptions: typeof import('./resources/ts/utils/parapheurUi')['statusOptions']
   const storeToRefs: typeof import('pinia')['storeToRefs']
   const syncRef: typeof import('@vueuse/core')['syncRef']
   const syncRefs: typeof import('@vueuse/core')['syncRefs']
@@ -375,6 +389,7 @@ declare module 'vue' {
     readonly COOKIE_MAX_AGE_1_YEAR: UnwrapRef<typeof import('./resources/ts/utils/constants')['COOKIE_MAX_AGE_1_YEAR']>
     readonly EffectScope: UnwrapRef<typeof import('vue')['EffectScope']>
     readonly acceptHMRUpdate: UnwrapRef<typeof import('pinia')['acceptHMRUpdate']>
+    readonly actionLabels: UnwrapRef<typeof import('./resources/ts/utils/parapheurUi')['actionLabels']>
     readonly alphaDashValidator: UnwrapRef<typeof import('./resources/ts/@core/utils/validators')['alphaDashValidator']>
     readonly alphaValidator: UnwrapRef<typeof import('./resources/ts/@core/utils/validators')['alphaValidator']>
     readonly asyncComputed: UnwrapRef<typeof import('@vueuse/core')['asyncComputed']>
@@ -386,6 +401,8 @@ declare module 'vue' {
     readonly computedEager: UnwrapRef<typeof import('@vueuse/core')['computedEager']>
     readonly computedInject: UnwrapRef<typeof import('@vueuse/core')['computedInject']>
     readonly computedWithControl: UnwrapRef<typeof import('@vueuse/core')['computedWithControl']>
+    readonly confidentialityLabels: UnwrapRef<typeof import('./resources/ts/utils/parapheurUi')['confidentialityLabels']>
+    readonly confidentialityOptions: UnwrapRef<typeof import('./resources/ts/utils/parapheurUi')['confidentialityOptions']>
     readonly confirmedValidator: UnwrapRef<typeof import('./resources/ts/@core/utils/validators')['confirmedValidator']>
     readonly controlledComputed: UnwrapRef<typeof import('@vueuse/core')['controlledComputed']>
     readonly controlledRef: UnwrapRef<typeof import('@vueuse/core')['controlledRef']>
@@ -413,8 +430,12 @@ declare module 'vue' {
     readonly eagerComputed: UnwrapRef<typeof import('@vueuse/core')['eagerComputed']>
     readonly effectScope: UnwrapRef<typeof import('vue')['effectScope']>
     readonly emailValidator: UnwrapRef<typeof import('./resources/ts/@core/utils/validators')['emailValidator']>
+    readonly expectedActionOptions: UnwrapRef<typeof import('./resources/ts/utils/parapheurUi')['expectedActionOptions']>
     readonly extendRef: UnwrapRef<typeof import('@vueuse/core')['extendRef']>
+    readonly folderMeta: UnwrapRef<typeof import('./resources/ts/utils/parapheurUi')['folderMeta']>
     readonly formatDate: UnwrapRef<typeof import('./resources/ts/@core/utils/formatters')['formatDate']>
+    readonly formatDateFr: UnwrapRef<typeof import('./resources/ts/utils/parapheurUi')['formatDateFr']>
+    readonly formatDateTimeFr: UnwrapRef<typeof import('./resources/ts/utils/parapheurUi')['formatDateTimeFr']>
     readonly formatDateToMonthShort: UnwrapRef<typeof import('./resources/ts/@core/utils/formatters')['formatDateToMonthShort']>
     readonly getActivePinia: UnwrapRef<typeof import('pinia')['getActivePinia']>
     readonly getCurrentInstance: UnwrapRef<typeof import('vue')['getCurrentInstance']>
@@ -436,6 +457,7 @@ declare module 'vue' {
     readonly isRef: UnwrapRef<typeof import('vue')['isRef']>
     readonly isToday: UnwrapRef<typeof import('./resources/ts/@core/utils/helpers')['isToday']>
     readonly kFormatter: UnwrapRef<typeof import('./resources/ts/@core/utils/formatters')['kFormatter']>
+    readonly labelOf: UnwrapRef<typeof import('./resources/ts/utils/parapheurUi')['labelOf']>
     readonly lengthValidator: UnwrapRef<typeof import('./resources/ts/@core/utils/validators')['lengthValidator']>
     readonly logicAnd: UnwrapRef<typeof import('@vueuse/math')['logicAnd']>
     readonly logicNot: UnwrapRef<typeof import('@vueuse/math')['logicNot']>
@@ -473,6 +495,9 @@ declare module 'vue' {
     readonly passwordValidator: UnwrapRef<typeof import('./resources/ts/@core/utils/validators')['passwordValidator']>
     readonly pausableWatch: UnwrapRef<typeof import('@vueuse/core')['pausableWatch']>
     readonly prefixWithPlus: UnwrapRef<typeof import('./resources/ts/@core/utils/formatters')['prefixWithPlus']>
+    readonly priorityColor: UnwrapRef<typeof import('./resources/ts/utils/parapheurUi')['priorityColor']>
+    readonly priorityLabels: UnwrapRef<typeof import('./resources/ts/utils/parapheurUi')['priorityLabels']>
+    readonly priorityOptions: UnwrapRef<typeof import('./resources/ts/utils/parapheurUi')['priorityOptions']>
     readonly provide: UnwrapRef<typeof import('vue')['provide']>
     readonly provideLocal: UnwrapRef<typeof import('@vueuse/core')['provideLocal']>
     readonly reactify: UnwrapRef<typeof import('@vueuse/core')['reactify']>
@@ -501,6 +526,9 @@ declare module 'vue' {
     readonly shallowReactive: UnwrapRef<typeof import('vue')['shallowReactive']>
     readonly shallowReadonly: UnwrapRef<typeof import('vue')['shallowReadonly']>
     readonly shallowRef: UnwrapRef<typeof import('vue')['shallowRef']>
+    readonly statusColor: UnwrapRef<typeof import('./resources/ts/utils/parapheurUi')['statusColor']>
+    readonly statusLabels: UnwrapRef<typeof import('./resources/ts/utils/parapheurUi')['statusLabels']>
+    readonly statusOptions: UnwrapRef<typeof import('./resources/ts/utils/parapheurUi')['statusOptions']>
     readonly storeToRefs: UnwrapRef<typeof import('pinia')['storeToRefs']>
     readonly syncRef: UnwrapRef<typeof import('@vueuse/core')['syncRef']>
     readonly syncRefs: UnwrapRef<typeof import('@vueuse/core')['syncRefs']>

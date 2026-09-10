@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import ParapheurPageHeader from '@/components/parapheur/ParapheurPageHeader.vue'
+
 definePage({
   meta: {
     action: 'manage',
@@ -216,17 +218,12 @@ onMounted(load)
 
 <template>
   <div>
-    <div class="d-flex flex-wrap justify-space-between align-center gap-4 mb-6">
-      <div>
-        <h4 class="text-h4 mb-1">
-          Rôles & permissions
-        </h4>
-        <p class="text-body-1 mb-0 text-medium-emphasis">
-          Paramétrage RBAC des profils e-Parapheur
-        </p>
-      </div>
-
-      <div class="d-flex flex-wrap gap-2">
+    <ParapheurPageHeader
+      title="Rôles & permissions"
+      subtitle="Paramétrage RBAC des profils e-Parapheur"
+      icon="tabler-lock-access"
+    >
+      <template #actions>
         <VBtn
           variant="tonal"
           color="primary"
@@ -242,8 +239,9 @@ onMounted(load)
         >
           Nouveau rôle
         </VBtn>
-      </div>
-    </div>
+      </template>
+    </ParapheurPageHeader>
+
 
     <VAlert
       v-if="successMessage"

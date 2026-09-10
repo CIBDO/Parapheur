@@ -1,4 +1,11 @@
 <script setup lang="ts">
+import ParapheurPageHeader from '@/components/parapheur/ParapheurPageHeader.vue'
+import {
+  confidentialityOptions,
+  expectedActionOptions,
+  priorityOptions,
+} from '@/utils/parapheurUi'
+
 definePage({
   meta: {
     action: 'create',
@@ -30,10 +37,29 @@ const form = ref({
   transmit_message: '',
 })
 
-const mainFile = ref<File[]>([])
-const attachments = ref<File[]>([])
+const mainFile = ref<File | File[] | null>(null)
+const piecesJointes = ref<File | File[] | null>(null)
+const annexes = ref<File | File[] | null>(null)
 const saving = ref(false)
 const errorMessage = ref('')
+
+const asFile = (value: File | File[] | null | undefined): File | null => {
+  if (!value)
+    return null
+
+  return Array.isArray(value) ? (value[0] ?? null) : value
+}
+
+const asFiles = (value: File | File[] | null | undefined): File[] => {
+  if (!value)
+    return []
+
+  return Array.isArray(value) ? value.filter(Boolean) : [value]
+}
+
+const canSubmit = computed(() =>
+  Boolean(form.value.object.trim() && form.value.document_type_id),
+)
 
 onMounted(async () => {
   const [types, structs, people, circuits] = await Promise.all([
@@ -50,6 +76,12 @@ onMounted(async () => {
 
 const submit = async () => {
   errorMessage.value = ''
+  if (!canSubmit.value) {
+    errorMessage.value = 'Renseignez au minimum l’objet et le type de document.'
+
+    return
+  }
+
   saving.value = true
   try {
     const body = new FormData()
@@ -66,9 +98,12 @@ const submit = async () => {
       body.append('keywords', JSON.stringify(kws))
     }
 
-    if (mainFile.value[0])
-      body.append('main_file', mainFile.value[0])
-    attachments.value.forEach(file => body.append('attachments[]', file))
+    const principal = asFile(mainFile.value)
+    if (principal)
+      body.append('main_file', principal)
+
+    asFiles(piecesJointes.value).forEach(file => body.append('pieces_jointes[]', file))
+    asFiles(annexes.value).forEach(file => body.append('annexes[]', file))
 
     if (form.value.transmit_mode === 'libre' && form.value.transmit_to) {
       body.append('transmit_to', String(form.value.transmit_to))
@@ -98,217 +133,325 @@ const submit = async () => {
 </script>
 
 <template>
-  <VCard>
-    <VCardTitle>Nouveau document</VCardTitle>
-    <VCardText>
-      <VAlert
-        v-if="errorMessage"
-        type="error"
-        class="mb-4"
-      >
-        {{ errorMessage }}
-      </VAlert>
+  <div>
+    <ParapheurPageHeader
+      title="Nouveau document"
+      subtitle="Déposez un dossier et lancez sa circulation"
+      icon="tabler-file-plus"
+    >
+      <template #actions>
+        <VBtn
+          variant="tonal"
+          color="secondary"
+          :to="{ name: 'parapheur' }"
+        >
+          Retour
+        </VBtn>
+      </template>
+    </ParapheurPageHeader>
 
-      <VRow>
-        <VCol cols="12">
-          <AppTextField
-            v-model="form.object"
-            label="Objet"
-            required
-          />
-        </VCol>
-        <VCol
-          cols="12"
-          md="6"
-        >
-          <AppTextField
-            v-model="form.reference"
-            label="Référence (auto si vide)"
-          />
-        </VCol>
-        <VCol
-          cols="12"
-          md="6"
-        >
-          <AppSelect
-            v-model="form.document_type_id"
-            :items="documentTypes"
-            item-title="name"
-            item-value="id"
-            label="Type de document"
-          />
-        </VCol>
-        <VCol
-          cols="12"
-          md="6"
-        >
-          <AppSelect
-            v-model="form.structure_id"
-            :items="structures"
-            :item-title="(i: any) => `${i.code} — ${i.name}`"
-            item-value="id"
-            label="Structure émettrice"
-          />
-        </VCol>
-        <VCol
-          cols="12"
-          md="6"
-        >
-          <AppSelect
-            v-model="form.expected_action"
-            :items="[
-              { title: 'Pour information', value: 'information' },
-              { title: 'Pour consultation', value: 'consultation' },
-              { title: 'Pour avis', value: 'avis' },
-              { title: 'Pour observations', value: 'observations' },
-              { title: 'Pour instruction', value: 'instruction' },
-              { title: 'Pour visa', value: 'visa' },
-              { title: 'Pour validation', value: 'validation' },
-            ]"
-            label="Action attendue"
-          />
-        </VCol>
-        <VCol
-          cols="12"
-          md="4"
-        >
-          <AppSelect
-            v-model="form.priority"
-            :items="[
-              { title: 'Normale', value: 'normale' },
-              { title: 'Importante', value: 'importante' },
-              { title: 'Urgente', value: 'urgente' },
-              { title: 'Très urgente', value: 'tres_urgente' },
-            ]"
-            label="Priorité"
-          />
-        </VCol>
-        <VCol
-          cols="12"
-          md="4"
-        >
-          <AppSelect
-            v-model="form.confidentiality"
-            :items="[
-              { title: 'Normal', value: 'normal' },
-              { title: 'Restreint', value: 'restreint' },
-              { title: 'Confidentiel', value: 'confidentiel' },
-              { title: 'Très confidentiel', value: 'tres_confidentiel' },
-            ]"
-            label="Confidentialité"
-          />
-        </VCol>
-        <VCol
-          cols="12"
-          md="4"
-        >
-          <AppTextField
-            v-model="form.due_date"
-            type="date"
-            label="Date limite"
-          />
-        </VCol>
-        <VCol
-          cols="12"
-          md="6"
-        >
-          <AppTextField
-            v-model="form.document_date"
-            type="date"
-            label="Date du document"
-          />
-        </VCol>
-        <VCol
-          cols="12"
-          md="6"
-        >
-          <AppTextField
-            v-model="form.keywords"
-            label="Mots-clés (séparés par des virgules)"
-          />
-        </VCol>
-        <VCol cols="12">
-          <VFileInput
-            v-model="mainFile"
-            label="Document principal"
-            show-size
-          />
-        </VCol>
-        <VCol cols="12">
-          <VFileInput
-            v-model="attachments"
-            label="Pièces jointes / annexes"
-            multiple
-            show-size
-          />
-        </VCol>
+    <VAlert
+      v-if="errorMessage"
+      type="error"
+      variant="tonal"
+      class="mb-6"
+      closable
+      @click:close="errorMessage = ''"
+    >
+      {{ errorMessage }}
+    </VAlert>
 
-        <VCol cols="12">
-          <AppSelect
-            v-model="form.transmit_mode"
-            :items="[
-              { title: 'Enregistrer en brouillon (sans transmission)', value: 'none' },
-              { title: 'Transmission libre', value: 'libre' },
-              { title: 'Circuit prédéfini', value: 'predefini' },
-            ]"
-            label="Mode de transmission"
-          />
-        </VCol>
-        <VCol
-          v-if="form.transmit_mode === 'libre'"
-          cols="12"
-          md="6"
+    <VCard>
+      <VCardText class="pa-6">
+        <div class="parapheur-form-section">
+          <div class="parapheur-form-section__title">
+            <VIcon
+              icon="tabler-file-description"
+              color="primary"
+              size="20"
+            />
+            Identification
+          </div>
+          <VRow>
+            <VCol cols="12">
+              <AppTextField
+                v-model="form.object"
+                label="Objet *"
+                placeholder="Ex. Compte rendu réunion DSI"
+              />
+            </VCol>
+            <VCol
+              cols="12"
+              md="6"
+            >
+              <AppTextField
+                v-model="form.reference"
+                label="Référence"
+                placeholder="Auto si vide"
+                hint="Laissée vide, une référence structure/année est générée"
+                persistent-hint
+              />
+            </VCol>
+            <VCol
+              cols="12"
+              md="6"
+            >
+              <AppSelect
+                v-model="form.document_type_id"
+                :items="documentTypes"
+                item-title="name"
+                item-value="id"
+                label="Type de document *"
+              />
+            </VCol>
+            <VCol
+              cols="12"
+              md="6"
+            >
+              <AppSelect
+                v-model="form.structure_id"
+                :items="structures"
+                :item-title="(i: any) => `${i.code} — ${i.name}`"
+                item-value="id"
+                label="Structure émettrice"
+                clearable
+              />
+            </VCol>
+            <VCol
+              cols="12"
+              md="6"
+            >
+              <AppSelect
+                v-model="form.expected_action"
+                :items="expectedActionOptions"
+                item-title="title"
+                item-value="value"
+                label="Action attendue"
+              />
+            </VCol>
+          </VRow>
+        </div>
+
+        <div class="parapheur-form-section">
+          <div class="parapheur-form-section__title">
+            <VIcon
+              icon="tabler-adjustments"
+              color="primary"
+              size="20"
+            />
+            Priorité & confidentialité
+          </div>
+          <VRow>
+            <VCol
+              cols="12"
+              md="4"
+            >
+              <AppSelect
+                v-model="form.priority"
+                :items="priorityOptions"
+                item-title="title"
+                item-value="value"
+                label="Priorité"
+              />
+            </VCol>
+            <VCol
+              cols="12"
+              md="4"
+            >
+              <AppSelect
+                v-model="form.confidentiality"
+                :items="confidentialityOptions"
+                item-title="title"
+                item-value="value"
+                label="Confidentialité"
+              />
+            </VCol>
+            <VCol
+              cols="12"
+              md="4"
+            >
+              <AppTextField
+                v-model="form.due_date"
+                type="date"
+                label="Date limite"
+              />
+            </VCol>
+            <VCol
+              cols="12"
+              md="6"
+            >
+              <AppTextField
+                v-model="form.document_date"
+                type="date"
+                label="Date du document"
+              />
+            </VCol>
+            <VCol
+              cols="12"
+              md="6"
+            >
+              <AppTextField
+                v-model="form.keywords"
+                label="Mots-clés"
+                placeholder="séparés par des virgules"
+              />
+            </VCol>
+          </VRow>
+        </div>
+
+        <div class="parapheur-form-section">
+          <div class="parapheur-form-section__title">
+            <VIcon
+              icon="tabler-paperclip"
+              color="primary"
+              size="20"
+            />
+            Fichiers
+          </div>
+          <VAlert
+            type="info"
+            variant="tonal"
+            class="mb-4"
+            density="compact"
+          >
+            Le <strong>document principal</strong> est le fichier à viser / valider.
+            Vous pouvez joindre plusieurs <strong>pièces jointes</strong> et <strong>annexes</strong>.
+          </VAlert>
+          <VRow>
+            <VCol cols="12">
+              <VFileInput
+                v-model="mainFile"
+                label="Document principal *"
+                prepend-icon=""
+                prepend-inner-icon="tabler-file"
+                show-size
+                clearable
+                hint="PDF recommandé pour la prévisualisation"
+                persistent-hint
+              />
+            </VCol>
+            <VCol
+              cols="12"
+              md="6"
+            >
+              <VFileInput
+                v-model="piecesJointes"
+                label="Pièces jointes"
+                prepend-icon=""
+                prepend-inner-icon="tabler-paperclip"
+                multiple
+                chips
+                show-size
+                clearable
+                hint="Plusieurs fichiers autorisés"
+                persistent-hint
+              />
+            </VCol>
+            <VCol
+              cols="12"
+              md="6"
+            >
+              <VFileInput
+                v-model="annexes"
+                label="Annexes"
+                prepend-icon=""
+                prepend-inner-icon="tabler-files"
+                multiple
+                chips
+                show-size
+                clearable
+                hint="Plusieurs fichiers autorisés"
+                persistent-hint
+              />
+            </VCol>
+          </VRow>
+        </div>
+
+        <div class="parapheur-form-section mb-0">
+          <div class="parapheur-form-section__title">
+            <VIcon
+              icon="tabler-send"
+              color="primary"
+              size="20"
+            />
+            Transmission
+          </div>
+          <VRow>
+            <VCol cols="12">
+              <AppSelect
+                v-model="form.transmit_mode"
+                :items="[
+                  { title: 'Enregistrer en brouillon (sans transmission)', value: 'none' },
+                  { title: 'Transmission libre', value: 'libre' },
+                  { title: 'Circuit prédéfini', value: 'predefini' },
+                ]"
+                item-title="title"
+                item-value="value"
+                label="Mode de transmission"
+              />
+            </VCol>
+            <VCol
+              v-if="form.transmit_mode === 'libre'"
+              cols="12"
+              md="6"
+            >
+              <AppSelect
+                v-model="form.transmit_to"
+                :items="users"
+                item-title="name"
+                item-value="id"
+                label="Transmettre à"
+                clearable
+              />
+            </VCol>
+            <VCol
+              v-if="form.transmit_mode === 'predefini'"
+              cols="12"
+              md="6"
+            >
+              <AppSelect
+                v-model="form.workflow_id"
+                :items="workflows"
+                item-title="name"
+                item-value="id"
+                label="Circuit"
+                clearable
+              />
+            </VCol>
+            <VCol
+              v-if="form.transmit_mode !== 'none'"
+              cols="12"
+              md="6"
+            >
+              <AppTextField
+                v-model="form.transmit_message"
+                label="Message de transmission"
+              />
+            </VCol>
+          </VRow>
+        </div>
+      </VCardText>
+
+      <VDivider />
+      <VCardActions class="pa-4">
+        <VBtn
+          variant="text"
+          :to="{ name: 'parapheur' }"
         >
-          <AppSelect
-            v-model="form.transmit_to"
-            :items="users"
-            item-title="name"
-            item-value="id"
-            label="Transmettre à"
-            clearable
-          />
-        </VCol>
-        <VCol
-          v-if="form.transmit_mode === 'predefini'"
-          cols="12"
-          md="6"
+          Annuler
+        </VBtn>
+        <VSpacer />
+        <VBtn
+          color="primary"
+          size="large"
+          prepend-icon="tabler-device-floppy"
+          :loading="saving"
+          :disabled="!canSubmit"
+          @click="submit"
         >
-          <AppSelect
-            v-model="form.workflow_id"
-            :items="workflows"
-            item-title="name"
-            item-value="id"
-            label="Circuit"
-            clearable
-          />
-        </VCol>
-        <VCol
-          v-if="form.transmit_mode !== 'none'"
-          cols="12"
-          md="6"
-        >
-          <AppTextField
-            v-model="form.transmit_message"
-            label="Message de transmission"
-          />
-        </VCol>
-      </VRow>
-    </VCardText>
-    <VCardActions>
-      <VSpacer />
-      <VBtn
-        variant="text"
-        :to="{ name: 'parapheur' }"
-      >
-        Annuler
-      </VBtn>
-      <VBtn
-        color="primary"
-        :loading="saving"
-        @click="submit"
-      >
-        Enregistrer
-      </VBtn>
-    </VCardActions>
-  </VCard>
+          Enregistrer le dossier
+        </VBtn>
+      </VCardActions>
+    </VCard>
+  </div>
 </template>

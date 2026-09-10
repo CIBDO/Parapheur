@@ -42,6 +42,47 @@ class ParapheurActionsTest extends TestCase
             ->assertForbidden();
     }
 
+    public function test_initiator_cannot_process_after_transmit_even_with_vise_permission(): void
+    {
+        $this->seed(DatabaseSeeder::class);
+
+        $directeur = User::query()->where('email', 'directeur.dsi@dgtcp.local')->firstOrFail();
+        $dg = User::query()->where('email', 'dg@dgtcp.local')->firstOrFail();
+        $type = DocumentType::query()->firstOrFail();
+        $structure = Structure::query()->where('code', 'DSI')->firstOrFail();
+
+        $id = $this->actingAs($directeur)->postJson('/api/parapheur/documents', [
+            'object' => 'CR initiateur',
+            'document_type_id' => $type->id,
+            'structure_id' => $structure->id,
+            'expected_action' => 'instruction',
+            'transmit_to' => $dg->id,
+        ])->assertCreated()->json('id');
+
+        $doc = Document::query()->findOrFail($id);
+        $this->assertSame($dg->id, $doc->current_assignee_id);
+        $this->assertSame($directeur->id, $doc->author_id);
+
+        $this->actingAs($directeur)
+            ->postJson("/api/parapheur/documents/{$id}/vise", ['comment' => 'non'])
+            ->assertForbidden();
+
+        $this->actingAs($directeur)
+            ->postJson("/api/parapheur/documents/{$id}/validate", ['comment' => 'non'])
+            ->assertForbidden();
+
+        $this->actingAs($directeur)
+            ->postJson("/api/parapheur/documents/{$id}/acknowledge")
+            ->assertForbidden();
+
+        $this->actingAs($directeur)
+            ->postJson("/api/parapheur/documents/{$id}/comments", [
+                'body' => 'Note de l’auteur',
+                'kind' => 'general',
+            ])
+            ->assertForbidden();
+    }
+
     public function test_avis_recommandation_and_complement(): void
     {
         $this->seed(DatabaseSeeder::class);

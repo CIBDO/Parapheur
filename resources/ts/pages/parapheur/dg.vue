@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useTheme } from 'vuetify'
 import { hexToRgb } from '@layouts/utils'
+import ParapheurPageHeader from '@/components/parapheur/ParapheurPageHeader.vue'
 
 definePage({
   meta: {
@@ -241,8 +242,11 @@ const sparkOptions = computed(() => {
   }
 })
 
+const loadError = ref('')
+
 const loadDashboard = async () => {
   loading.value = true
+  loadError.value = ''
   try {
     const [statsRes, docsRes] = await Promise.all([
       $api('/dashboard/dg'),
@@ -251,6 +255,11 @@ const loadDashboard = async () => {
 
     stats.value = statsRes
     documents.value = docsRes.data ?? docsRes
+  }
+  catch (e: any) {
+    loadError.value = e?.data?.message || e?.message || 'Impossible de charger le bureau DG'
+    stats.value = null
+    documents.value = []
   }
   finally {
     loading.value = false
@@ -324,17 +333,12 @@ onMounted(async () => {
 
 <template>
   <div>
-    <div class="d-flex flex-wrap justify-space-between align-center gap-4 mb-6">
-      <div>
-        <h4 class="text-h4 mb-1">
-          {{ greeting }}{{ userData?.fullName ? `, ${userData.fullName}` : '' }}
-        </h4>
-        <p class="text-body-1 mb-0 text-medium-emphasis">
-          Bureau du Directeur Général — vue orientée action
-        </p>
-      </div>
-
-      <div class="d-flex flex-wrap gap-2">
+    <ParapheurPageHeader
+      :title="`${greeting}${userData?.fullName ? `, ${userData.fullName}` : ''}`"
+      subtitle="Bureau du Directeur Général — vue orientée action"
+      icon="tabler-layout-dashboard"
+    >
+      <template #actions>
         <VBtn
           variant="tonal"
           color="primary"
@@ -351,8 +355,19 @@ onMounted(async () => {
         >
           Mon parapheur
         </VBtn>
-      </div>
-    </div>
+      </template>
+    </ParapheurPageHeader>
+
+    <VAlert
+      v-if="loadError"
+      type="error"
+      variant="tonal"
+      class="mb-6"
+      closable
+      @click:close="loadError = ''"
+    >
+      {{ loadError }}
+    </VAlert>
 
     <VRow class="match-height">
       <!-- KPI cards style CRM -->

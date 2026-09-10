@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import ParapheurPageHeader from '@/components/parapheur/ParapheurPageHeader.vue'
+
 definePage({
   meta: {
     action: 'manage',
@@ -114,23 +116,22 @@ onMounted(load)
 
 <template>
   <div>
-    <div class="d-flex flex-wrap justify-space-between align-center gap-4 mb-6">
-      <div>
-        <h4 class="text-h4 mb-1">
-          Types de documents
-        </h4>
-        <p class="text-body-1 mb-0 text-medium-emphasis">
-          Référentiel des natures de pièces du parapheur
-        </p>
-      </div>
-      <VBtn
-        color="primary"
-        prepend-icon="tabler-plus"
-        @click="openCreate"
-      >
-        Nouveau type
-      </VBtn>
-    </div>
+    <ParapheurPageHeader
+      title="Types de documents"
+      subtitle="Référentiel des natures de pièces du parapheur"
+      icon="tabler-file-description"
+    >
+      <template #actions>
+        <VBtn
+          color="primary"
+          prepend-icon="tabler-plus"
+          @click="openCreate"
+        >
+          Nouveau type
+        </VBtn>
+      </template>
+    </ParapheurPageHeader>
+
 
     <VAlert
       v-if="successMessage"

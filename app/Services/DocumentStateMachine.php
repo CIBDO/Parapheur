@@ -64,6 +64,11 @@ class DocumentStateMachine
         ],
         DocumentStatus::ACorriger->value => [
             DocumentStatus::Corrige->value,
+            DocumentStatus::EnCircuit->value,
+            DocumentStatus::Transmis->value,
+            DocumentStatus::AConsulter->value,
+            DocumentStatus::AViser->value,
+            DocumentStatus::AValider->value,
             DocumentStatus::Annule->value,
         ],
         DocumentStatus::Corrige->value => [

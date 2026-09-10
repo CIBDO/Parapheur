@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import ParapheurPageHeader from '@/components/parapheur/ParapheurPageHeader.vue'
+
 definePage({
   meta: {
     action: 'manage',
@@ -240,24 +242,22 @@ onMounted(async () => {
 
 <template>
   <div>
-    <div class="d-flex flex-wrap justify-space-between align-center gap-4 mb-6">
-      <div>
-        <h4 class="text-h4 mb-1">
-          Utilisateurs
-        </h4>
-        <p class="text-body-1 mb-0 text-medium-emphasis">
-          Comptes, rôles et rattachement aux structures
-        </p>
-      </div>
+    <ParapheurPageHeader
+      title="Utilisateurs"
+      subtitle="Comptes, rôles et rattachement aux structures"
+      icon="tabler-users"
+    >
+      <template #actions>
+        <VBtn
+          color="primary"
+          prepend-icon="tabler-user-plus"
+          @click="openCreate"
+        >
+          Nouvel utilisateur
+        </VBtn>
+      </template>
+    </ParapheurPageHeader>
 
-      <VBtn
-        color="primary"
-        prepend-icon="tabler-user-plus"
-        @click="openCreate"
-      >
-        Nouvel utilisateur
-      </VBtn>
-    </div>
 
     <VAlert
       v-if="successMessage"

@@ -21,6 +21,7 @@ use App\Services\ParapheurService;
 use App\Services\PrivateDocumentStorage;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Validation\Rule;
@@ -111,6 +112,10 @@ class DocumentController extends Controller
             'main_file' => ['nullable', 'file', 'max:20480'],
             'attachments' => ['nullable', 'array'],
             'attachments.*' => ['file', 'max:20480'],
+            'pieces_jointes' => ['nullable', 'array'],
+            'pieces_jointes.*' => ['file', 'max:20480'],
+            'annexes' => ['nullable', 'array'],
+            'annexes.*' => ['file', 'max:20480'],
             'transmit_to' => ['nullable', 'exists:users,id'],
             'transmit_message' => ['nullable', 'string'],
             'workflow_id' => ['nullable', 'exists:workflows,id'],
@@ -123,11 +128,23 @@ class DocumentController extends Controller
                 : array_values(array_filter(array_map('trim', explode(',', $data['keywords']))));
         }
 
+        $attachments = [];
+        foreach ($this->uploadedFiles($request, 'pieces_jointes') as $file) {
+            $attachments[] = ['file' => $file, 'kind' => 'piece_jointe'];
+        }
+        foreach ($this->uploadedFiles($request, 'annexes') as $file) {
+            $attachments[] = ['file' => $file, 'kind' => 'annexe'];
+        }
+        // Compatibilité : ancien champ unique « attachments[] »
+        foreach ($this->uploadedFiles($request, 'attachments') as $file) {
+            $attachments[] = ['file' => $file, 'kind' => 'piece_jointe'];
+        }
+
         $document = $this->workflow->createDraft(
             $request->user(),
             $data,
-            $request->file('main_file'),
-            $request->file('attachments', []) ?: [],
+            $this->firstUploadedFile($request, 'main_file'),
+            $attachments,
         );
 
         if (! empty($data['workflow_id']) || ! empty($data['transmit_to'])) {
@@ -224,7 +241,7 @@ class DocumentController extends Controller
 
     public function transmit(Request $request, Document $document): JsonResponse
     {
-        $this->access->authorize($request->user(), $document);
+        $this->access->authorizeTransmit($request->user(), $document);
         abort_unless($request->user()->can('documents.act') || $request->user()->can('admin.access'), 403);
 
         $data = $request->validate([
@@ -252,7 +269,7 @@ class DocumentController extends Controller
 
     public function reassign(Request $request, Document $document): JsonResponse
     {
-        $this->access->authorize($request->user(), $document);
+        $this->access->authorizeProcess($request->user(), $document);
         abort_unless($request->user()->can('documents.act') || $request->user()->can('admin.access'), 403);
 
         $data = $request->validate([
@@ -274,7 +291,7 @@ class DocumentController extends Controller
 
     public function acknowledge(Request $request, Document $document): JsonResponse
     {
-        $this->access->authorize($request->user(), $document);
+        $this->access->authorizeProcess($request->user(), $document);
         abort_unless($request->user()->can('documents.act') || $request->user()->can('admin.access'), 403);
         $data = $request->validate(['comment' => ['nullable', 'string']]);
 
@@ -285,7 +302,7 @@ class DocumentController extends Controller
 
     public function hold(Request $request, Document $document): JsonResponse
     {
-        $this->access->authorize($request->user(), $document);
+        $this->access->authorizeProcess($request->user(), $document);
         abort_unless($request->user()->can('documents.act') || $request->user()->can('admin.access'), 403);
         $data = $request->validate(['comment' => ['nullable', 'string']]);
 
@@ -296,7 +313,7 @@ class DocumentController extends Controller
 
     public function classify(Request $request, Document $document): JsonResponse
     {
-        $this->access->authorize($request->user(), $document);
+        $this->access->authorizeProcess($request->user(), $document);
         abort_unless($request->user()->can('documents.act') || $request->user()->can('admin.access'), 403);
         $data = $request->validate(['comment' => ['nullable', 'string']]);
 
@@ -315,12 +332,15 @@ class DocumentController extends Controller
             'kind' => ['nullable', Rule::in(['general', 'avis', 'observation', 'recommandation'])],
         ]);
 
+        $kind = $data['kind'] ?? 'general';
+        $this->access->authorizeProcess($request->user(), $document);
+
         try {
             $comment = $this->workflow->addComment(
                 $document,
                 $request->user(),
                 $data['body'],
-                $data['kind'] ?? 'general',
+                $kind,
             );
         } catch (\InvalidArgumentException $e) {
             return response()->json(['message' => $e->getMessage()], 422);
@@ -331,7 +351,7 @@ class DocumentController extends Controller
 
     public function returnCorrection(Request $request, Document $document): JsonResponse
     {
-        $this->access->authorize($request->user(), $document);
+        $this->access->authorizeProcess($request->user(), $document);
         abort_unless($request->user()->can('documents.act') || $request->user()->can('admin.access'), 403);
         $data = $request->validate(['comment' => ['required', 'string']]);
 
@@ -342,7 +362,7 @@ class DocumentController extends Controller
 
     public function requestComplement(Request $request, Document $document): JsonResponse
     {
-        $this->access->authorize($request->user(), $document);
+        $this->access->authorizeProcess($request->user(), $document);
         abort_unless($request->user()->can('documents.act') || $request->user()->can('admin.access'), 403);
         $data = $request->validate(['comment' => ['required', 'string']]);
 
@@ -353,7 +373,7 @@ class DocumentController extends Controller
 
     public function vise(Request $request, Document $document): JsonResponse
     {
-        $this->access->authorize($request->user(), $document);
+        $this->access->authorizeProcess($request->user(), $document, 'vise');
         abort_unless($request->user()->can('documents.vise') || $request->user()->can('admin.access'), 403);
         $data = $request->validate(['comment' => ['nullable', 'string']]);
 
@@ -364,7 +384,7 @@ class DocumentController extends Controller
 
     public function validateAction(Request $request, Document $document): JsonResponse
     {
-        $this->access->authorize($request->user(), $document);
+        $this->access->authorizeProcess($request->user(), $document, 'validate');
         abort_unless($request->user()->can('documents.validate') || $request->user()->can('admin.access'), 403);
         $data = $request->validate(['comment' => ['nullable', 'string']]);
 
@@ -375,7 +395,7 @@ class DocumentController extends Controller
 
     public function reject(Request $request, Document $document): JsonResponse
     {
-        $this->access->authorize($request->user(), $document);
+        $this->access->authorizeProcess($request->user(), $document);
         abort_unless(
             $request->user()->can('documents.validate')
             || $request->user()->can('documents.vise')
@@ -392,7 +412,7 @@ class DocumentController extends Controller
 
     public function archive(Request $request, Document $document): JsonResponse
     {
-        $this->access->authorize($request->user(), $document);
+        $this->access->authorizeProcess($request->user(), $document);
         abort_unless($request->user()->can('documents.act') || $request->user()->can('admin.access'), 403);
         $data = $request->validate(['comment' => ['nullable', 'string']]);
 
@@ -426,10 +446,13 @@ class DocumentController extends Controller
             'change_note' => ['nullable', 'string'],
         ]);
 
+        $file = $this->firstUploadedFile($request, 'file');
+        abort_unless($file, 422, 'Fichier requis.');
+
         $version = $this->workflow->addVersion(
             $document,
             $request->user(),
-            $request->file('file'),
+            $file,
             $data['change_note'] ?? null,
         );
 
@@ -445,10 +468,13 @@ class DocumentController extends Controller
             'kind' => ['nullable', Rule::in(['piece_jointe', 'annexe', 'complement'])],
         ]);
 
+        $file = $this->firstUploadedFile($request, 'file');
+        abort_unless($file, 422, 'Fichier requis.');
+
         $attachment = $this->workflow->addAttachment(
             $document,
             $request->user(),
-            $request->file('file'),
+            $file,
             $data['kind'] ?? 'piece_jointe',
         );
 
@@ -523,5 +549,43 @@ class DocumentController extends Controller
         abort_unless($this->storage->exists($attachment->disk, $attachment->path), 404);
 
         return Storage::disk($attachment->disk)->download($attachment->path, $attachment->original_name);
+    }
+
+    private function firstUploadedFile(Request $request, string $key): ?UploadedFile
+    {
+        $file = $request->file($key);
+
+        if ($file instanceof UploadedFile) {
+            return $file;
+        }
+
+        if (is_array($file)) {
+            $first = reset($file);
+
+            return $first instanceof UploadedFile ? $first : null;
+        }
+
+        return null;
+    }
+
+    /**
+     * @return list<UploadedFile>
+     */
+    private function uploadedFiles(Request $request, string $key): array
+    {
+        $files = $request->file($key, []);
+
+        if ($files instanceof UploadedFile) {
+            return [$files];
+        }
+
+        if (! is_array($files)) {
+            return [];
+        }
+
+        return array_values(array_filter(
+            $files,
+            fn ($file) => $file instanceof UploadedFile
+        ));
     }
 }

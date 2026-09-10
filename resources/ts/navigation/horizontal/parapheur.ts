@@ -7,6 +7,13 @@ export default [
     subject: 'Parapheur',
   },
   {
+    title: 'Dossiers envoyés',
+    icon: { icon: 'tabler-send' },
+    to: { name: 'parapheur', query: { folder: 'envoyes' } },
+    action: 'read',
+    subject: 'Parapheur',
+  },
+  {
     title: 'Nouveau document',
     icon: { icon: 'tabler-file-plus' },
     to: 'parapheur-nouveau',

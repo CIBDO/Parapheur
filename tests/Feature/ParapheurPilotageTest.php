@@ -16,6 +16,32 @@ class ParapheurPilotageTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_dg_dashboard_returns_stats(): void
+    {
+        $this->seed(DatabaseSeeder::class);
+        $dg = User::query()->where('email', 'dg@dgtcp.local')->firstOrFail();
+
+        $response = $this->actingAs($dg, 'sanctum')
+            ->getJson('/api/dashboard/dg')
+            ->assertOk()
+            ->assertJsonStructure([
+                'received',
+                'to_process',
+                'urgent',
+                'overdue',
+                'validated',
+                'returned',
+                'by_status',
+                'by_structure',
+                'instructions_open',
+                'instructions_late',
+            ]);
+
+        $this->assertGreaterThanOrEqual(1, $response->json('received'));
+        $this->assertNotEmpty($response->json('by_structure'));
+        $this->assertNotEmpty($response->json('by_status'));
+    }
+
     public function test_archive_pack_download_and_frozen_comments(): void
     {
         $this->seed(DatabaseSeeder::class);

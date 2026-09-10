@@ -58,7 +58,19 @@ class DocumentWorkflowService
             }
 
             foreach ($attachments as $attachment) {
-                $this->storeAttachment($document, $author, $attachment);
+                if ($attachment instanceof UploadedFile) {
+                    $this->storeAttachment($document, $author, $attachment);
+                    continue;
+                }
+
+                if (is_array($attachment) && ($attachment['file'] ?? null) instanceof UploadedFile) {
+                    $this->storeAttachment(
+                        $document,
+                        $author,
+                        $attachment['file'],
+                        $attachment['kind'] ?? 'piece_jointe',
+                    );
+                }
             }
 
             $this->audit->log('document.created', $document);
@@ -80,6 +92,11 @@ class DocumentWorkflowService
                 $this->transition($document, DocumentStatus::Depose);
                 $document->submitted_at = now();
                 $document->save();
+            }
+
+            // Après retour : la retransmission marque le dossier comme corrigé.
+            if ($document->status === DocumentStatus::ACorriger) {
+                $this->transition($document, DocumentStatus::Corrige);
             }
 
             if (in_array($document->status, [DocumentStatus::Archive, DocumentStatus::Annule], true)) {

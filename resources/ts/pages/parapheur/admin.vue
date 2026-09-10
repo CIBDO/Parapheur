@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useTheme } from 'vuetify'
 import { hexToRgb } from '@layouts/utils'
+import ParapheurPageHeader from '@/components/parapheur/ParapheurPageHeader.vue'
 
 definePage({
   meta: {
@@ -253,17 +254,12 @@ onMounted(loadDashboard)
 
 <template>
   <div>
-    <div class="d-flex flex-wrap justify-space-between align-center gap-4 mb-6">
-      <div>
-        <h4 class="text-h4 mb-1">
-          {{ greeting }}{{ userData?.fullName ? `, ${userData.fullName}` : '' }}
-        </h4>
-        <p class="text-body-1 mb-0 text-medium-emphasis">
-          Tableau de bord administrateur — pilotage global du parapheur
-        </p>
-      </div>
-
-      <div class="d-flex flex-wrap gap-2">
+    <ParapheurPageHeader
+      :title="`${greeting}${userData?.fullName ? `, ${userData.fullName}` : ''}`"
+      subtitle="Tableau de bord administrateur — pilotage global du parapheur"
+      icon="tabler-shield-cog"
+    >
+      <template #actions>
         <VBtn
           variant="tonal"
           color="primary"
@@ -280,8 +276,9 @@ onMounted(loadDashboard)
         >
           Nouveau document
         </VBtn>
-      </div>
-    </div>
+      </template>
+    </ParapheurPageHeader>
+
 
     <VRow class="match-height">
       <VCol

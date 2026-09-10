@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import ParapheurPageHeader from '@/components/parapheur/ParapheurPageHeader.vue'
+
 definePage({
   meta: {
     action: 'manage',
@@ -196,17 +198,12 @@ onMounted(load)
 
 <template>
   <div>
-    <div class="d-flex flex-wrap justify-space-between align-center gap-4 mb-6">
-      <div>
-        <h4 class="text-h4 mb-1">
-          Structures
-        </h4>
-        <p class="text-body-1 mb-0 text-medium-emphasis">
-          Organigramme des services et directions
-        </p>
-      </div>
-
-      <div class="d-flex flex-wrap gap-2">
+    <ParapheurPageHeader
+      title="Structures"
+      subtitle="Organigramme des services et directions"
+      icon="tabler-building-community"
+    >
+      <template #actions>
         <VBtn
           variant="tonal"
           color="primary"
@@ -222,8 +219,8 @@ onMounted(load)
         >
           Nouvelle structure
         </VBtn>
-      </div>
-    </div>
+      </template>
+    </ParapheurPageHeader>
 
     <VAlert
       v-if="successMessage"
@@ -247,10 +244,11 @@ onMounted(load)
       {{ errorMessage }}
     </VAlert>
 
-    <VCard>
+    <VCard class="parapheur-section-card">
       <VDataTable
         :items="structures"
         :loading="loading"
+        hover
         :headers="[
           { title: 'Code', key: 'code' },
           { title: 'Libellé', key: 'name' },

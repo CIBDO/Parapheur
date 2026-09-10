@@ -2,11 +2,31 @@
 
 namespace App\Services;
 
+use App\Enums\DocumentStatus;
+use App\Enums\ParapheurFolder;
 use App\Models\Document;
+use App\Models\User;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 
 class ParapheurService
 {
+    /**
+     * Dossiers que l'utilisateur a transmis (suivi initiateur), y compris retournés / traités.
+     */
+    private function sentDocumentsQuery(User $user): Builder
+    {
+        return Document::query()
+            ->where(function ($q) use ($user) {
+                $q->whereHas('transmissions', fn ($t) => $t->where('from_user_id', $user->id))
+                    ->orWhere(function ($q2) use ($user) {
+                        $q2->where('author_id', $user->id)
+                            ->whereNotNull('submitted_at');
+                    });
+            })
+            ->where('status', '!=', DocumentStatus::Brouillon->value);
+    }
+
     private function applyMetadataFilters(\Illuminate\Database\Eloquent\Builder $query, array $filters): void
     {
         if (! empty($filters['q'])) {
@@ -75,20 +95,26 @@ class ParapheurService
         }
     }
 
-    public function countsFor(\App\Models\User $user): array
+    public function countsFor(User $user): array
     {
         $base = \App\Models\DocumentTransmission::query()
             ->where('to_user_id', $user->id);
 
         $counts = [];
-        foreach (\App\Enums\ParapheurFolder::cases() as $folder) {
+        foreach (ParapheurFolder::cases() as $folder) {
+            if ($folder === ParapheurFolder::Envoyes) {
+                $counts[$folder->value] = $this->sentDocumentsQuery($user)->count();
+
+                continue;
+            }
+
             $query = (clone $base)->where('folder', $folder->value);
 
-            if (in_array($folder, [\App\Enums\ParapheurFolder::Traites, \App\Enums\ParapheurFolder::Archives], true)) {
+            if (in_array($folder, [ParapheurFolder::Traites, ParapheurFolder::Archives], true)) {
                 $counts[$folder->value] = $query->where('status', 'done')
                     ->distinct('document_id')
                     ->count('document_id');
-            } elseif ($folder === \App\Enums\ParapheurFolder::ATraiter) {
+            } elseif ($folder === ParapheurFolder::ATraiter) {
                 $counts[$folder->value] = Document::query()
                     ->where(function ($q) use ($user) {
                         $q->where('current_assignee_id', $user->id)
@@ -96,19 +122,19 @@ class ParapheurService
                                 $t->where('to_user_id', $user->id)
                                     ->whereIn('status', ['pending', 'seen'])
                                     ->whereIn('folder', [
-                                        \App\Enums\ParapheurFolder::ATraiter->value,
-                                        \App\Enums\ParapheurFolder::AConsulter->value,
-                                        \App\Enums\ParapheurFolder::AViser->value,
-                                        \App\Enums\ParapheurFolder::AValider->value,
+                                        ParapheurFolder::ATraiter->value,
+                                        ParapheurFolder::AConsulter->value,
+                                        ParapheurFolder::AViser->value,
+                                        ParapheurFolder::AValider->value,
                                     ]);
                             });
                     })
                     ->whereNotIn('status', [
-                        \App\Enums\DocumentStatus::Archive->value,
-                        \App\Enums\DocumentStatus::Annule->value,
-                        \App\Enums\DocumentStatus::Traite->value,
-                        \App\Enums\DocumentStatus::Classe->value,
-                        \App\Enums\DocumentStatus::Brouillon->value,
+                        DocumentStatus::Archive->value,
+                        DocumentStatus::Annule->value,
+                        DocumentStatus::Traite->value,
+                        DocumentStatus::Classe->value,
+                        DocumentStatus::Brouillon->value,
                     ])
                     ->count();
             } else {
@@ -128,7 +154,7 @@ class ParapheurService
     }
 
     public function listFolder(
-        \App\Models\User $user,
+        User $user,
         ?string $folder = null,
         array $filters = [],
         int $perPage = 15
@@ -146,30 +172,42 @@ class ParapheurService
                 ->paginate($perPage);
         }
 
+        if ($folder === ParapheurFolder::Envoyes->value) {
+            $query = $this->sentDocumentsQuery($user)
+                ->with(['type', 'structure', 'author', 'currentAssignee', 'latestVersion']);
+
+            $this->applyMetadataFilters($query, $filters);
+
+            return $query
+                ->orderByRaw("CASE priority WHEN 'tres_urgente' THEN 1 WHEN 'urgente' THEN 2 WHEN 'importante' THEN 3 ELSE 4 END")
+                ->orderByDesc('updated_at')
+                ->paginate($perPage);
+        }
+
         $query = Document::query()
             ->with(['type', 'structure', 'author', 'currentAssignee', 'latestVersion']);
 
-        if ($folder === \App\Enums\ParapheurFolder::ATraiter->value) {
+        if ($folder === ParapheurFolder::ATraiter->value) {
             $query->where(function ($q) use ($user) {
                 $q->where('current_assignee_id', $user->id)
                     ->orWhereHas('transmissions', function ($t) use ($user) {
                         $t->where('to_user_id', $user->id)
                             ->whereIn('status', ['pending', 'seen'])
                             ->whereIn('folder', [
-                                \App\Enums\ParapheurFolder::ATraiter->value,
-                                \App\Enums\ParapheurFolder::AConsulter->value,
-                                \App\Enums\ParapheurFolder::AViser->value,
-                                \App\Enums\ParapheurFolder::AValider->value,
+                                ParapheurFolder::ATraiter->value,
+                                ParapheurFolder::AConsulter->value,
+                                ParapheurFolder::AViser->value,
+                                ParapheurFolder::AValider->value,
                             ]);
                     });
             })->whereNotIn('status', [
-                \App\Enums\DocumentStatus::Archive->value,
-                \App\Enums\DocumentStatus::Annule->value,
-                \App\Enums\DocumentStatus::Traite->value,
-                \App\Enums\DocumentStatus::Classe->value,
-                \App\Enums\DocumentStatus::Brouillon->value,
+                DocumentStatus::Archive->value,
+                DocumentStatus::Annule->value,
+                DocumentStatus::Traite->value,
+                DocumentStatus::Classe->value,
+                DocumentStatus::Brouillon->value,
             ]);
-        } elseif (in_array($folder, [\App\Enums\ParapheurFolder::Traites->value, \App\Enums\ParapheurFolder::Archives->value], true)) {
+        } elseif (in_array($folder, [ParapheurFolder::Traites->value, ParapheurFolder::Archives->value], true)) {
             $query->whereHas('transmissions', function ($t) use ($user, $folder) {
                 $t->where('to_user_id', $user->id)
                     ->where('folder', $folder)
@@ -223,30 +261,25 @@ class ParapheurService
             })
             ->count();
 
+        $avgDaysExpression = DB::connection()->getDriverName() === 'sqlite'
+            ? 'AVG(JULIANDAY(COALESCE(archived_at, updated_at)) - JULIANDAY(submitted_at)) as avg_days'
+            : 'AVG(DATEDIFF(COALESCE(archived_at, updated_at), submitted_at)) as avg_days';
+
         $avgDays = Document::query()
             ->whereNotNull('submitted_at')
             ->whereIn('status', ['valide', 'traite', 'archive'])
-            ->selectRaw('AVG(JULIANDAY(COALESCE(archived_at, updated_at)) - JULIANDAY(submitted_at)) as avg_days')
+            ->selectRaw($avgDaysExpression)
             ->value('avg_days');
 
-        // MySQL/MariaDB compatible average
-        if (DB::connection()->getDriverName() !== 'sqlite') {
-            $avgDays = Document::query()
-                ->whereNotNull('submitted_at')
-                ->whereIn('status', ['valide', 'traite', 'archive'])
-                ->selectRaw('AVG(DATEDIFF(COALESCE(archived_at, updated_at), submitted_at)) as avg_days')
-                ->value('avg_days');
-        }
+        $avgByStructureExpression = DB::connection()->getDriverName() === 'sqlite'
+            ? 'structures.code, AVG(JULIANDAY(COALESCE(documents.archived_at, documents.updated_at)) - JULIANDAY(documents.submitted_at)) as avg_days'
+            : 'structures.code, AVG(DATEDIFF(COALESCE(documents.archived_at, documents.updated_at), documents.submitted_at)) as avg_days';
 
         $avgByStructure = Document::query()
             ->join('structures', 'structures.id', '=', 'documents.structure_id')
             ->whereNotNull('documents.submitted_at')
             ->whereIn('documents.status', ['valide', 'traite', 'archive'])
-            ->when(
-                DB::connection()->getDriverName() === 'sqlite',
-                fn ($q) => $q->selectRaw('structures.code, AVG(JULIANDAY(COALESCE(documents.archived_at, documents.updated_at)) - JULIANDAY(documents.submitted_at)) as avg_days'),
-                fn ($q) => $q->selectRaw('structures.code, AVG(DATEDIFF(COALESCE(documents.archived_at, documents.updated_at), documents.submitted_at)) as avg_days'),
-            )
+            ->selectRaw($avgByStructureExpression)
             ->groupBy('structures.code')
             ->pluck('avg_days', 'code')
             ->map(fn ($v) => round((float) $v, 1));
@@ -264,17 +297,17 @@ class ParapheurService
             'overdue' => Document::query()->whereNotNull('due_date')->whereDate('due_date', '<', now())->whereNotIn('status', ['archive', 'valide', 'traite', 'classe'])->count(),
             'validated' => Document::query()->where('status', 'valide')->count(),
             'returned' => $returned,
-            'by_status' => $byStatus,
-            'by_structure' => $byStructure,
+            'by_status' => $byStatus->all(),
+            'by_structure' => $byStructure->all(),
             'instructions_open' => DB::table('instructions')->whereIn('status', ['a_faire', 'en_cours'])->count(),
             'instructions_late' => DB::table('instructions')->whereIn('status', ['a_faire', 'en_cours'])->whereNotNull('due_date')->whereDate('due_date', '<', now())->count(),
             'avg_processing_days' => round((float) ($avgDays ?? 0), 1),
-            'avg_processing_by_structure' => $avgByStructure,
+            'avg_processing_by_structure' => $avgByStructure->all(),
             'return_rate' => $submitted > 0 ? round(($returned / $submitted) * 100, 1) : 0,
             'electronic_treated' => $validatedOrTreated,
             'deadline_respect_rate' => $validatedOrTreated > 0 ? round(($onTime / $validatedOrTreated) * 100, 1) : 0,
             'decision_execution_rate' => $decisionsTotal > 0 ? round(($decisionsDone / $decisionsTotal) * 100, 1) : 0,
-            'volume_by_structure' => $byStructure,
+            'volume_by_structure' => $byStructure->all(),
         ];
     }
 }

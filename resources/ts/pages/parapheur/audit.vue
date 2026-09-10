@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import ParapheurPageHeader from '@/components/parapheur/ParapheurPageHeader.vue'
+
 definePage({
   meta: {
     action: 'read',
@@ -53,14 +55,12 @@ onMounted(() => load())
 
 <template>
   <div>
-    <div class="mb-6">
-      <h4 class="text-h4 mb-1">
-        Journal d’audit
-      </h4>
-      <p class="text-body-1 mb-0 text-medium-emphasis">
-        Traçabilité append-only des actions sensibles
-      </p>
-    </div>
+    <ParapheurPageHeader
+      title="Journal d’audit"
+      subtitle="Traçabilité append-only des actions sensibles"
+      icon="tabler-history"
+    />
+
 
     <VAlert
       v-if="errorMessage"

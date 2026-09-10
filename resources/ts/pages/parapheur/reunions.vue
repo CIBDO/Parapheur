@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import ParapheurPageHeader from '@/components/parapheur/ParapheurPageHeader.vue'
+
 definePage({
   meta: {
     action: 'manage',
@@ -130,22 +132,22 @@ const selectedDocIds = computed({
 
 <template>
   <div>
-    <div class="d-flex justify-space-between mb-4">
-      <div>
-        <h4 class="text-h4 mb-1">
-          Réunions
-        </h4>
-        <p class="text-body-1 mb-0">
-          Dossiers de séance, participants et décisions
-        </p>
-      </div>
-      <VBtn
-        color="primary"
-        @click="dialog = true"
-      >
-        Nouvelle réunion
-      </VBtn>
-    </div>
+    <ParapheurPageHeader
+      title="Réunions"
+      subtitle="Dossiers de séance, participants et décisions"
+      icon="tabler-users-group"
+    >
+      <template #actions>
+        <VBtn
+          color="primary"
+          prepend-icon="tabler-plus"
+          @click="dialog = true"
+        >
+          Nouvelle réunion
+        </VBtn>
+      </template>
+    </ParapheurPageHeader>
+
 
     <VRow>
       <VCol

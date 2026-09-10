@@ -11,6 +11,7 @@ enum ParapheurFolder: string
     case AValider = 'a_valider';
     case EnAttente = 'en_attente';
     case Retournes = 'retournes';
+    case Envoyes = 'envoyes';
     case Traites = 'traites';
     case Archives = 'archives';
 
@@ -24,8 +25,15 @@ enum ParapheurFolder: string
             self::AValider => 'À valider',
             self::EnAttente => 'En attente',
             self::Retournes => 'Retournés',
+            self::Envoyes => 'Envoyés',
             self::Traites => 'Traités',
             self::Archives => 'Archivés',
         };
+    }
+
+    /** Dossier virtuel (filtre initiateur), non stocké sur les transmissions. */
+    public function isVirtual(): bool
+    {
+        return $this === self::Envoyes;
     }
 }

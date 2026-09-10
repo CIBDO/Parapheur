@@ -58,5 +58,13 @@ export const $api = ofetch.create({
     const accessToken = useCookie('accessToken').value
     if (accessToken)
       options.headers = setHeader(options.headers as HeadersInit, 'Authorization', `Bearer ${accessToken}`)
+
+    // Laisser le navigateur poser le boundary multipart (sinon le fichier est ignoré).
+    if (options.body instanceof FormData) {
+      const headers = new Headers(options.headers as HeadersInit)
+
+      headers.delete('Content-Type')
+      options.headers = headers
+    }
   },
 })

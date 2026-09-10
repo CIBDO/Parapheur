@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import ParapheurPageHeader from '@/components/parapheur/ParapheurPageHeader.vue'
+
 definePage({
   meta: {
     action: 'manage',
@@ -157,24 +159,24 @@ const remove = async (wf: WorkflowItem) => {
 
 <template>
   <div>
-    <div class="d-flex justify-space-between align-center mb-6">
-      <div>
-        <h4 class="text-h4 mb-1">
-          Circuits prédéfinis
-        </h4>
-        <p class="text-body-1 mb-0">
-          Configuration des workflows (CDC §17.2)
-        </p>
-      </div>
-      <VBtn
-        color="primary"
-        @click="openCreate"
-      >
-        Nouveau circuit
-      </VBtn>
-    </div>
+    <ParapheurPageHeader
+      title="Circuits prédéfinis"
+      subtitle="Configuration des workflows de circulation"
+      icon="tabler-git-branch"
+    >
+      <template #actions>
+        <VBtn
+          color="primary"
+          prepend-icon="tabler-plus"
+          @click="openCreate"
+        >
+          Nouveau circuit
+        </VBtn>
+      </template>
+    </ParapheurPageHeader>
 
-    <VCard>
+    <VCard class="parapheur-section-card">
+
       <VDataTable
         :items="workflows"
         :loading="loading"
