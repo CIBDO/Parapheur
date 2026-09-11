@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import OnlyOfficeEditor from '@/components/parapheur/OnlyOfficeEditor.vue'
+
 const route = useRoute('parapheur-id')
 const ability = useAbility()
 
@@ -6,6 +8,7 @@ definePage({
   meta: {
     action: 'read',
     subject: 'Parapheur',
+    navActiveLink: 'parapheur',
   },
 })
 
@@ -199,6 +202,57 @@ const canTransmit = computed(() => {
     && !dossier.value?.current_assignee_id
     && ['brouillon', 'depose', 'a_corriger', 'corrige'].includes(dossier.value?.status)
 })
+
+/** Action attendue + statut → boutons visibles (pas le panneau figé). */
+const expectedAction = computed(() => String(dossier.value?.expected_action || ''))
+const dossierStatus = computed(() => String(dossier.value?.status || ''))
+
+const consultExpectedActions = ['information', 'consultation', 'avis', 'observations', 'instruction']
+const endStatuses = ['valide', 'vise', 'traite', 'classe']
+const blockedTreatStatuses = ['archive', 'annule', 'en_attente', ...endStatuses]
+
+const canShowProcessActions = computed(() =>
+  canProcess.value && !isFrozen.value && !isReturnedToAuthor.value,
+)
+
+const showComments = computed(() => canShowProcessActions.value)
+const showAcknowledge = computed(() =>
+  canShowProcessActions.value
+  && consultExpectedActions.includes(expectedAction.value)
+  && !blockedTreatStatuses.includes(dossierStatus.value),
+)
+const showVise = computed(() =>
+  canShowProcessActions.value
+  && canVisePermission.value
+  && expectedAction.value === 'visa'
+  && !blockedTreatStatuses.includes(dossierStatus.value),
+)
+const showValidate = computed(() =>
+  canShowProcessActions.value
+  && canValidatePermission.value
+  && expectedAction.value === 'validation'
+  && !blockedTreatStatuses.includes(dossierStatus.value),
+)
+const showReject = computed(() => showVise.value || showValidate.value)
+const showCirculation = computed(() =>
+  canShowProcessActions.value
+  && !['valide', 'vise', 'traite', 'classe', 'archive', 'annule'].includes(dossierStatus.value),
+)
+const showFiling = computed(() =>
+  canProcess.value
+  && !isFrozen.value
+  && endStatuses.includes(dossierStatus.value),
+)
+
+const showTreatGroup = computed(() =>
+  showAcknowledge.value || showVise.value || showValidate.value || showReject.value,
+)
+const showActionComment = computed(() =>
+  showComments.value || showTreatGroup.value || showCirculation.value || showFiling.value,
+)
+const showActionPanel = computed(() =>
+  showComments.value || showTreatGroup.value || showCirculation.value || showFiling.value,
+)
 
 const asFile = (value: FileInputValue | undefined): File | null => {
   if (!value)
@@ -454,7 +508,28 @@ const streamUrl = computed(() => {
   return (mainVersion.value?.mime_type || '').includes('pdf') ? mainVersion.value?.stream_url : null
 })
 const isOffice = computed(() => mainVersion.value?.preview?.mode === 'office_download')
+const isOnlyOffice = computed(() => mainVersion.value?.preview?.mode === 'onlyoffice_editor')
 const hasMainDocument = computed(() => versions.value.length > 0)
+
+const editorRemountKey = ref(0)
+
+const onOnlyOfficeSaved = async () => {
+  // Soft refresh : ne pas toucher editorRemountKey (évite de demonstrer l’éditeur).
+  try {
+    const fresh = await $api(`/parapheur/documents/${route.params.id}`) as any
+    // Mettre à jour sans remplacer les versions si l’id courant est inchangé
+    if (fresh)
+      dossier.value = fresh
+  }
+  catch {
+    // ignore
+  }
+}
+
+const onOnlyOfficeReload = async () => {
+  await onOnlyOfficeSaved()
+  editorRemountKey.value += 1
+}
 
 const circuitSteps = computed(() => {
   const steps = dossier.value?.workflow_instance?.workflow?.steps || []
@@ -627,6 +702,15 @@ const circuitSteps = computed(() => {
                 style="border: 0; min-block-size: 520px;"
                 :src="streamUrl"
                 title="Aperçu du document principal"
+              />
+              <OnlyOfficeEditor
+                v-else-if="isOnlyOffice && dossier?.id"
+                :key="`oo-${dossier.id}-${editorRemountKey}`"
+                :document-id="dossier.id"
+                class="mb-4"
+                @saved="onOnlyOfficeSaved"
+                @reload="onOnlyOfficeReload"
+                @error="(msg) => { actionError = msg }"
               />
               <VAlert
                 v-else-if="isOffice"
@@ -898,125 +982,134 @@ const circuitSteps = computed(() => {
             </VAlert>
 
             <AppTextarea
-              v-if="canProcess"
+              v-if="showActionComment"
               v-model="actionComment"
               label="Commentaire / motif d'action"
               rows="3"
               class="mb-4"
             />
 
-            <template v-if="canProcess">
-              <div class="text-subtitle-2 mb-2">
-                Commenter
-              </div>
-              <div class="d-flex flex-wrap gap-2 mb-4">
-                <VBtn
-                  variant="tonal"
-                  :loading="busy"
-                  @click="runAction('comments', { body: actionComment, kind: 'general' })"
-                >
+            <template v-if="showActionPanel">
+              <template v-if="showComments">
+                <div class="text-subtitle-2 mb-2">
                   Commenter
-                </VBtn>
-                <VBtn
-                  variant="tonal"
-                  :loading="busy"
-                  @click="runAction('comments', { body: actionComment, kind: 'avis' })"
-                >
-                  Avis
-                </VBtn>
-                <VBtn
-                  variant="tonal"
-                  :loading="busy"
-                  @click="runAction('comments', { body: actionComment, kind: 'recommandation' })"
-                >
-                  Recommander
-                </VBtn>
-              </div>
+                </div>
+                <div class="d-flex flex-wrap gap-2 mb-4">
+                  <VBtn
+                    variant="tonal"
+                    :loading="busy"
+                    @click="runAction('comments', { body: actionComment, kind: 'general' })"
+                  >
+                    Commenter
+                  </VBtn>
+                  <VBtn
+                    variant="tonal"
+                    :loading="busy"
+                    @click="runAction('comments', { body: actionComment, kind: 'avis' })"
+                  >
+                    Avis
+                  </VBtn>
+                  <VBtn
+                    variant="tonal"
+                    :loading="busy"
+                    @click="runAction('comments', { body: actionComment, kind: 'recommandation' })"
+                  >
+                    Recommander
+                  </VBtn>
+                </div>
+              </template>
 
-              <div class="text-subtitle-2 mb-2">
-                Traiter
-              </div>
-              <div class="d-flex flex-wrap gap-2 mb-4">
-                <VBtn
-                  color="secondary"
-                  :loading="busy"
-                  @click="runAction('acknowledge')"
-                >
-                  Prise de connaissance
-                </VBtn>
-                <VBtn
-                  v-if="canVise"
-                  color="info"
-                  :loading="busy"
-                  @click="runAction('vise')"
-                >
-                  Viser
-                </VBtn>
-                <VBtn
-                  v-if="canValidate"
-                  color="success"
-                  :loading="busy"
-                  @click="runAction('validate')"
-                >
-                  Valider
-                </VBtn>
-                <VBtn
-                  v-if="canVise || canValidate"
-                  color="error"
-                  :loading="busy"
-                  @click="runAction('reject')"
-                >
-                  Rejeter
-                </VBtn>
-              </div>
+              <template v-if="showTreatGroup">
+                <div class="text-subtitle-2 mb-2">
+                  Traiter
+                </div>
+                <div class="d-flex flex-wrap gap-2 mb-4">
+                  <VBtn
+                    v-if="showAcknowledge"
+                    color="secondary"
+                    :loading="busy"
+                    @click="runAction('acknowledge')"
+                  >
+                    Prise de connaissance
+                  </VBtn>
+                  <VBtn
+                    v-if="showVise"
+                    color="info"
+                    :loading="busy"
+                    @click="runAction('vise')"
+                  >
+                    Viser
+                  </VBtn>
+                  <VBtn
+                    v-if="showValidate"
+                    color="success"
+                    :loading="busy"
+                    @click="runAction('validate')"
+                  >
+                    Valider
+                  </VBtn>
+                  <VBtn
+                    v-if="showReject"
+                    color="error"
+                    :loading="busy"
+                    @click="runAction('reject')"
+                  >
+                    Rejeter
+                  </VBtn>
+                </div>
+              </template>
 
-              <div class="text-subtitle-2 mb-2">
-                Circulation
-              </div>
-              <div class="d-flex flex-wrap gap-2 mb-4">
-                <VBtn
-                  color="warning"
-                  :loading="busy"
-                  @click="runAction('return')"
-                >
-                  Retourner
-                </VBtn>
-                <VBtn
-                  color="warning"
-                  variant="tonal"
-                  :loading="busy"
-                  @click="runAction('complement')"
-                >
-                  Demander complément
-                </VBtn>
-                <VBtn
-                  variant="tonal"
-                  :loading="busy"
-                  @click="runAction('hold')"
-                >
-                  En attente
-                </VBtn>
-              </div>
+              <template v-if="showCirculation">
+                <div class="text-subtitle-2 mb-2">
+                  Circulation
+                </div>
+                <div class="d-flex flex-wrap gap-2 mb-4">
+                  <VBtn
+                    color="warning"
+                    :loading="busy"
+                    @click="runAction('return')"
+                  >
+                    Retourner
+                  </VBtn>
+                  <VBtn
+                    color="warning"
+                    variant="tonal"
+                    :loading="busy"
+                    @click="runAction('complement')"
+                  >
+                    Demander complément
+                  </VBtn>
+                  <VBtn
+                    variant="tonal"
+                    :loading="busy"
+                    @click="runAction('hold')"
+                  >
+                    En attente
+                  </VBtn>
+                </div>
+              </template>
 
-              <div class="text-subtitle-2 mb-2">
-                Classement
-              </div>
-              <div class="d-flex flex-wrap gap-2">
-                <VBtn
-                  variant="tonal"
-                  :loading="busy"
-                  @click="runAction('classify')"
-                >
-                  Classer
-                </VBtn>
-                <VBtn
-                  variant="tonal"
-                  :loading="busy"
-                  @click="runAction('archive')"
-                >
-                  Archiver
-                </VBtn>
-              </div>
+              <template v-if="showFiling">
+                <div class="text-subtitle-2 mb-2">
+                  Classement
+                </div>
+                <div class="d-flex flex-wrap gap-2">
+                  <VBtn
+                    variant="tonal"
+                    :loading="busy"
+                    @click="runAction('classify')"
+                  >
+                    Classer
+                  </VBtn>
+                  <VBtn
+                    variant="tonal"
+                    :loading="busy"
+                    @click="runAction('archive')"
+                  >
+                    Archiver
+                  </VBtn>
+                </div>
+              </template>
             </template>
             <VAlert
               v-else-if="!isInitiatorSpectator"

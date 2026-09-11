@@ -72,6 +72,14 @@ const login = async () => {
     useCookie('accessToken').value = accessToken
     ability.update(userAbilityRules || [])
 
+    if (userData?.mustChangePassword) {
+      await nextTick(() => {
+        router.replace({ name: 'change-password' })
+      })
+
+      return
+    }
+
     const role = String(userData?.role ?? '')
     const fallback = role === 'Administrateur'
       ? '/parapheur/admin'

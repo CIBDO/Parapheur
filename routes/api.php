@@ -20,6 +20,7 @@ use App\Http\Controllers\Api\MeetingTemplateController;
 use App\Http\Controllers\Api\MeetingTypeController;
 use App\Http\Controllers\Api\MetaController;
 use App\Http\Controllers\Api\NotificationController;
+use App\Http\Controllers\Api\OnlyOfficeController;
 use App\Http\Controllers\Api\ReportingController;
 use App\Http\Controllers\Api\RolePermissionController;
 use App\Http\Controllers\Api\StructureController;
@@ -37,7 +38,10 @@ Route::post('/auth/reset-password', [AuthController::class, 'resetPassword'])
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/auth/me', [AuthController::class, 'me']);
     Route::post('/auth/logout', [AuthController::class, 'logout']);
+    Route::post('/auth/change-password', [AuthController::class, 'changePassword']);
+});
 
+Route::middleware(['auth:sanctum', 'password.changed'])->group(function () {
     Route::get('/notifications', [NotificationController::class, 'index']);
     Route::post('/notifications/read', [NotificationController::class, 'markRead']);
     Route::post('/notifications/unread', [NotificationController::class, 'markUnread']);
@@ -105,8 +109,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/dashboard/direction', [DashboardController::class, 'direction']);
 
     Route::get('/parapheur/counts', [DocumentController::class, 'counts']);
-    Route::get('/parapheur/documents', [DocumentController::class, 'index']);
     Route::post('/parapheur/documents', [DocumentController::class, 'store']);
+    Route::get('/parapheur/documents', [DocumentController::class, 'index']);
     Route::get('/parapheur/documents/{document}', [DocumentController::class, 'show']);
     Route::post('/parapheur/documents/{document}/transmit', [DocumentController::class, 'transmit']);
     Route::post('/parapheur/documents/{document}/reassign', [DocumentController::class, 'reassign']);
@@ -124,6 +128,15 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/parapheur/documents/{document}/versions', [DocumentController::class, 'addVersion']);
     Route::post('/parapheur/documents/{document}/attachments', [DocumentController::class, 'addAttachment']);
     Route::post('/parapheur/documents/{document}/instructions', [DocumentController::class, 'createInstruction']);
+
+    Route::get('/parapheur/documents/{document}/onlyoffice/config', [OnlyOfficeController::class, 'config']);
+    Route::get('/parapheur/documents/{document}/onlyoffice/history', [OnlyOfficeController::class, 'history']);
+    Route::get('/parapheur/documents/{document}/onlyoffice/history/{versionNumber}', [OnlyOfficeController::class, 'historyData'])
+        ->whereNumber('versionNumber');
+    Route::get('/parapheur/documents/{document}/onlyoffice/compare/{versionNumber}', [OnlyOfficeController::class, 'compare'])
+        ->whereNumber('versionNumber');
+    Route::post('/parapheur/documents/{document}/onlyoffice/restore/{versionNumber}', [OnlyOfficeController::class, 'restore'])
+        ->whereNumber('versionNumber');
 
     Route::get('/instructions', [InstructionController::class, 'index']);
     Route::patch('/instructions/{instruction}/status', [InstructionController::class, 'updateStatus']);
@@ -222,6 +235,9 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('/reporting/export', [ReportingController::class, 'export']);
 });
+// Callback ONLYOFFICE Document Server (JWT, hors Sanctum)
+Route::post('/onlyoffice/callback/{document}', [OnlyOfficeController::class, 'callback'])
+    ->name('onlyoffice.callback');
 
 // Téléchargement via URL signée + contrôle d'accès métier (sans Bearer dans un nouvel onglet)
 Route::middleware('signed')->group(function () {

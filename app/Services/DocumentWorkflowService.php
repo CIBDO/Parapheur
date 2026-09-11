@@ -60,6 +60,7 @@ class DocumentWorkflowService
             foreach ($attachments as $attachment) {
                 if ($attachment instanceof UploadedFile) {
                     $this->storeAttachment($document, $author, $attachment);
+
                     continue;
                 }
 
@@ -747,6 +748,62 @@ class DocumentWorkflowService
 
             $document->save();
             $this->audit->log('document.version_added', $document, ['version' => $version->version_number]);
+
+            return $version;
+        });
+    }
+
+    /**
+     * Nouvelle version immuable à partir d’un contenu binaire (callback ONLYOFFICE).
+     */
+    public function addVersionFromContents(
+        Document $document,
+        User $user,
+        string $contents,
+        string $originalName,
+        string $mimeType,
+        ?string $note = null,
+    ): DocumentVersion {
+        return DB::transaction(function () use ($document, $user, $contents, $originalName, $mimeType, $note) {
+            if (in_array($document->status, [DocumentStatus::Archive, DocumentStatus::Annule], true)) {
+                throw new InvalidArgumentException('Document figé : nouvelle version impossible.');
+            }
+
+            $stored = $this->storage->storeContent(
+                $contents,
+                $originalName,
+                $mimeType,
+                'documents/'.$document->uuid,
+            );
+            $next = ((int) $document->versions()->max('version_number')) + 1;
+
+            $document->versions()->where('is_main', true)->update(['is_main' => false]);
+
+            $version = DocumentVersion::query()->create([
+                'document_id' => $document->id,
+                'version_number' => $next,
+                'disk' => $stored['disk'],
+                'path' => $stored['path'],
+                'original_name' => $stored['original_name'],
+                'mime_type' => $stored['mime_type'],
+                'size' => $stored['size'],
+                'checksum' => $stored['checksum'],
+                'is_main' => true,
+                'uploaded_by' => $user->id,
+                'change_note' => $note,
+            ]);
+
+            $document->current_version = $version->version_number;
+
+            if ($document->status === DocumentStatus::ACorriger) {
+                $this->transition($document, DocumentStatus::Corrige);
+            }
+
+            $document->save();
+            $this->audit->log('document.version_added', $document, [
+                'version' => $version->version_number,
+                'source' => 'onlyoffice',
+            ]);
 
             return $version;
         });

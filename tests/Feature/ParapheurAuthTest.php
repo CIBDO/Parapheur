@@ -5,8 +5,10 @@ namespace Tests\Feature;
 use App\Models\DocumentType;
 use App\Models\Structure;
 use App\Models\User;
+use App\Notifications\UserAccountCreatedNotification;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Notification;
 use Tests\TestCase;
 
 class ParapheurAuthTest extends TestCase
@@ -57,5 +59,82 @@ class ParapheurAuthTest extends TestCase
         $response->assertCreated()
             ->assertJsonPath('object', 'Note technique de test')
             ->assertJsonPath('current_assignee_id', $dg->id);
+    }
+
+    public function test_new_user_must_change_password_on_first_login(): void
+    {
+        $this->seed(DatabaseSeeder::class);
+
+        Notification::fake();
+
+        $admin = User::query()->where('email', 'admin@dgtcp.local')->firstOrFail();
+        $adminToken = $admin->createToken('test')->plainTextToken;
+
+        $create = $this->withToken($adminToken)->postJson('/api/users', [
+            'first_name' => 'Nouveau',
+            'last_name' => 'Agent',
+            'email' => 'nouveau.agent@dgtcp.local',
+            'structure_id' => Structure::query()->firstOrFail()->id,
+            'role' => 'Agent',
+            'is_active' => true,
+        ]);
+
+        $create->assertCreated()
+            ->assertJsonPath('must_change_password', true);
+
+        $this->app['auth']->forgetGuards();
+        $this->flushHeaders();
+
+        $user = User::query()->where('email', 'nouveau.agent@dgtcp.local')->firstOrFail();
+        $this->assertTrue($user->must_change_password);
+
+        $plainPassword = null;
+        Notification::assertSentTo(
+            $user,
+            UserAccountCreatedNotification::class,
+            function (UserAccountCreatedNotification $notification) use (&$plainPassword) {
+                $plainPassword = $notification->plainPassword;
+
+                return $plainPassword !== '';
+            }
+        );
+
+        $login = $this->postJson('/api/auth/login', [
+            'email' => 'nouveau.agent@dgtcp.local',
+            'password' => $plainPassword,
+        ]);
+
+        $login->assertOk()
+            ->assertJsonPath('userData.mustChangePassword', true);
+
+        $token = $login->json('accessToken');
+        $this->assertNotEmpty($token);
+
+        $this->app['auth']->forgetGuards();
+        $this->flushHeaders();
+
+        $this->withToken($token)
+            ->getJson('/api/parapheur/counts')
+            ->assertForbidden()
+            ->assertJsonPath('code', 'MUST_CHANGE_PASSWORD');
+
+        $this->app['auth']->forgetGuards();
+
+        $this->withToken($token)
+            ->postJson('/api/auth/change-password', [
+                'current_password' => $plainPassword,
+                'password' => 'NewSecurePass1!',
+                'password_confirmation' => 'NewSecurePass1!',
+            ])
+            ->assertOk()
+            ->assertJsonPath('userData.mustChangePassword', false);
+
+        $this->assertFalse($user->fresh()->must_change_password);
+
+        $this->app['auth']->forgetGuards();
+
+        $this->withToken($token)
+            ->getJson('/api/parapheur/counts')
+            ->assertOk();
     }
 }

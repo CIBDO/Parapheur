@@ -3,13 +3,14 @@
 namespace App\Providers;
 
 use App\Contracts\DocumentPreviewDriver;
+use App\Models\Appointment;
 use App\Models\User;
+use App\Policies\AppointmentPolicy;
 use App\Services\Preview\NativeDocumentPreviewDriver;
+use App\Services\Preview\OnlyOfficeDocumentPreviewDriver;
 use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
-use App\Models\Appointment;
-use App\Policies\AppointmentPolicy;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
@@ -18,7 +19,13 @@ class AppServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        $this->app->bind(DocumentPreviewDriver::class, NativeDocumentPreviewDriver::class);
+        $this->app->bind(DocumentPreviewDriver::class, function ($app) {
+            if (config('onlyoffice.enabled') && (string) config('onlyoffice.jwt_secret') !== '') {
+                return $app->make(OnlyOfficeDocumentPreviewDriver::class);
+            }
+
+            return $app->make(NativeDocumentPreviewDriver::class);
+        });
     }
 
     public function boot(): void

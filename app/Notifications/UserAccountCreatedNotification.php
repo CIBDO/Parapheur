@@ -33,7 +33,7 @@ class UserAccountCreatedNotification extends Notification
             ->line('**Adresse e-mail :** '.$notifiable->email)
             ->line('**Mot de passe temporaire :** '.$this->plainPassword)
             ->action('Se connecter', $loginUrl)
-            ->line('Pour des raisons de sécurité, changez ce mot de passe après votre première connexion.')
+            ->line('Pour des raisons de sécurité, vous devrez obligatoirement changer ce mot de passe à votre première connexion.')
             ->line('Ceci est un message automatique — merci de ne pas y répondre.');
     }
 }

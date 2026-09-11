@@ -371,6 +371,7 @@ declare module 'vue' {
     I18n: typeof import('./resources/ts/@core/components/I18n.vue')['default']
     MoreBtn: typeof import('./resources/ts/@core/components/MoreBtn.vue')['default']
     Notifications: typeof import('./resources/ts/@core/components/Notifications.vue')['default']
+    OnlyOfficeEditor: typeof import('./resources/ts/components/parapheur/OnlyOfficeEditor.vue')['default']
     ParapheurPageHeader: typeof import('./resources/ts/components/parapheur/ParapheurPageHeader.vue')['default']
     PaymentProvidersDialog: typeof import('./resources/ts/components/dialogs/PaymentProvidersDialog.vue')['default']
     PricingPlanDialog: typeof import('./resources/ts/components/dialogs/PricingPlanDialog.vue')['default']

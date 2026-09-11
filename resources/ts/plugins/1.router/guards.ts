@@ -27,6 +27,21 @@ export const setupGuards = (router: _RouterTyped<RouteNamedMap & { [key: string]
       else return undefined;
     }
 
+    if (isLoggedIn) {
+      const userData = useCookie<Record<string, unknown> | null>('userData').value;
+      const mustChangePassword = Boolean(userData?.mustChangePassword);
+      const isChangePasswordRoute = to.name === 'change-password';
+
+      if (mustChangePassword && !isChangePasswordRoute)
+        return { name: 'change-password' };
+
+      if (!mustChangePassword && isChangePasswordRoute)
+        return '/';
+    }
+    else if (to.name === 'change-password') {
+      return { name: 'login' };
+    }
+
     if (!canNavigate(to) && to.matched.length) {
       /* eslint-disable indent */
       return isLoggedIn

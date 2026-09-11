@@ -43,6 +43,18 @@ Ou séparément : `php artisan serve` + `pnpm dev`.
 - Instructions, réunions, délégations, reporting
 - Bureau DG (tablette)
 
-## Temps 2 (plus tard)
+## Temps 2 — ONLYOFFICE
 
-ONLYOFFICE, LDAP/SSO, FTS/OCR, interop/SAE/PWA — après recette du e-Parapheur.
+Édition collaborative DOCX/XLSX/PPTX (sans LDAP/SSO/OCR) :
+
+```bash
+# .env : ONLYOFFICE_ENABLED=true + JWT (voir .env.example)
+docker compose up -d
+composer run dev
+```
+
+Guide : [`docs/onlyoffice.md`](docs/onlyoffice.md).
+
+## Temps 2 (lots ultérieurs)
+
+LDAP/SSO, FTS/OCR, interop/SAE/PWA — après ONLYOFFICE.

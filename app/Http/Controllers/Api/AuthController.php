@@ -58,6 +58,46 @@ class AuthController extends Controller
         return response()->json(['message' => 'Déconnecté']);
     }
 
+    public function changePassword(Request $request): JsonResponse
+    {
+        /** @var User $user */
+        $user = $request->user();
+
+        $data = $request->validate([
+            'current_password' => ['required', 'string'],
+            'password' => ['required', 'confirmed', PasswordRule::defaults()],
+        ]);
+
+        if (! Hash::check($data['current_password'], $user->password)) {
+            throw ValidationException::withMessages([
+                'current_password' => ['Mot de passe actuel incorrect.'],
+            ]);
+        }
+
+        if (Hash::check($data['password'], $user->password)) {
+            throw ValidationException::withMessages([
+                'password' => ['Le nouveau mot de passe doit être différent de l’actuel.'],
+            ]);
+        }
+
+        $user->forceFill([
+            'password' => $data['password'],
+            'must_change_password' => false,
+            'remember_token' => Str::random(60),
+        ])->save();
+
+        // Révoquer les autres sessions ; conserver le token courant.
+        $currentTokenId = $user->currentAccessToken()?->id;
+        $user->tokens()
+            ->when($currentTokenId, fn ($q) => $q->where('id', '!=', $currentTokenId))
+            ->delete();
+
+        return response()->json([
+            'message' => 'Mot de passe mis à jour.',
+            'userData' => $this->userPayload($user->fresh(['structure', 'roles'])),
+        ]);
+    }
+
     public function forgotPassword(Request $request): JsonResponse
     {
         $request->validate([
@@ -94,6 +134,7 @@ class AuthController extends Controller
             function (User $user, string $password) {
                 $user->forceFill([
                     'password' => $password,
+                    'must_change_password' => false,
                     'remember_token' => Str::random(60),
                 ])->save();
 
@@ -133,6 +174,7 @@ class AuthController extends Controller
             'roles' => $user->getRoleNames(),
             'structure' => $user->structure?->only(['id', 'code', 'name']),
             'position_title' => $user->position_title,
+            'mustChangePassword' => (bool) $user->must_change_password,
             'avatar' => null,
         ];
     }

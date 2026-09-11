@@ -5,6 +5,7 @@ definePage({
   meta: {
     action: 'create',
     subject: 'Appointment',
+    navActiveLink: 'parapheur-agenda',
   },
 })
 

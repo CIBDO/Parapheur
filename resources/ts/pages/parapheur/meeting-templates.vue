@@ -51,7 +51,32 @@ const dialogTitle = computed(() =>
 const kindLabel = (kind: string) =>
   kindOptions.find(k => k.value === kind)?.title || kind
 
-const placeholdersHelp = '{{reference}}, {{title}}, {{object}}, {{date}}, {{time}}, {{end_time}}, {{location}}, {{chair}}, {{secretary}}, {{structure}}, {{participants}}, {{agenda}}, {{observations}}, {{signatory}}'
+const placeholders = [
+  'reference',
+  'title',
+  'object',
+  'date',
+  'time',
+  'end_time',
+  'location',
+  'chair',
+  'secretary',
+  'structure',
+  'participants',
+  'agenda',
+  'observations',
+  'signatory',
+] as const
+
+const placeholderToken = (key: string) => `{{${key}}}`
+
+const insertPlaceholder = (key: string) => {
+  const token = placeholderToken(key)
+  const current = form.value.body || ''
+  const needsSpace = current.length > 0 && !/\s$/.test(current)
+
+  form.value.body = `${current}${needsSpace ? ' ' : ''}${token}`
+}
 
 const extractError = (e: any) => {
   const errors = e?.data?.errors
@@ -268,14 +293,30 @@ onMounted(load)
               />
             </VCol>
             <VCol cols="12">
-              <AppTextarea
+              <div class="text-body-2 mb-2">
+                Contenu du modèle
+              </div>
+              <TiptapEditor
                 v-model="form.body"
-                label="Corps HTML"
-                rows="12"
-                auto-grow
+                placeholder="Rédigez le modèle… Utilisez les balises ci-dessous pour les champs dynamiques."
+                class="meeting-template-editor border rounded"
               />
-              <div class="text-caption text-medium-emphasis mt-1">
-                Placeholders : {{ placeholdersHelp }}
+              <div class="text-caption text-medium-emphasis mt-3 mb-2">
+                Champs dynamiques (cliquer pour insérer) :
+              </div>
+              <div class="d-flex flex-wrap gap-1">
+                <VChip
+                  v-for="key in placeholders"
+                  :key="key"
+                  size="small"
+                  label
+                  variant="tonal"
+                  color="primary"
+                  class="cursor-pointer"
+                  @click="insertPlaceholder(key)"
+                >
+                  {{ placeholderToken(key) }}
+                </VChip>
               </div>
             </VCol>
             <VCol
@@ -324,3 +365,15 @@ onMounted(load)
     </VDialog>
   </div>
 </template>
+
+<style scoped lang="scss">
+.meeting-template-editor {
+  :deep(.ProseMirror) {
+    min-block-size: 220px;
+    max-block-size: 420px;
+    overflow: auto;
+    padding-inline: 1rem;
+    padding-block: 0.75rem;
+  }
+}
+</style>

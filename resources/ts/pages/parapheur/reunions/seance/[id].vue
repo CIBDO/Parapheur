@@ -6,6 +6,7 @@ definePage({
   meta: {
     action: 'read',
     subject: 'Meeting',
+    navActiveLink: 'parapheur-reunions',
   },
 })
 

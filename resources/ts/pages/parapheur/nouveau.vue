@@ -10,6 +10,7 @@ definePage({
   meta: {
     action: 'create',
     subject: 'Document',
+    navActiveLink: 'parapheur-nouveau',
   },
 })
 

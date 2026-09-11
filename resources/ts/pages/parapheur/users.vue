@@ -595,6 +595,7 @@ onMounted(async () => {
                 class="mb-0"
               >
                 Un mot de passe temporaire sera généré et envoyé automatiquement à l’adresse e-mail saisie.
+                L’utilisateur devra le changer à sa première connexion.
               </VAlert>
             </VCol>
             <VCol

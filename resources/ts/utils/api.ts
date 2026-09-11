@@ -67,4 +67,14 @@ export const $api = ofetch.create({
       options.headers = headers
     }
   },
+  onResponseError({ response }) {
+    if (response.status === 403 && response._data?.code === 'MUST_CHANGE_PASSWORD') {
+      const userData = useCookie<Record<string, unknown> | null>('userData')
+      if (userData.value)
+        userData.value = { ...userData.value, mustChangePassword: true }
+
+      if (typeof window !== 'undefined' && !window.location.pathname.includes('/change-password'))
+        window.location.assign('/change-password')
+    }
+  },
 })

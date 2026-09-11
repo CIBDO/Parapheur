@@ -61,6 +61,7 @@ class UserController extends Controller
         $data['name'] = $this->resolveName($data);
         $data['is_active'] = $data['is_active'] ?? true;
         $data['password'] = $plainPassword;
+        $data['must_change_password'] = true;
 
         $user = DB::transaction(function () use ($data, $role, $plainPassword) {
             $user = User::query()->create($data);
@@ -93,6 +94,9 @@ class UserController extends Controller
 
         if (empty($data['password'])) {
             unset($data['password']);
+        }
+        else {
+            $data['must_change_password'] = true;
         }
 
         $data['name'] = $this->resolveName($data, $user);
@@ -202,6 +206,7 @@ class UserController extends Controller
             'phone' => $user->phone,
             'email' => $user->email,
             'is_active' => (bool) $user->is_active,
+            'must_change_password' => (bool) $user->must_change_password,
             'structure_id' => $user->structure_id,
             'position_title' => $user->position_title,
             'role' => $user->getRoleNames()->first(),
