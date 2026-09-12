@@ -3,17 +3,24 @@
 namespace App\Providers;
 
 use App\Contracts\DocumentPreviewDriver;
+use App\Contracts\IdentityProvider;
 use App\Models\Appointment;
 use App\Models\User;
 use App\Policies\AppointmentPolicy;
+use App\Services\Identity\LdapIdentityProvider;
+use App\Services\Identity\LocalIdentityProvider;
+use App\Services\Identity\SsoIdentityProvider;
+use App\Services\OnlyOffice\OnlyOfficeJwt;
 use App\Services\Preview\NativeDocumentPreviewDriver;
 use App\Services\Preview\OnlyOfficeDocumentPreviewDriver;
 use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
+use InvalidArgumentException;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -26,11 +33,31 @@ class AppServiceProvider extends ServiceProvider
 
             return $app->make(NativeDocumentPreviewDriver::class);
         });
+
+        $this->app->singleton(IdentityProvider::class, function ($app) {
+            return match ((string) config('identity.driver', 'local')) {
+                'ldap' => $app->make(LdapIdentityProvider::class),
+                'sso' => $app->make(SsoIdentityProvider::class),
+                default => $app->make(LocalIdentityProvider::class),
+            };
+        });
     }
 
     public function boot(): void
     {
         Gate::policy(Appointment::class, AppointmentPolicy::class);
+
+        if (config('onlyoffice.enabled')) {
+            try {
+                $this->app->make(OnlyOfficeJwt::class)->assertSecretStrength();
+            } catch (InvalidArgumentException $e) {
+                // En local on logue ; en prod on bloque le boot si ONLYOFFICE_ENABLED.
+                if (app()->environment('production')) {
+                    throw $e;
+                }
+                Log::warning('ONLYOFFICE JWT : '.$e->getMessage());
+            }
+        }
 
         RateLimiter::for('login', function (Request $request) {
             $email = (string) $request->input('email');

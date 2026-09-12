@@ -31,6 +31,7 @@ class DocumentWorkflowService
         private readonly PrivateDocumentStorage $storage,
         private readonly AuditLogger $audit,
         private readonly DelegationResolver $delegations,
+        private readonly DocumentAccessService $access,
     ) {}
 
     public function createDraft(User $author, array $data, ?UploadedFile $mainFile = null, array $attachments = []): Document
@@ -137,6 +138,12 @@ class DocumentWorkflowService
 
             if (! $to) {
                 throw new InvalidArgumentException('Destinataire de transmission requis.');
+            }
+
+            if (! $this->access->canReceive($to, $document)) {
+                throw new InvalidArgumentException(
+                    'Le destinataire n’a pas le niveau d’habilitation requis pour ce document.'
+                );
             }
 
             // Clôturer les transmissions en attente de l'expéditeur

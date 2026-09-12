@@ -49,11 +49,12 @@ Ou séparément : `php artisan serve` + `pnpm dev`.
 
 ```bash
 # .env : ONLYOFFICE_ENABLED=true + JWT (voir .env.example)
+php artisan onlyoffice:generate-jwt-secret   # copier dans ONLYOFFICE_JWT_SECRET
 docker compose up -d
 composer run dev
 ```
 
-Guide : [`docs/onlyoffice.md`](docs/onlyoffice.md).
+Guide : [`docs/onlyoffice.md`](docs/onlyoffice.md). Identité : [`docs/identity.md`](docs/identity.md).
 
 ## Temps 2 (lots ultérieurs)
 

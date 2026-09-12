@@ -19,6 +19,8 @@ use App\Services\DocumentAccessService;
 use App\Services\DocumentWorkflowService;
 use App\Services\ParapheurService;
 use App\Services\PrivateDocumentStorage;
+use App\Services\SignedDownloadService;
+use App\Support\AllowedDocumentUploads;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
@@ -36,6 +38,7 @@ class DocumentController extends Controller
         private readonly DocumentAccessService $access,
         private readonly DocumentPreviewDriver $preview,
         private readonly ArchivePackService $archivePack,
+        private readonly SignedDownloadService $signedDownloads,
     ) {}
 
     public function index(Request $request): JsonResponse
@@ -109,13 +112,13 @@ class DocumentController extends Controller
             'document_date' => ['nullable', 'date'],
             'due_date' => ['nullable', 'date'],
             'keywords' => ['nullable'],
-            'main_file' => ['nullable', 'file', 'max:20480'],
+            'main_file' => AllowedDocumentUploads::fileRules(),
             'attachments' => ['nullable', 'array'],
-            'attachments.*' => ['file', 'max:20480'],
+            'attachments.*' => AllowedDocumentUploads::fileRules(),
             'pieces_jointes' => ['nullable', 'array'],
-            'pieces_jointes.*' => ['file', 'max:20480'],
+            'pieces_jointes.*' => AllowedDocumentUploads::fileRules(),
             'annexes' => ['nullable', 'array'],
-            'annexes.*' => ['file', 'max:20480'],
+            'annexes.*' => AllowedDocumentUploads::fileRules(),
             'transmit_to' => ['nullable', 'exists:users,id'],
             'transmit_message' => ['nullable', 'string'],
             'workflow_id' => ['nullable', 'exists:workflows,id'],
@@ -152,14 +155,18 @@ class DocumentController extends Controller
                 ? User::query()->findOrFail($data['transmit_to'])
                 : null;
             $action = ExpectedAction::from($data['expected_action'] ?? ExpectedAction::Consultation->value);
-            $document = $this->workflow->submitAndTransmit(
-                $document,
-                $request->user(),
-                $to,
-                $action,
-                $data['transmit_message'] ?? null,
-                isset($data['workflow_id']) ? (int) $data['workflow_id'] : null,
-            );
+            try {
+                $document = $this->workflow->submitAndTransmit(
+                    $document,
+                    $request->user(),
+                    $to,
+                    $action,
+                    $data['transmit_message'] ?? null,
+                    isset($data['workflow_id']) ? (int) $data['workflow_id'] : null,
+                );
+            } catch (\InvalidArgumentException $e) {
+                return response()->json(['message' => $e->getMessage()], 422);
+            }
         }
 
         return response()->json($document, 201);
@@ -189,22 +196,30 @@ class DocumentController extends Controller
 
         $userId = $request->user()->id;
 
-        $versions = $document->versions->map(function (DocumentVersion $version) use ($document, $userId) {
+        $versions = $document->versions->map(function (DocumentVersion $version) use ($document, $request) {
             $payload = $version->toArray();
-            $params = [
-                'document' => $document->id,
-                'version' => $version->id,
-                'user' => $userId,
-            ];
+            $user = $request->user();
+            $downloadParams = $this->signedDownloads->paramsForVersion(
+                $document,
+                $version->id,
+                $user,
+                SignedDownloadService::PURPOSE_DOWNLOAD,
+            );
+            $streamParams = $this->signedDownloads->paramsForVersion(
+                $document,
+                $version->id,
+                $user,
+                SignedDownloadService::PURPOSE_STREAM,
+            );
             $payload['download_url'] = URL::temporarySignedRoute(
                 'documents.version.download',
-                now()->addMinutes(30),
-                $params
+                now()->addMinutes($this->signedDownloads->ttlMinutes(SignedDownloadService::PURPOSE_DOWNLOAD)),
+                $downloadParams
             );
             $payload['stream_url'] = URL::temporarySignedRoute(
                 'documents.version.stream',
-                now()->addMinutes(30),
-                $params
+                now()->addMinutes($this->signedDownloads->ttlMinutes(SignedDownloadService::PURPOSE_STREAM)),
+                $streamParams
             );
             $payload['preview'] = $this->preview->preview(
                 $version,
@@ -215,16 +230,17 @@ class DocumentController extends Controller
             return $payload;
         })->values();
 
-        $attachments = $document->attachments->map(function (DocumentAttachment $attachment) use ($document, $userId) {
+        $attachments = $document->attachments->map(function (DocumentAttachment $attachment) use ($document, $request) {
             $payload = $attachment->toArray();
+            $params = $this->signedDownloads->paramsForAttachment(
+                $document,
+                $attachment->id,
+                $request->user(),
+            );
             $payload['download_url'] = URL::temporarySignedRoute(
                 'documents.attachment.download',
-                now()->addMinutes(30),
-                [
-                    'document' => $document->id,
-                    'attachment' => $attachment->id,
-                    'user' => $userId,
-                ]
+                now()->addMinutes($this->signedDownloads->ttlMinutes(SignedDownloadService::PURPOSE_DOWNLOAD)),
+                $params
             );
 
             return $payload;
@@ -255,14 +271,18 @@ class DocumentController extends Controller
             return response()->json(['message' => 'Destinataire ou circuit requis.'], 422);
         }
 
-        $document = $this->workflow->submitAndTransmit(
-            $document,
-            $request->user(),
-            ! empty($data['to_user_id']) ? User::query()->findOrFail($data['to_user_id']) : null,
-            ExpectedAction::from($data['expected_action']),
-            $data['message'] ?? null,
-            isset($data['workflow_id']) ? (int) $data['workflow_id'] : null,
-        );
+        try {
+            $document = $this->workflow->submitAndTransmit(
+                $document,
+                $request->user(),
+                ! empty($data['to_user_id']) ? User::query()->findOrFail($data['to_user_id']) : null,
+                ExpectedAction::from($data['expected_action']),
+                $data['message'] ?? null,
+                isset($data['workflow_id']) ? (int) $data['workflow_id'] : null,
+            );
+        } catch (\InvalidArgumentException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
 
         return response()->json($document);
     }
@@ -442,7 +462,7 @@ class DocumentController extends Controller
         $this->access->authorize($request->user(), $document);
 
         $data = $request->validate([
-            'file' => ['required', 'file', 'max:20480'],
+            'file' => AllowedDocumentUploads::fileRules(required: true),
             'change_note' => ['nullable', 'string'],
         ]);
 
@@ -464,7 +484,7 @@ class DocumentController extends Controller
         $this->access->authorize($request->user(), $document);
 
         $data = $request->validate([
-            'file' => ['required', 'file', 'max:20480'],
+            'file' => AllowedDocumentUploads::fileRules(required: true),
             'kind' => ['nullable', Rule::in(['piece_jointe', 'annexe', 'complement'])],
         ]);
 
@@ -524,6 +544,10 @@ class DocumentController extends Controller
         abort_unless($version->document_id === $document->id, 404);
         $user = User::query()->findOrFail($request->integer('user'));
         $this->access->authorize($user, $document);
+        $this->signedDownloads->consume($request, $document, $user, [
+            SignedDownloadService::PURPOSE_DOWNLOAD,
+            SignedDownloadService::PURPOSE_ONLYOFFICE,
+        ]);
         abort_unless($this->storage->exists($version->disk, $version->path), 404);
 
         return Storage::disk($version->disk)->download($version->path, $version->original_name);
@@ -534,6 +558,9 @@ class DocumentController extends Controller
         abort_unless($version->document_id === $document->id, 404);
         $user = User::query()->findOrFail($request->integer('user'));
         $this->access->authorize($user, $document);
+        $this->signedDownloads->consume($request, $document, $user, [
+            SignedDownloadService::PURPOSE_STREAM,
+        ]);
         abort_unless($this->storage->exists($version->disk, $version->path), 404);
 
         return Storage::disk($version->disk)->response($version->path, $version->original_name, [
@@ -546,6 +573,9 @@ class DocumentController extends Controller
         abort_unless($attachment->document_id === $document->id, 404);
         $user = User::query()->findOrFail($request->integer('user'));
         $this->access->authorize($user, $document);
+        $this->signedDownloads->consume($request, $document, $user, [
+            SignedDownloadService::PURPOSE_DOWNLOAD,
+        ]);
         abort_unless($this->storage->exists($attachment->disk, $attachment->path), 404);
 
         return Storage::disk($attachment->disk)->download($attachment->path, $attachment->original_name);

@@ -19,7 +19,7 @@ class PrivateDocumentStorage
             'disk' => 'local',
             'path' => $path,
             'original_name' => $file->getClientOriginalName(),
-            'mime_type' => $file->getClientMimeType(),
+            'mime_type' => $file->getMimeType() ?: $file->getClientMimeType(),
             'size' => $file->getSize() ?: 0,
             'checksum' => hash_file('sha256', $file->getRealPath()),
         ];

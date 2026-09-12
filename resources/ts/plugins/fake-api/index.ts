@@ -1,49 +1,58 @@
-import { setupWorker } from 'msw/browser';
-
-// Handlers
-import { handlerAppBarSearch } from '@db/app-bar-search/index';
-import { handlerAppsAcademy } from '@db/apps/academy/index';
-import { handlerAppsCalendar } from '@db/apps/calendar/index';
-import { handlerAppsChat } from '@db/apps/chat/index';
-import { handlerAppsEcommerce } from '@db/apps/ecommerce/index';
-import { handlerAppsEmail } from '@db/apps/email/index';
-import { handlerAppsInvoice } from '@db/apps/invoice/index';
-import { handlerAppsKanban } from '@db/apps/kanban/index';
-import { handlerAppLogistics } from '@db/apps/logistics/index';
-import { handlerAppsPermission } from '@db/apps/permission/index';
-import { handlerAppsUsers } from '@db/apps/users/index';
-import { handlerDashboard } from '@db/dashboard/index';
-import { handlerPagesDatatable } from '@db/pages/datatable/index';
-import { handlerPagesFaq } from '@db/pages/faq/index';
-import { handlerPagesHelpCenter } from '@db/pages/help-center/index';
-import { handlerPagesProfile } from '@db/pages/profile/index';
-
-const worker = setupWorker(
-  ...handlerAppsEcommerce,
-  ...handlerAppsAcademy,
-  ...handlerAppsInvoice,
-  ...handlerAppsUsers,
-  ...handlerAppsEmail,
-  ...handlerAppsCalendar,
-  ...handlerAppsChat,
-  ...handlerAppsPermission,
-  ...handlerPagesHelpCenter,
-  ...handlerPagesProfile,
-  ...handlerPagesFaq,
-  ...handlerPagesDatatable,
-  ...handlerAppBarSearch,
-  ...handlerAppLogistics,
-  ...handlerAppsKanban,
-  ...handlerDashboard,
-);
-
+/**
+ * Fake API Vuexy (MSW) — désactivé par défaut.
+ * Activer uniquement en local : VITE_ENABLE_FAKE_API=true
+ */
 export default function () {
-  const workerUrl = `${import.meta.env.BASE_URL.replace(/build\/$/g, '') ?? '/'}mockServiceWorker.js`;
+  if (!import.meta.env.DEV || import.meta.env.VITE_ENABLE_FAKE_API !== 'true')
+    return
 
-  worker.start({
+  void startFakeApi()
+}
+
+async function startFakeApi() {
+  const { setupWorker } = await import('msw/browser')
+  const { handlerAppBarSearch } = await import('@db/app-bar-search/index')
+  const { handlerAppsAcademy } = await import('@db/apps/academy/index')
+  const { handlerAppsCalendar } = await import('@db/apps/calendar/index')
+  const { handlerAppsChat } = await import('@db/apps/chat/index')
+  const { handlerAppsEcommerce } = await import('@db/apps/ecommerce/index')
+  const { handlerAppsEmail } = await import('@db/apps/email/index')
+  const { handlerAppsInvoice } = await import('@db/apps/invoice/index')
+  const { handlerAppsKanban } = await import('@db/apps/kanban/index')
+  const { handlerAppLogistics } = await import('@db/apps/logistics/index')
+  const { handlerAppsPermission } = await import('@db/apps/permission/index')
+  const { handlerAppsUsers } = await import('@db/apps/users/index')
+  const { handlerDashboard } = await import('@db/dashboard/index')
+  const { handlerPagesDatatable } = await import('@db/pages/datatable/index')
+  const { handlerPagesFaq } = await import('@db/pages/faq/index')
+  const { handlerPagesHelpCenter } = await import('@db/pages/help-center/index')
+  const { handlerPagesProfile } = await import('@db/pages/profile/index')
+
+  const worker = setupWorker(
+    ...handlerAppsEcommerce,
+    ...handlerAppsAcademy,
+    ...handlerAppsInvoice,
+    ...handlerAppsUsers,
+    ...handlerAppsEmail,
+    ...handlerAppsCalendar,
+    ...handlerAppsChat,
+    ...handlerAppsPermission,
+    ...handlerPagesHelpCenter,
+    ...handlerPagesProfile,
+    ...handlerPagesFaq,
+    ...handlerPagesDatatable,
+    ...handlerAppBarSearch,
+    ...handlerAppLogistics,
+    ...handlerAppsKanban,
+    ...handlerDashboard,
+  )
+
+  const workerUrl = `${import.meta.env.BASE_URL.replace(/build\/$/g, '') ?? '/'}mockServiceWorker.js`
+
+  await worker.start({
     serviceWorker: {
       url: workerUrl,
     },
     onUnhandledRequest: 'bypass',
-  });
+  })
 }

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Contracts\IdentityProvider;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use Illuminate\Auth\Events\PasswordReset;
@@ -15,6 +16,10 @@ use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
 {
+    public function __construct(
+        private readonly IdentityProvider $identity,
+    ) {}
+
     public function login(Request $request): JsonResponse
     {
         $credentials = $request->validate([
@@ -22,15 +27,15 @@ class AuthController extends Controller
             'password' => ['required', 'string'],
         ]);
 
-        /** @var User|null $user */
-        $user = User::query()->where('email', $credentials['email'])->first();
+        $user = $this->identity->attempt($credentials);
 
-        if (! $user || ! Hash::check($credentials['password'], $user->password) || ! $user->is_active) {
+        if (! $user) {
             throw ValidationException::withMessages([
                 'email' => ['Identifiants invalides.'],
             ]);
         }
 
+        $user->load(['structure', 'roles']);
         $token = $user->createToken('spa')->plainTextToken;
 
         return response()->json([
@@ -86,7 +91,6 @@ class AuthController extends Controller
             'remember_token' => Str::random(60),
         ])->save();
 
-        // Révoquer les autres sessions ; conserver le token courant.
         $currentTokenId = $user->currentAccessToken()?->id;
         $user->tokens()
             ->when($currentTokenId, fn ($q) => $q->where('id', '!=', $currentTokenId))
@@ -109,7 +113,6 @@ class AuthController extends Controller
             ->where('is_active', true)
             ->first();
 
-        // Réponse neutre pour ne pas révéler si l'e-mail existe.
         if ($user) {
             Password::broker()->sendResetLink(
                 $request->only('email')

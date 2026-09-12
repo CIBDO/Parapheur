@@ -8,6 +8,7 @@ use App\Models\DocumentVersion;
 use App\Models\User;
 use App\Services\DocumentAccessService;
 use App\Services\DocumentWorkflowService;
+use App\Services\SignedDownloadService;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\URL;
@@ -20,6 +21,7 @@ class OnlyOfficeService
         private readonly OnlyOfficeJwt $jwt,
         private readonly DocumentAccessService $access,
         private readonly DocumentWorkflowService $workflow,
+        private readonly SignedDownloadService $signedDownloads,
     ) {}
 
     public function isEnabled(): bool
@@ -441,7 +443,7 @@ class OnlyOfficeService
 
     public function signedFileUrl(Document $document, DocumentVersion $version, User $user): string
     {
-        $ttl = now()->addMinutes((int) config('onlyoffice.file_url_ttl_minutes', 120));
+        $ttl = now()->addMinutes($this->signedDownloads->ttlMinutes(SignedDownloadService::PURPOSE_ONLYOFFICE));
         $appUrl = rtrim((string) config('onlyoffice.app_url'), '/');
         $previousRoot = rtrim((string) config('app.url'), '/');
 
@@ -454,11 +456,12 @@ class OnlyOfficeService
             return URL::temporarySignedRoute(
                 'documents.version.download',
                 $ttl,
-                [
-                    'document' => $document->id,
-                    'version' => $version->id,
-                    'user' => $user->id,
-                ]
+                $this->signedDownloads->paramsForVersion(
+                    $document,
+                    $version->id,
+                    $user,
+                    SignedDownloadService::PURPOSE_ONLYOFFICE,
+                )
             );
         } finally {
             URL::forceRootUrl($previousRoot !== '' ? $previousRoot : null);

@@ -38,13 +38,19 @@ return [
 
     'jwt_secret' => (string) env('ONLYOFFICE_JWT_SECRET', ''),
 
+    /*
+    | Secret précédent pour rotation douce (décodage uniquement).
+    */
+    'jwt_secret_previous' => (string) env('ONLYOFFICE_JWT_SECRET_PREVIOUS', ''),
+
     'jwt_header' => (string) env('ONLYOFFICE_JWT_HEADER', 'Authorization'),
 
     'jwt_ttl' => (int) env('ONLYOFFICE_JWT_TTL', 3600),
 
     /*
     | Durée de vie des URLs signées exposées au Document Server (minutes).
+    | Déprécié au profit de config('parapheur.signed_urls.onlyoffice_ttl_minutes').
     */
-    'file_url_ttl_minutes' => (int) env('ONLYOFFICE_FILE_URL_TTL', 120),
+    'file_url_ttl_minutes' => (int) env('ONLYOFFICE_FILE_URL_TTL', 30),
 
 ];

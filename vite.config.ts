@@ -45,12 +45,21 @@ export default defineConfig({
           .toLowerCase();
       },
 
-      beforeWriteFiles: root => {
-        root.insert('/apps/email/:filter', '/resources/ts/pages/apps/email/index.vue');
-        root.insert('/apps/email/:label', '/resources/ts/pages/apps/email/index.vue');
-      },
-
+      // Surface métier uniquement — pages démo Vuexy exclues du routeur.
       routesFolder: 'resources/ts/pages',
+      exclude: [
+        'resources/ts/pages/apps/**',
+        'resources/ts/pages/charts/**',
+        'resources/ts/pages/components/**',
+        'resources/ts/pages/dashboards/**',
+        'resources/ts/pages/extensions/**',
+        'resources/ts/pages/forms/**',
+        'resources/ts/pages/front-pages/**',
+        'resources/ts/pages/pages/**',
+        'resources/ts/pages/tables/**',
+        'resources/ts/pages/wizard-examples/**',
+        'resources/ts/pages/access-control.vue',
+      ],
     }),
     vue({
       template: {
