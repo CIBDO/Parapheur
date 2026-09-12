@@ -169,9 +169,12 @@ class OnlyOfficeIntegrationTest extends TestCase
         [$agent, $document] = $this->createDocxDocument();
 
         $newContents = 'contenu-version-2-onlyoffice-'.uniqid();
-        Http::fake([
-            'http://onlyoffice.test/*' => Http::response($newContents, 200),
-        ]);
+        Http::fake(function (\Illuminate\Http\Client\Request $request) use ($newContents) {
+            $this->assertTrue($request->hasHeader('Authorization'));
+            $this->assertStringStartsWith('Bearer ', $request->header('Authorization')[0] ?? '');
+
+            return Http::response($newContents, 200);
+        });
 
         $jwt = app(OnlyOfficeJwt::class)->encode([
             'status' => 2,

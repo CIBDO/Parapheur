@@ -81,6 +81,7 @@ declare global {
   const isEmptyArray: typeof import('./resources/ts/@core/utils/helpers')['isEmptyArray']
   const isNullOrUndefined: typeof import('./resources/ts/@core/utils/helpers')['isNullOrUndefined']
   const isObject: typeof import('./resources/ts/@core/utils/helpers')['isObject']
+  const isOnlyOfficeEditableDocument: typeof import('./resources/ts/utils/meetingsUi')['isOnlyOfficeEditableDocument']
   const isProxy: typeof import('vue')['isProxy']
   const isReactive: typeof import('vue')['isReactive']
   const isReadonly: typeof import('vue')['isReadonly']
@@ -473,6 +474,7 @@ declare module 'vue' {
     readonly isEmptyArray: UnwrapRef<typeof import('./resources/ts/@core/utils/helpers')['isEmptyArray']>
     readonly isNullOrUndefined: UnwrapRef<typeof import('./resources/ts/@core/utils/helpers')['isNullOrUndefined']>
     readonly isObject: UnwrapRef<typeof import('./resources/ts/@core/utils/helpers')['isObject']>
+    readonly isOnlyOfficeEditableDocument: UnwrapRef<typeof import('./resources/ts/utils/meetingsUi')['isOnlyOfficeEditableDocument']>
     readonly isProxy: UnwrapRef<typeof import('vue')['isProxy']>
     readonly isReactive: UnwrapRef<typeof import('vue')['isReactive']>
     readonly isReadonly: UnwrapRef<typeof import('vue')['isReadonly']>

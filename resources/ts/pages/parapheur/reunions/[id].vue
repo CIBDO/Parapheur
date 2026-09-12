@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import ParapheurPageHeader from '@/components/parapheur/ParapheurPageHeader.vue'
+import OnlyOfficeEditor from '@/components/parapheur/OnlyOfficeEditor.vue'
 import { formatDateFr, formatDateTimeFr } from '@/utils/parapheurUi'
 import {
   attendanceLabels,
@@ -7,6 +8,7 @@ import {
   documentKindLabels,
   downloadMeetingHtml,
   exportKindLabels,
+  isOnlyOfficeEditableDocument,
   meetingStatusColor,
   meetingStatusLabels,
   openMeetingHtml,
@@ -61,6 +63,8 @@ const externalForm = ref({
 })
 const existingDocId = ref<number | null>(null)
 const uploadFile = ref<File[] | File | null>(null)
+const selectedMeetingDocId = ref<number | null>(null)
+const meetingEditorRemountKey = ref(0)
 const noteForm = ref({ visibility: 'officielle', section: 'resume', body: '', agenda_item_id: null as number | null })
 const decisionForm = ref({ title: '', body: '', assignee_id: null as number | null, due_date: '', create_instruction: true, agenda_item_id: null as number | null })
 const postponeForm = ref({ meeting_date: '', meeting_time: '', reason: '' })
@@ -175,6 +179,32 @@ const uploadNew = () => run(async () => {
   await $api(`/meetings/${id.value}/documents`, { method: 'POST', body })
   uploadFile.value = null
 })
+
+const selectedMeetingDocument = computed(() =>
+  (meeting.value?.documents || []).find((link: any) => link.document?.id === selectedMeetingDocId.value)?.document
+  ?? null,
+)
+const selectedMeetingDocIsOffice = computed(() => isOnlyOfficeEditableDocument(selectedMeetingDocument.value))
+
+const openMeetingDocument = (documentId?: number | null) => {
+  if (!documentId)
+    return
+  selectedMeetingDocId.value = documentId
+  meetingEditorRemountKey.value += 1
+}
+
+const closeMeetingDocument = () => {
+  selectedMeetingDocId.value = null
+}
+
+const onMeetingOnlyOfficeSaved = async () => {
+  await load()
+}
+
+const onMeetingOnlyOfficeReload = () => {
+  meetingEditorRemountKey.value += 1
+}
+
 const addNote = () => run(async () => {
   await $api(`/meetings/${id.value}/notes`, { method: 'POST', body: noteForm.value })
   noteForm.value.body = ''
@@ -736,12 +766,77 @@ const statusLabel = computed(() => meetingStatusLabels[meeting.value?.status] ||
               <VListItem
                 v-for="link in meeting.documents"
                 :key="link.id"
-                :to="{ name: 'parapheur-id', params: { id: link.document?.id } }"
               >
                 <VListItemTitle>{{ link.document?.object }}</VListItemTitle>
                 <VListItemSubtitle>{{ documentKindLabels[link.kind] || link.kind }} · {{ link.document?.reference }}</VListItemSubtitle>
+                <template #append>
+                  <div class="d-flex flex-wrap gap-2">
+                    <VBtn
+                      size="small"
+                      color="primary"
+                      variant="tonal"
+                      :disabled="!link.document?.id"
+                      @click="openMeetingDocument(link.document?.id)"
+                    >
+                      Ouvrir
+                    </VBtn>
+                    <VBtn
+                      size="small"
+                      variant="text"
+                      :to="{ name: 'parapheur-id', params: { id: link.document?.id } }"
+                      :disabled="!link.document?.id"
+                    >
+                      Fiche parapheur
+                    </VBtn>
+                  </div>
+                </template>
               </VListItem>
             </VList>
+
+            <div
+              v-if="selectedMeetingDocId && selectedMeetingDocument"
+              class="mt-6"
+            >
+              <div class="d-flex flex-wrap align-center justify-space-between gap-2 mb-3">
+                <div>
+                  <div class="text-subtitle-1">
+                    {{ selectedMeetingDocument.object }}
+                  </div>
+                  <div class="text-caption text-medium-emphasis">
+                    {{ selectedMeetingDocument.reference }}
+                  </div>
+                </div>
+                <VBtn
+                  variant="tonal"
+                  size="small"
+                  @click="closeMeetingDocument"
+                >
+                  Fermer
+                </VBtn>
+              </div>
+
+              <OnlyOfficeEditor
+                v-if="selectedMeetingDocIsOffice"
+                :key="`oo-meeting-${selectedMeetingDocId}-${meetingEditorRemountKey}`"
+                :document-id="selectedMeetingDocId"
+                @saved="onMeetingOnlyOfficeSaved"
+                @reload="onMeetingOnlyOfficeReload"
+                @error="(msg) => { errorMessage = msg }"
+              />
+              <VAlert
+                v-else
+                type="info"
+                variant="tonal"
+              >
+                Ce fichier n’est pas éditable via ONLYOFFICE (DOCX, XLSX ou PPTX requis).
+                <RouterLink
+                  class="ms-1"
+                  :to="{ name: 'parapheur-id', params: { id: selectedMeetingDocId } }"
+                >
+                  Ouvrir la fiche parapheur
+                </RouterLink>
+              </VAlert>
+            </div>
           </VCardText>
         </VCard>
       </VWindowItem>

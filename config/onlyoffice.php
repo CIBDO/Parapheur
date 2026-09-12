@@ -21,6 +21,14 @@ return [
     'url' => rtrim((string) env('ONLYOFFICE_URL', 'http://localhost:8080'), '/'),
 
     /*
+    | URL Document Server vue depuis Laravel (téléchargements callback).
+    | Laisser vide = ONLYOFFICE_URL. Utile si le DS renvoie un hôte Docker
+    | injoignable depuis l’hôte (ex. http://onlyoffice) alors que Laravel
+    | doit passer par http://localhost:8080.
+    */
+    'internal_url' => rtrim((string) env('ONLYOFFICE_INTERNAL_URL', ''), '/'),
+
+    /*
     | URL de l’application Laravel vue par le Document Server
     | (téléchargement fichier + callback). Sur Docker Desktop :
     | http://host.docker.internal:8000

@@ -130,3 +130,24 @@ export async function downloadMeetingHtml(url: string, filename: string) {
   a.click()
   URL.revokeObjectURL(objectUrl)
 }
+
+/** DOCX / XLSX / PPTX éditables via ONLYOFFICE (mime ou extension). */
+export function isOnlyOfficeEditableDocument(doc?: {
+  latest_version?: { mime_type?: string | null; original_name?: string | null } | null
+} | null): boolean {
+  const version = doc?.latest_version
+  if (!version)
+    return false
+
+  const mime = String(version.mime_type || '').toLowerCase()
+  if (
+    mime.includes('wordprocessingml')
+    || mime.includes('spreadsheetml')
+    || mime.includes('presentationml')
+  )
+    return true
+
+  const ext = String(version.original_name || '').split('.').pop()?.toLowerCase()
+
+  return ['docx', 'xlsx', 'pptx'].includes(ext || '')
+}

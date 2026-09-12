@@ -883,14 +883,32 @@ class MeetingService
             'recurrence' => $meeting->recurrence,
             'participants' => $meeting->participants,
             'agenda_items' => $meeting->agendaItems,
-            'documents' => $meeting->documentLinks->map(fn (MeetingDocument $link) => [
-                'id' => $link->id,
-                'kind' => $link->kind,
-                'sort_order' => $link->sort_order,
-                'agenda_item_id' => $link->agenda_item_id,
-                'agenda_label' => $link->agenda_label,
-                'document' => $link->document,
-            ]),
+            'documents' => $meeting->documentLinks->map(function (MeetingDocument $link) {
+                $document = $link->document;
+                $version = $document?->latestVersion;
+
+                return [
+                    'id' => $link->id,
+                    'kind' => $link->kind,
+                    'sort_order' => $link->sort_order,
+                    'agenda_item_id' => $link->agenda_item_id,
+                    'agenda_label' => $link->agenda_label,
+                    'document' => $document ? [
+                        'id' => $document->id,
+                        'uuid' => $document->uuid,
+                        'object' => $document->object,
+                        'reference' => $document->reference,
+                        'status' => $document->status,
+                        'type' => $document->type,
+                        'latest_version' => $version ? [
+                            'id' => $version->id,
+                            'version_number' => $version->version_number,
+                            'mime_type' => $version->mime_type,
+                            'original_name' => $version->original_name,
+                        ] : null,
+                    ] : null,
+                ];
+            }),
             'decisions' => $meeting->decisions->map(fn (MeetingDecision $d) => [
                 ...$d->toArray(),
                 'status' => $d->effectiveStatus()->value,
@@ -922,6 +940,7 @@ class MeetingService
             'participants.user.structure', 'participants.representative',
             'agendaItems.presenter',
             'documentLinks.document.type',
+            'documentLinks.document.latestVersion',
             'decisions.assignee', 'decisions.structure', 'decisions.instruction', 'decisions.instructions',
             'recommendations.structure', 'recommendations.creator',
             'sessionNotes.author', 'sessionNotes.agendaItem',

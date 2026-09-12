@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import ParapheurPageHeader from '@/components/parapheur/ParapheurPageHeader.vue'
-import { attendanceLabels, decisionStatusLabels } from '@/utils/meetingsUi'
+import OnlyOfficeEditor from '@/components/parapheur/OnlyOfficeEditor.vue'
+import { attendanceLabels, decisionStatusLabels, isOnlyOfficeEditableDocument } from '@/utils/meetingsUi'
 
 definePage({
   meta: {
@@ -16,6 +17,9 @@ const meeting = ref<any>(null)
 const busy = ref(false)
 const noteBody = ref('')
 const decisionTitle = ref('')
+const selectedDocId = ref<number | null>(null)
+const editorRemountKey = ref(0)
+const editorError = ref('')
 
 const currentIndex = computed(() => {
   const items = meeting.value?.agenda_items || []
@@ -26,6 +30,17 @@ const currentIndex = computed(() => {
 })
 
 const currentItem = computed(() => (meeting.value?.agenda_items || [])[currentIndex.value] || null)
+
+const pointDocuments = computed(() =>
+  (meeting.value?.documents || []).filter((d: any) => !d.agenda_item_id || d.agenda_item_id === currentItem.value?.id),
+)
+
+const selectedDocument = computed(() =>
+  pointDocuments.value.find((link: any) => link.document?.id === selectedDocId.value)?.document
+  ?? null,
+)
+
+const selectedDocIsOffice = computed(() => isOnlyOfficeEditableDocument(selectedDocument.value))
 
 const load = async () => {
   meeting.value = await $api(`/meetings/${id.value}`)
@@ -42,15 +57,17 @@ const run = async (fn: () => Promise<unknown>) => {
   }
 }
 
-const setCurrent = (itemId: number) => run(() =>
-  $api(`/meetings/${id.value}/agenda/${itemId}/current`, { method: 'POST' }),
-)
+const setCurrent = (itemId: number) => run(async () => {
+  selectedDocId.value = null
+  editorError.value = ''
+  await $api(`/meetings/${id.value}/agenda/${itemId}/current`, { method: 'POST' })
+})
 
 const prev = () => {
   const items = meeting.value?.agenda_items || []
-  const next = items[currentIndex.value - 1]
-  if (next)
-    setCurrent(next.id)
+  const nextItem = items[currentIndex.value - 1]
+  if (nextItem)
+    setCurrent(nextItem.id)
 }
 
 const next = () => {
@@ -58,6 +75,27 @@ const next = () => {
   const following = items[currentIndex.value + 1]
   if (following)
     setCurrent(following.id)
+}
+
+const openDocument = (documentId?: number | null) => {
+  if (!documentId)
+    return
+  selectedDocId.value = documentId
+  editorError.value = ''
+  editorRemountKey.value += 1
+}
+
+const closeDocument = () => {
+  selectedDocId.value = null
+  editorError.value = ''
+}
+
+const onOnlyOfficeSaved = async () => {
+  await load()
+}
+
+const onOnlyOfficeReload = () => {
+  editorRemountKey.value += 1
 }
 
 const addOfficialNote = () => run(async () => {
@@ -170,14 +208,85 @@ onMounted(load)
           <VCardTitle>Documents du point</VCardTitle>
           <VList>
             <VListItem
-              v-for="link in (meeting.documents || []).filter((d: any) => !d.agenda_item_id || d.agenda_item_id === currentItem?.id)"
+              v-for="link in pointDocuments"
               :key="link.id"
-              :to="link.document?.id ? { name: 'parapheur-id', params: { id: link.document.id } } : undefined"
             >
               <VListItemTitle>{{ link.document?.object }}</VListItemTitle>
               <VListItemSubtitle>{{ link.document?.reference }}</VListItemSubtitle>
+              <template #append>
+                <div class="d-flex flex-wrap gap-2">
+                  <VBtn
+                    size="small"
+                    color="primary"
+                    variant="tonal"
+                    :disabled="!link.document?.id"
+                    @click="openDocument(link.document?.id)"
+                  >
+                    Ouvrir
+                  </VBtn>
+                  <VBtn
+                    size="small"
+                    variant="text"
+                    :to="link.document?.id ? { name: 'parapheur-id', params: { id: link.document.id } } : undefined"
+                    :disabled="!link.document?.id"
+                  >
+                    Fiche
+                  </VBtn>
+                </div>
+              </template>
             </VListItem>
           </VList>
+
+          <VCardText v-if="selectedDocId && selectedDocument">
+            <div class="d-flex flex-wrap align-center justify-space-between gap-2 mb-3">
+              <div>
+                <div class="text-subtitle-1">
+                  {{ selectedDocument.object }}
+                </div>
+                <div class="text-caption text-medium-emphasis">
+                  {{ selectedDocument.reference }}
+                </div>
+              </div>
+              <VBtn
+                variant="tonal"
+                size="small"
+                @click="closeDocument"
+              >
+                Fermer
+              </VBtn>
+            </div>
+
+            <VAlert
+              v-if="editorError"
+              type="warning"
+              variant="tonal"
+              class="mb-3"
+            >
+              {{ editorError }}
+            </VAlert>
+
+            <OnlyOfficeEditor
+              v-if="selectedDocIsOffice"
+              :key="`oo-seance-${selectedDocId}-${editorRemountKey}`"
+              :document-id="selectedDocId"
+              @saved="onOnlyOfficeSaved"
+              @reload="onOnlyOfficeReload"
+              @error="(msg) => { editorError = msg }"
+            />
+            <VAlert
+              v-else
+              type="info"
+              variant="tonal"
+            >
+              Ce fichier n’est pas éditable via ONLYOFFICE (DOCX, XLSX ou PPTX requis).
+              <RouterLink
+                class="ms-1"
+                :to="{ name: 'parapheur-id', params: { id: selectedDocId } }"
+              >
+                Ouvrir la fiche parapheur
+              </RouterLink>
+            </VAlert>
+          </VCardText>
         </VCard>
 
         <VCard class="mb-4">

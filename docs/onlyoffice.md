@@ -99,4 +99,19 @@ Symptôme typique : bandeau « Éditeur ONLYOFFICE » visible mais squelette gri
    Attendre 1–2 min (`http://localhost:8080/healthcheck`).
 7. Recharger la fiche (Ctrl+F5). Attendre le statut « Document ouvert ».
 
+## Dépannage (sauvegarde / « copie de sauvegarde »)
+
+Symptôme : avertissement « fichier ouvert depuis une copie de sauvegarde » ; pas de nouvelle version Laravel.
+
+Cause typique : le callback Docs atteint Laravel, mais le **téléchargement** du DOCX modifié depuis `/cache/files/...` échoue (JWT inbox manquant ou URL injoignable).
+
+1. Vérifier Laravel écoute `0.0.0.0:8000` et `ONLYOFFICE_APP_URL=http://host.docker.internal:8000`.
+2. Secret JWT identique `.env` ↔ conteneur ; header `Authorization`.
+3. Si besoin, forcer l’URL de téléchargement serveur : `ONLYOFFICE_INTERNAL_URL=http://localhost:8080`.
+4. Vider le cache oublié Docs si une session est coincée :
+   ```bash
+   docker exec eparapheur-onlyoffice bash -lc "rm -rf /var/lib/onlyoffice/documentserver/App_Data/cache/files/forgotten/*"
+   ```
+   puis recharger la fiche (nouvelle clé document après sauvegarde OK).
+
 Note : un bug Vue effaçait l’iframe DocsAPI à chaque re-render ; le conteneur éditeur utilise désormais `v-once`.

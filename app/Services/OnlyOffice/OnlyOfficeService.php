@@ -322,13 +322,8 @@ class OnlyOfficeService
             return ['error' => 0];
         }
 
-        $url = $this->rewriteDocumentServerUrl($url);
-        $response = Http::timeout(120)->withOptions(['allow_redirects' => true])->get($url);
-        if (! $response->successful()) {
-            throw new RuntimeException('Téléchargement fichier ONLYOFFICE impossible (HTTP '.$response->status().').');
-        }
+        $contents = $this->downloadFromDocumentServer($url);
 
-        $contents = $response->body();
         $current = $document->latestVersion;
         if ($current && hash('sha256', $contents) === $current->checksum) {
             return ['error' => 0];
@@ -359,6 +354,60 @@ class OnlyOfficeService
         );
 
         return ['error' => 0];
+    }
+
+    /**
+     * Télécharge le fichier modifié depuis Document Server.
+     * Essaie l’URL d’origine puis l’URL réécrite ; avec JWT inbox puis sans
+     * (URLs cache signées md5/expires).
+     */
+    public function downloadFromDocumentServer(string $url): string
+    {
+        $candidates = array_values(array_unique(array_filter([
+            $url,
+            $this->rewriteDocumentServerUrl($url),
+        ])));
+
+        $lastStatus = 0;
+        $lastBody = '';
+
+        foreach ($candidates as $candidate) {
+            $authVariants = [null];
+            if ((string) config('onlyoffice.jwt_secret') !== '') {
+                $authVariants = [
+                    ['payload' => ['url' => $candidate]],
+                    ['url' => $candidate],
+                    null,
+                ];
+            }
+
+            foreach ($authVariants as $jwtPayload) {
+                $request = Http::timeout(120)->withOptions([
+                    'allow_redirects' => true,
+                    'http_errors' => false,
+                ]);
+
+                if (is_array($jwtPayload)) {
+                    $header = (string) config('onlyoffice.jwt_header', 'Authorization');
+                    $token = $this->jwt->encode($jwtPayload);
+                    $request = $request->withHeaders([
+                        $header => 'Bearer '.$token,
+                    ]);
+                }
+
+                $response = $request->get($candidate);
+                $lastStatus = $response->status();
+                $lastBody = $response->body();
+
+                if ($response->successful()) {
+                    return $lastBody;
+                }
+            }
+        }
+
+        throw new RuntimeException(
+            'Téléchargement fichier ONLYOFFICE impossible (HTTP '.$lastStatus.').'
+        );
     }
 
     /**
@@ -440,17 +489,19 @@ class OnlyOfficeService
 
     /**
      * Si le DS renvoie une URL avec un hôte injoignable depuis Laravel, on normalise.
+     * On conserve path + query (md5/expires) — seuls scheme/host/port changent.
+     * Preferer ONLYOFFICE_INTERNAL_URL pour les téléchargements serveur (Docker).
      */
     public function rewriteDocumentServerUrl(string $url): string
     {
-        $ds = rtrim((string) config('onlyoffice.url'), '/');
+        $ds = rtrim((string) (config('onlyoffice.internal_url') ?: config('onlyoffice.url')), '/');
         $parts = parse_url($url);
         $dsParts = parse_url($ds);
         if (! is_array($parts) || ! is_array($dsParts) || empty($parts['path'])) {
             return $url;
         }
 
-        // Remplacer host/port par ceux de ONLYOFFICE_URL si le path Docs est reconnu
+        // Remplacer host/port par ceux de ONLYOFFICE_URL / INTERNAL_URL si le path Docs est reconnu
         if (str_contains($parts['path'], '/cache/') || str_contains($parts['path'], '/downloadfile/') || str_contains($url, 'onlyoffice')) {
             $scheme = $dsParts['scheme'] ?? ($parts['scheme'] ?? 'http');
             $host = $dsParts['host'] ?? ($parts['host'] ?? 'localhost');
