@@ -35,8 +35,13 @@ class OnlyOfficeService
         $name = strtolower((string) $version->original_name);
         $mime = strtolower((string) $version->mime_type);
 
+        // Formats Office ouverts (pas de macros .xlsm/.docm — non supportés de façon fiable).
         if (preg_match('/\.(docx|xlsx|pptx)$/', $name)) {
             return true;
+        }
+
+        if (preg_match('/\.(xlsm|xls|docm|doc|ppt|pptm)$/', $name)) {
+            return false;
         }
 
         return str_contains($mime, 'wordprocessingml')
@@ -69,6 +74,13 @@ class OnlyOfficeService
         }
 
         if (! $this->isOfficeEditable($version)) {
+            $ext = strtolower(pathinfo((string) $version->original_name, PATHINFO_EXTENSION));
+            if (in_array($ext, ['xlsm', 'docm', 'pptm', 'xls', 'doc', 'ppt'], true)) {
+                throw new InvalidArgumentException(
+                    "Le format .{$ext} n’est pas éditable via ONLYOFFICE. Convertissez en .docx / .xlsx / .pptx, ou téléchargez le fichier."
+                );
+            }
+
             throw new InvalidArgumentException('Format non éditable via ONLYOFFICE.');
         }
 

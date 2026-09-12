@@ -53,20 +53,38 @@ declare global {
   }
 }
 
-const ooErrorMessage = (code: unknown): string => {
+const ooErrorMessage = (data: unknown): string => {
   const map: Record<string, string> = {
     '-1': 'Erreur inconnue ONLYOFFICE',
     '-2': 'Délai de conversion dépassé',
-    '-3': 'Erreur de conversion du document',
-    '-4': 'Document Server ne peut pas télécharger le fichier',
+    '-3': 'Erreur de conversion du document (format non supporté ? ex. .xlsm)',
+    '-4': 'Document Server ne peut pas télécharger le fichier depuis Laravel (ONLYOFFICE_APP_URL / réseau / URL signée)',
     '-5': 'Mot de passe document incorrect',
     '-6': 'Erreur base ONLYOFFICE',
     '-7': 'Erreur force-save',
     '-8': 'Jeton JWT invalide (secret Laravel ≠ conteneur)',
   }
-  const key = String(code ?? '')
 
-  return map[key] || `Erreur éditeur ONLYOFFICE (${key || 'inconnue'})`
+  let code: unknown = data
+  let description = ''
+
+  if (data && typeof data === 'object') {
+    const obj = data as Record<string, unknown>
+    code = obj.errorCode ?? obj.code ?? obj.error ?? obj.data
+    description = String(obj.errorDescription ?? obj.message ?? obj.description ?? '')
+  }
+
+  const key = String(code ?? '')
+  if (map[key])
+    return description ? `${map[key]} — ${description}` : map[key]
+
+  if (description)
+    return `Erreur éditeur ONLYOFFICE (${key || '?'}) — ${description}`
+
+  if (key && key !== '[object Object]')
+    return `Erreur éditeur ONLYOFFICE (${key})`
+
+  return 'Erreur éditeur ONLYOFFICE (détail indisponible — voir console navigateur / logs Docs)'
 }
 
 const loadScript = (src: string): Promise<void> => new Promise((resolve, reject) => {
@@ -181,11 +199,12 @@ const initEditor = async () => {
           if (event?.data === false)
             emit('saved')
         },
-        onError(event: { data?: string | number }) {
+        onError(event: { data?: unknown }) {
           clearReadyTimer()
           loading.value = false
           error.value = ooErrorMessage(event?.data)
           emit('error', error.value)
+          console.warn('[ONLYOFFICE onError]', event?.data)
         },
         async onRequestHistory() {
           try {
@@ -249,8 +268,8 @@ const initEditor = async () => {
       if (!documentReady.value && !error.value) {
         const iframeCount = host.querySelectorAll('iframe').length
         error.value = iframeCount
-          ? 'ONLYOFFICE a chargé une iframe mais le document ne s’ouvre pas (JWT ou téléchargement fichier).'
-          : 'ONLYOFFICE n’a pas créé d’iframe. Rechargez (Ctrl+F5) ou vérifiez http://localhost:8080.'
+          ? 'ONLYOFFICE a chargé une iframe mais le document ne s’ouvre pas (JWT, téléchargement fichier ou ONLYOFFICE_APP_URL injoignable depuis Docs).'
+          : 'ONLYOFFICE n’a pas créé d’iframe. Vérifiez ONLYOFFICE_URL (api.js) et un rechargement forcé (Ctrl+F5).'
         emit('error', error.value)
         loading.value = false
       }

@@ -89,7 +89,31 @@ class DocumentWorkflowService
         ?string $message = null,
         ?int $workflowId = null,
     ): Document {
-        return DB::transaction(function () use ($document, $from, $to, $expectedAction, $message, $workflowId) {
+        return $this->submitAndTransmitToMany(
+            $document,
+            $from,
+            $to ? [$to] : [],
+            $expectedAction,
+            $message,
+            $workflowId,
+        );
+    }
+
+    /**
+     * Transmission libre vers un ou plusieurs destinataires (parallèle),
+     * ou circuit prédéfini (un destinataire résolu par l’étape).
+     *
+     * @param  list<User>  $recipients
+     */
+    public function submitAndTransmitToMany(
+        Document $document,
+        User $from,
+        array $recipients,
+        ExpectedAction $expectedAction,
+        ?string $message = null,
+        ?int $workflowId = null,
+    ): Document {
+        return DB::transaction(function () use ($document, $from, $recipients, $expectedAction, $message, $workflowId) {
             if ($document->status === DocumentStatus::Brouillon) {
                 $this->transition($document, DocumentStatus::Depose);
                 $document->submitted_at = now();
@@ -108,6 +132,7 @@ class DocumentWorkflowService
             $workflow = null;
             $step = null;
             $kind = 'libre';
+            $targets = [];
 
             if ($workflowId) {
                 $workflow = Workflow::query()->with('steps')->where('is_active', true)->findOrFail($workflowId);
@@ -116,34 +141,52 @@ class DocumentWorkflowService
                     throw new InvalidArgumentException('Le circuit sélectionné ne contient aucune étape.');
                 }
 
-                // Sauter les étapes dont le destinataire serait l'expéditeur (ex. Agent qui dépose)
+                $to = null;
                 foreach ($steps as $candidate) {
                     $assignee = $this->resolveStepAssignee($candidate, $document, $from);
                     if ((int) $assignee->id !== (int) $from->id) {
                         $step = $candidate;
-                        $to = $to ?? $assignee;
+                        $to = $assignee;
                         break;
                     }
                 }
 
                 if (! $step) {
                     $step = $steps->first();
-                    $to = $to ?? $this->resolveStepAssignee($step, $document, $from);
+                    $to = $this->resolveStepAssignee($step, $document, $from);
                 }
 
                 $kind = 'predefini';
                 $expectedAction = $step->expected_action ?? $expectedAction;
-                $to = $to ?? $this->resolveStepAssignee($step, $document, $from);
+                $targets = [$to];
+            } else {
+                $seen = [];
+                foreach ($recipients as $user) {
+                    if (! $user instanceof User) {
+                        continue;
+                    }
+                    $id = (int) $user->id;
+                    if ($id === (int) $from->id || isset($seen[$id])) {
+                        continue;
+                    }
+                    $seen[$id] = true;
+                    $targets[] = $user;
+                }
             }
 
-            if (! $to) {
-                throw new InvalidArgumentException('Destinataire de transmission requis.');
+            if ($targets === []) {
+                throw new InvalidArgumentException('Au moins un destinataire de transmission est requis.');
             }
 
-            if (! $this->access->canReceive($to, $document)) {
-                throw new InvalidArgumentException(
-                    'Le destinataire n’a pas le niveau d’habilitation requis pour ce document.'
-                );
+            foreach ($targets as $recipient) {
+                if (! $this->access->canReceive($recipient, $document)) {
+                    throw new InvalidArgumentException(
+                        sprintf(
+                            'Le destinataire %s n’a pas le niveau d’habilitation requis pour ce document.',
+                            $recipient->name ?: $recipient->email
+                        )
+                    );
+                }
             }
 
             // Clôturer les transmissions en attente de l'expéditeur
@@ -166,17 +209,20 @@ class DocumentWorkflowService
             ]);
 
             $folder = $this->folderForAction($expectedAction);
+            $primary = $targets[0];
 
-            DocumentTransmission::query()->create([
-                'document_id' => $document->id,
-                'workflow_instance_id' => $instance->id,
-                'from_user_id' => $from->id,
-                'to_user_id' => $to->id,
-                'expected_action' => $expectedAction,
-                'folder' => $folder,
-                'status' => 'pending',
-                'message' => $message,
-            ]);
+            foreach ($targets as $recipient) {
+                DocumentTransmission::query()->create([
+                    'document_id' => $document->id,
+                    'workflow_instance_id' => $instance->id,
+                    'from_user_id' => $from->id,
+                    'to_user_id' => $recipient->id,
+                    'expected_action' => $expectedAction,
+                    'folder' => $folder,
+                    'status' => 'pending',
+                    'message' => $message,
+                ]);
+            }
 
             $fromStatus = $document->status;
 
@@ -195,7 +241,7 @@ class DocumentWorkflowService
             $this->transition($document, $targetStatus);
 
             $document->expected_action = $expectedAction;
-            $document->current_assignee_id = $to->id;
+            $document->current_assignee_id = $primary->id;
             $document->save();
 
             $this->recordAction(
@@ -209,19 +255,21 @@ class DocumentWorkflowService
             );
 
             $this->audit->log('document.transmitted', $document, [
-                'to_user_id' => $to->id,
+                'to_user_ids' => array_map(fn (User $u) => $u->id, $targets),
                 'expected_action' => $expectedAction->value,
                 'workflow_id' => $workflow?->id,
                 'kind' => $kind,
             ]);
 
-            $this->notifyUser(
-                $to,
-                $document,
-                'transmitted',
-                sprintf('%s vous a transmis un document pour %s.', $from->name, $expectedAction->label()),
-                $from->name,
-            );
+            foreach ($targets as $recipient) {
+                $this->notifyUser(
+                    $recipient,
+                    $document,
+                    'transmitted',
+                    sprintf('%s vous a transmis un document pour %s.', $from->name, $expectedAction->label()),
+                    $from->name,
+                );
+            }
 
             return $document->fresh(['type', 'structure', 'author', 'currentAssignee', 'latestVersion', 'workflowInstance.workflow.steps']);
         });

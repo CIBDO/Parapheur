@@ -33,7 +33,7 @@ const form = ref({
   document_date: '',
   keywords: '',
   transmit_mode: 'libre' as 'none' | 'libre' | 'predefini',
-  transmit_to: null as number | null,
+  transmit_to_ids: [] as number[],
   workflow_id: null as number | null,
   transmit_message: '',
 })
@@ -86,7 +86,7 @@ const submit = async () => {
   saving.value = true
   try {
     const body = new FormData()
-    const skip = ['transmit_mode', 'keywords', 'transmit_to', 'workflow_id', 'transmit_message']
+    const skip = ['transmit_mode', 'keywords', 'transmit_to_ids', 'workflow_id', 'transmit_message']
     Object.entries(form.value).forEach(([key, value]) => {
       if (skip.includes(key))
         return
@@ -106,8 +106,8 @@ const submit = async () => {
     asFiles(piecesJointes.value).forEach(file => body.append('pieces_jointes[]', file))
     asFiles(annexes.value).forEach(file => body.append('annexes[]', file))
 
-    if (form.value.transmit_mode === 'libre' && form.value.transmit_to) {
-      body.append('transmit_to', String(form.value.transmit_to))
+    if (form.value.transmit_mode === 'libre' && form.value.transmit_to_ids.length > 0) {
+      form.value.transmit_to_ids.forEach(id => body.append('transmit_to_ids[]', String(id)))
       if (form.value.transmit_message)
         body.append('transmit_message', form.value.transmit_message)
     }
@@ -397,11 +397,16 @@ const submit = async () => {
               md="6"
             >
               <AppSelect
-                v-model="form.transmit_to"
+                v-model="form.transmit_to_ids"
                 :items="users"
                 item-title="name"
                 item-value="id"
                 label="Transmettre à"
+                hint="Plusieurs destinataires possibles (traitement en parallèle)"
+                persistent-hint
+                multiple
+                chips
+                closable-chips
                 clearable
               />
             </VCol>

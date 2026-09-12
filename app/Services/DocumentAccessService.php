@@ -56,6 +56,14 @@ class DocumentAccessService
             return true;
         }
 
+        // Destinataire parallèle (transmission libre multi-destinataires).
+        if ($document->transmissions()
+            ->where('to_user_id', $user->id)
+            ->whereIn('status', ['pending', 'seen'])
+            ->exists()) {
+            return true;
+        }
+
         $delegator = $this->delegations->resolveDelegator($user, $document, $action);
 
         return $delegator !== null

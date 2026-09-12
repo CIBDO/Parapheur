@@ -119,7 +119,9 @@ class DocumentController extends Controller
             'pieces_jointes.*' => AllowedDocumentUploads::fileRules(),
             'annexes' => ['nullable', 'array'],
             'annexes.*' => AllowedDocumentUploads::fileRules(),
-            'transmit_to' => ['nullable', 'exists:users,id'],
+            'transmit_to' => ['nullable'], // id unique (rétrocompat) ou ignoré si transmit_to_ids
+            'transmit_to_ids' => ['nullable', 'array', 'max:25'],
+            'transmit_to_ids.*' => ['integer', 'distinct', 'exists:users,id'],
             'transmit_message' => ['nullable', 'string'],
             'workflow_id' => ['nullable', 'exists:workflows,id'],
         ]);
@@ -150,19 +152,20 @@ class DocumentController extends Controller
             $attachments,
         );
 
-        if (! empty($data['workflow_id']) || ! empty($data['transmit_to'])) {
-            $to = ! empty($data['transmit_to'])
-                ? User::query()->findOrFail($data['transmit_to'])
-                : null;
+        $recipientIds = $this->normalizeTransmitRecipientIds($data);
+        $hasWorkflow = ! empty($data['workflow_id']);
+
+        if ($hasWorkflow || $recipientIds !== []) {
+            $recipients = $this->usersInOrder($recipientIds);
             $action = ExpectedAction::from($data['expected_action'] ?? ExpectedAction::Consultation->value);
             try {
-                $document = $this->workflow->submitAndTransmit(
+                $document = $this->workflow->submitAndTransmitToMany(
                     $document,
                     $request->user(),
-                    $to,
+                    $recipients,
                     $action,
                     $data['transmit_message'] ?? null,
-                    isset($data['workflow_id']) ? (int) $data['workflow_id'] : null,
+                    $hasWorkflow ? (int) $data['workflow_id'] : null,
                 );
             } catch (\InvalidArgumentException $e) {
                 return response()->json(['message' => $e->getMessage()], 422);
@@ -261,24 +264,34 @@ class DocumentController extends Controller
         abort_unless($request->user()->can('documents.act') || $request->user()->can('admin.access'), 403);
 
         $data = $request->validate([
-            'to_user_id' => ['nullable', 'exists:users,id'],
+            'to_user_id' => ['nullable'], // id unique (rétrocompat)
+            'to_user_ids' => ['nullable', 'array', 'max:25'],
+            'to_user_ids.*' => ['integer', 'distinct', 'exists:users,id'],
             'workflow_id' => ['nullable', 'exists:workflows,id'],
             'expected_action' => ['required', Rule::in(array_column(ExpectedAction::cases(), 'value'))],
             'message' => ['nullable', 'string'],
         ]);
 
-        if (empty($data['to_user_id']) && empty($data['workflow_id'])) {
-            return response()->json(['message' => 'Destinataire ou circuit requis.'], 422);
+        $recipientIds = $this->normalizeTransmitRecipientIds([
+            'transmit_to' => $data['to_user_id'] ?? null,
+            'transmit_to_ids' => $data['to_user_ids'] ?? null,
+        ]);
+        $hasWorkflow = ! empty($data['workflow_id']);
+
+        if (! $hasWorkflow && $recipientIds === []) {
+            return response()->json(['message' => 'Destinataire(s) ou circuit requis.'], 422);
         }
 
+        $recipients = $this->usersInOrder($recipientIds);
+
         try {
-            $document = $this->workflow->submitAndTransmit(
+            $document = $this->workflow->submitAndTransmitToMany(
                 $document,
                 $request->user(),
-                ! empty($data['to_user_id']) ? User::query()->findOrFail($data['to_user_id']) : null,
+                $recipients,
                 ExpectedAction::from($data['expected_action']),
                 $data['message'] ?? null,
-                isset($data['workflow_id']) ? (int) $data['workflow_id'] : null,
+                $hasWorkflow ? (int) $data['workflow_id'] : null,
             );
         } catch (\InvalidArgumentException $e) {
             return response()->json(['message' => $e->getMessage()], 422);
@@ -617,5 +630,62 @@ class DocumentController extends Controller
             $files,
             fn ($file) => $file instanceof UploadedFile
         ));
+    }
+
+    /**
+     * Normalise transmit_to / transmit_to_ids (ou to_user_id / to_user_ids) en liste d’IDs uniques ordonnés.
+     *
+     * @param  array<string, mixed>  $data
+     * @return list<int>
+     */
+    private function normalizeTransmitRecipientIds(array $data): array
+    {
+        $ids = [];
+
+        if (! empty($data['transmit_to_ids']) && is_array($data['transmit_to_ids'])) {
+            $ids = $data['transmit_to_ids'];
+        } elseif (! empty($data['to_user_ids']) && is_array($data['to_user_ids'])) {
+            $ids = $data['to_user_ids'];
+        } elseif (isset($data['transmit_to']) && $data['transmit_to'] !== '' && $data['transmit_to'] !== null) {
+            $ids = is_array($data['transmit_to']) ? $data['transmit_to'] : [$data['transmit_to']];
+        } elseif (isset($data['to_user_id']) && $data['to_user_id'] !== '' && $data['to_user_id'] !== null) {
+            $ids = is_array($data['to_user_id']) ? $data['to_user_id'] : [$data['to_user_id']];
+        }
+
+        $normalized = [];
+        $seen = [];
+        foreach ($ids as $id) {
+            $intId = (int) $id;
+            if ($intId <= 0 || isset($seen[$intId])) {
+                continue;
+            }
+            $seen[$intId] = true;
+            $normalized[] = $intId;
+        }
+
+        return $normalized;
+    }
+
+    /**
+     * @param  list<int>  $ids
+     * @return list<User>
+     */
+    private function usersInOrder(array $ids): array
+    {
+        if ($ids === []) {
+            return [];
+        }
+
+        $byId = User::query()->whereIn('id', $ids)->get()->keyBy('id');
+
+        $ordered = [];
+        foreach ($ids as $id) {
+            $user = $byId->get($id);
+            if ($user) {
+                $ordered[] = $user;
+            }
+        }
+
+        return $ordered;
     }
 }
