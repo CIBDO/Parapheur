@@ -34,7 +34,7 @@ class MeetingNotification extends Notification
         $name = $notifiable->name ?? 'Madame, Monsieur';
 
         return (new MailMessage)
-            ->subject('[e-Parapheur] '.$this->title())
+            ->subject('[E-Tresor] '.$this->title())
             ->greeting('Bonjour '.$name.',')
             ->line($this->message)
             ->line('Réunion : '.$this->meeting->displayTitle())

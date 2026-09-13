@@ -3,6 +3,7 @@ import ParapheurPageHeader from '@/components/parapheur/ParapheurPageHeader.vue'
 import { useGedDocumentList } from '@/composables/useGedDocumentList'
 
 definePage({
+  name: 'ged-a-traiter',
   meta: { action: 'read', subject: 'Ged' },
 })
 

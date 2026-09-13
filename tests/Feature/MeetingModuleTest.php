@@ -37,7 +37,7 @@ class MeetingModuleTest extends TestCase
             'participant_ids' => [$dg->id, $dsi->id, $secretariat->id],
             'agenda_items' => [
                 ['title' => 'Adoption du compte rendu précédent'],
-                ['title' => 'Projet e-Parapheur'],
+                ['title' => 'Projet E-Tresor'],
             ],
         ]);
 
@@ -111,7 +111,7 @@ class MeetingModuleTest extends TestCase
             'chair_id' => $dg->id,
             'secretary_id' => $secretariat->id,
             'participant_ids' => [$dg->id, $dsi->id, $secretariat->id],
-            'agenda' => "1. Adoption du CR\n2. Projet e-Parapheur",
+            'agenda' => "1. Adoption du CR\n2. Projet E-Tresor",
         ])->assertCreated()->json('id');
 
         $this->actingAs($secretariat, 'sanctum')
@@ -150,7 +150,7 @@ class MeetingModuleTest extends TestCase
                 'visibility' => 'officielle',
                 'section' => 'resume',
                 'agenda_item_id' => $agendaId,
-                'body' => 'Échanges sur le prototype e-Parapheur.',
+                'body' => 'Échanges sur le prototype E-Tresor.',
             ])->assertCreated();
 
         $this->actingAs($dsi, 'sanctum')
@@ -160,7 +160,7 @@ class MeetingModuleTest extends TestCase
             ])->assertCreated();
 
         $decision = $this->actingAs($secretariat, 'sanctum')->postJson("/api/meetings/{$id}/decisions", [
-            'title' => 'Finaliser le prototype e-Parapheur',
+            'title' => 'Finaliser le prototype E-Tresor',
             'assignee_id' => $dsi->id,
             'due_date' => now()->addDays(10)->toDateString(),
             'create_instruction' => true,
@@ -189,7 +189,7 @@ class MeetingModuleTest extends TestCase
 
         $this->assertDatabaseHas('meeting_decisions', [
             'id' => $decision->json('id'),
-            'title' => 'Finaliser le prototype e-Parapheur',
+            'title' => 'Finaliser le prototype E-Tresor',
         ]);
         $this->assertSame(MeetingStatus::CrValide, Meeting::query()->find($id)->status);
     }

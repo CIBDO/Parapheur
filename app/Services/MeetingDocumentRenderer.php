@@ -266,7 +266,7 @@ HTML;
 </style></head>
 <body>
   <div class="header">
-    <strong>DGTCP</strong> — e-Parapheur<br>
+    <strong>DGTCP</strong> — E-Tresor<br>
     {$ref} · {$date}
   </div>
   <h1>{$this->e($title)}</h1>

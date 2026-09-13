@@ -3,14 +3,16 @@ import OnlyOfficeEditor from '@/components/parapheur/OnlyOfficeEditor.vue'
 import ParapheurPageHeader from '@/components/parapheur/ParapheurPageHeader.vue'
 import {
   attachmentKindLabels,
+  linkRelationLabels,
+  originLabels,
+} from '@/utils/gedUi'
+import {
   confidentialityLabels,
   formatDateFr,
   labelOf,
-  linkRelationLabels,
-  originLabels,
   statusColor,
   statusLabels,
-} from '@/utils/gedUi'
+} from '@/utils/parapheurUi'
 
 definePage({
   meta: {

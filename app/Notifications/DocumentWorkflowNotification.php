@@ -46,7 +46,7 @@ class DocumentWorkflowNotification extends Notification
         $url = url('/parapheur/'.$this->document->id);
 
         return (new MailMessage)
-            ->subject('[e-Parapheur] '.$this->title())
+            ->subject('[E-Tresor] '.$this->title())
             ->greeting('Bonjour '.$notifiable->name.',')
             ->line($this->message)
             ->line('Référence : '.($this->document->reference ?: '#'.$this->document->id))

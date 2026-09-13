@@ -4,9 +4,11 @@ namespace App\Services;
 
 use App\Enums\DocumentOrigin;
 use App\Models\BibliographicReference;
+use App\Models\Correspondence;
 use App\Models\Document;
 use App\Models\User;
 use App\Models\WorkspaceDocumentLink;
+use App\Services\CorrespondenceAccessService;
 use Illuminate\Support\Collection;
 
 /**
@@ -18,6 +20,7 @@ class UnifiedSearchService
         private readonly DocumentAccessService $access,
         private readonly DocumentSearchService $gedSearch,
         private readonly BibliographicReferenceService $library,
+        private readonly CorrespondenceAccessService $mailAccess,
     ) {}
 
     /**
@@ -74,6 +77,61 @@ class UnifiedSearchService
                 };
 
                 $results->push($this->mapDocument($doc, $provenance, $label));
+            }
+        }
+
+        // Courrier
+        if ($user->can('mail.view') || $user->can('admin.access')) {
+            $mailQuery = Correspondence::query()->with(['structure:id,name,code']);
+
+            if (! $user->can('admin.access') && ! $user->can('mail.view_all')) {
+                $mailQuery->where(function ($q) use ($user) {
+                    $q->where('owner_user_id', $user->id)
+                        ->orWhere('registered_by', $user->id)
+                        ->orWhere('structure_id', $user->structure_id)
+                        ->orWhereHas('assignments', fn ($a) => $a->where('to_user_id', $user->id));
+                });
+            }
+
+            if ($q !== '') {
+                $like = '%'.$q.'%';
+                $mailQuery->where(function ($qq) use ($like) {
+                    $qq->where('subject', 'like', $like)
+                        ->orWhere('arrival_number', 'like', $like)
+                        ->orWhere('departure_number', 'like', $like)
+                        ->orWhere('external_reference', 'like', $like);
+                });
+            }
+
+            foreach ($mailQuery->orderByDesc('updated_at')->limit(20)->get() as $mail) {
+                if (! $this->mailAccess->canView($user, $mail)) {
+                    continue;
+                }
+
+                $number = $mail->arrival_number ?: $mail->departure_number ?: '#'.$mail->id;
+                $path = match ($mail->direction?->value) {
+                    'sortant' => '/courrier/sortants/'.$mail->id,
+                    'interne' => '/courrier/internes/'.$mail->id,
+                    default => '/courrier/entrants/'.$mail->id,
+                };
+
+                $results->push([
+                    'id' => $mail->id,
+                    'provenance' => 'courrier',
+                    'provenance_label' => 'COURRIER',
+                    'title' => $mail->subject,
+                    'subtitle' => collect([
+                        $number,
+                        $mail->direction?->label(),
+                        $mail->structure?->name,
+                    ])->filter()->implode(' · '),
+                    'updated_at' => $mail->updated_at,
+                    'url' => $path,
+                    'meta' => [
+                        'status' => $mail->status?->value,
+                        'direction' => $mail->direction?->value,
+                    ],
+                ]);
             }
         }
 

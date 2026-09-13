@@ -1288,7 +1288,7 @@ Réimpression
 ```text
 Direction
        ↓
-e-PARAPHEUR
+e-PARAPHEUR 
        ↓
 DG / TABLETTE
        ↓

@@ -33,6 +33,7 @@ declare module 'vue' {
     CardStatisticsVerticalSimple: typeof import('./resources/ts/@core/components/CardStatisticsVerticalSimple.vue')['default']
     ClassificationTreeNodes: typeof import('./resources/ts/components/ged/ClassificationTreeNodes.vue')['default']
     ConfirmDialog: typeof import('./resources/ts/components/dialogs/ConfirmDialog.vue')['default']
+    CorrespondenceDetailView: typeof import('./resources/ts/components/courrier/CorrespondenceDetailView.vue')['default']
     CreateAppDialog: typeof import('./resources/ts/components/dialogs/CreateAppDialog.vue')['default']
     CustomCheckboxes: typeof import('./resources/ts/@core/components/app-form-elements/CustomCheckboxes.vue')['default']
     CustomCheckboxesWithIcon: typeof import('./resources/ts/@core/components/app-form-elements/CustomCheckboxesWithIcon.vue')['default']

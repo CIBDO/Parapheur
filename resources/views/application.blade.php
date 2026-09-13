@@ -5,7 +5,7 @@
   <link rel="icon" type="image/png" href="{{ asset('logo.png') }}" />
   <meta name="robots" content="noindex, nofollow" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>e-Parapheur</title>
+  <title>E-Tresor</title>
   <link rel="stylesheet" type="text/css" href="{{ asset('loader.css') }}" />
   <style>
     @font-face {

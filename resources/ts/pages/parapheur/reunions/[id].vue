@@ -601,7 +601,7 @@ const statusLabel = computed(() => meetingStatusLabels[meeting.value?.status] ||
                 :items="users"
                 item-title="name"
                 item-value="id"
-                label="Utilisateur e-Parapheur"
+                label="Utilisateur E-Tresor"
                 class="mb-3"
               />
             </div>

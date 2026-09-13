@@ -78,7 +78,7 @@ class MeetingSeeder extends Seeder
                 ['title' => 'Adoption du compte rendu précédent'],
                 ['title' => 'Situation des recettes'],
                 ['title' => 'État d’avancement du projet SIGRAC'],
-                ['title' => 'Projet e-Parapheur'],
+                ['title' => 'Projet E-Tresor'],
                 ['title' => 'Questions diverses'],
             ],
         ]);
@@ -93,7 +93,7 @@ class MeetingSeeder extends Seeder
         }
 
         $d1 = $service->addDecision($dg, $previous, [
-            'title' => 'Finaliser le prototype de l’e-Parapheur',
+            'title' => 'Finaliser le prototype de l’E-Tresor',
             'body' => 'La DSI livre le prototype fonctionnel pour démonstration.',
             'assignee_id' => $dsi?->id,
             'due_date' => now()->addDays(5)->toDateString(),
@@ -143,7 +143,7 @@ class MeetingSeeder extends Seeder
                 ['title' => 'Adoption du compte rendu précédent'],
                 ['title' => 'Situation des recettes'],
                 ['title' => 'État d’avancement du projet SIGRAC'],
-                ['title' => 'Projet e-Parapheur'],
+                ['title' => 'Projet E-Tresor'],
                 ['title' => 'Questions diverses'],
             ],
         ]);

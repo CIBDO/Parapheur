@@ -1,19 +1,4 @@
-/** Helpers UI module GED */
-
-export {
-  actionLabels,
-  confidentialityLabels,
-  confidentialityOptions,
-  expectedActionOptions,
-  formatDateFr,
-  labelOf,
-  priorityColor,
-  priorityLabels,
-  priorityOptions,
-  statusColor,
-  statusLabels,
-  statusOptions,
-} from '@/utils/parapheurUi'
+/** Helpers UI module GED (spécifiques ; le partage statut/priorité/etc. vient de parapheurUi) */
 
 export const archiveStatusLabels: Record<string, string> = {
   actif: 'Actif',
@@ -30,6 +15,7 @@ export const originLabels: Record<string, string> = {
   meeting: 'Réunion',
   appointment: 'Rendez-vous',
   instruction: 'Instruction',
+  courrier: 'Courrier',
 }
 
 export const attachmentKindLabels: Record<string, string> = {

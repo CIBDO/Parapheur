@@ -11,6 +11,7 @@ enum DocumentOrigin: string
     case Instruction = 'instruction';
     case Personal = 'personal';
     case Workspace = 'workspace';
+    case Courrier = 'courrier';
 
     public function label(): string
     {
@@ -22,6 +23,7 @@ enum DocumentOrigin: string
             self::Instruction => 'Instruction',
             self::Personal => 'Personnel',
             self::Workspace => 'Espace de travail',
+            self::Courrier => 'Courrier',
         };
     }
 

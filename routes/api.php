@@ -9,6 +9,16 @@ use App\Http\Controllers\Api\Ged\GedLifecycleController;
 use App\Http\Controllers\Api\Ged\GedTagController;
 use App\Http\Controllers\Api\Library\BibliographicReferenceController;
 use App\Http\Controllers\Api\Library\ReferenceCollectionController;
+use App\Http\Controllers\Api\Mail\CirculationSheetController;
+use App\Http\Controllers\Api\Mail\CorrespondenceAssignmentController;
+use App\Http\Controllers\Api\Mail\CorrespondenceController;
+use App\Http\Controllers\Api\Mail\CorrespondentController;
+use App\Http\Controllers\Api\Mail\DocumentTemplateController;
+use App\Http\Controllers\Api\Mail\MailAdminController;
+use App\Http\Controllers\Api\Mail\MailDashboardController;
+use App\Http\Controllers\Api\Mail\MailMetaController;
+use App\Http\Controllers\Api\Mail\MailRegisterController;
+use App\Http\Controllers\Api\Mail\TransmissionSlipController;
 use App\Http\Controllers\Api\Workspace\WorkspaceBridgeController;
 use App\Http\Controllers\Api\Workspace\WorkspaceController;
 use App\Http\Controllers\Api\Workspace\WorkspaceDocumentController;
@@ -363,6 +373,179 @@ Route::middleware(['auth:sanctum', 'password.changed'])->group(function () {
         Route::post('/references/{reference}/propose', [BibliographicReferenceController::class, 'propose']);
         Route::post('/references/{reference}/moderate', [BibliographicReferenceController::class, 'moderate']);
         Route::post('/references/{reference}/note', [BibliographicReferenceController::class, 'upsertNote']);
+    });
+
+    // ——— Module Courrier ———
+    Route::middleware('permission:mail.view|admin.access')->prefix('mail')->group(function () {
+        // Dashboards
+        Route::get('/dashboard/order-office', [MailDashboardController::class, 'orderOffice']);
+        Route::get('/dashboard/dg', [MailDashboardController::class, 'dg']);
+        Route::get('/dashboard/direction', [MailDashboardController::class, 'direction']);
+
+        // Métadonnées
+        Route::get('/meta/channels', [MailMetaController::class, 'channels']);
+        Route::get('/meta/categories', [MailMetaController::class, 'categories']);
+        Route::get('/meta/qualifications', [MailMetaController::class, 'qualifications']);
+        Route::get('/meta/actions', [MailMetaController::class, 'actions']);
+        Route::get('/meta/correspondents', [MailMetaController::class, 'correspondents']);
+
+        // Registres d'enregistrement
+        Route::post('/registers/incoming', [MailRegisterController::class, 'incoming'])
+            ->middleware('permission:mail.create|admin.access');
+        Route::post('/registers/outgoing', [MailRegisterController::class, 'outgoing'])
+            ->middleware('permission:mail.create|admin.access');
+        Route::post('/registers/internal', [MailRegisterController::class, 'internal'])
+            ->middleware('permission:mail.create|admin.access');
+
+        // Correspondances - CRUD
+        Route::get('/correspondences', [CorrespondenceController::class, 'index']);
+        Route::post('/correspondences', [CorrespondenceController::class, 'store'])
+            ->middleware('permission:mail.create|admin.access');
+        Route::get('/correspondences/{correspondence}', [CorrespondenceController::class, 'show']);
+        Route::put('/correspondences/{correspondence}', [CorrespondenceController::class, 'update'])
+            ->middleware('permission:mail.update|admin.access');
+        Route::delete('/correspondences/{correspondence}', [CorrespondenceController::class, 'destroy'])
+            ->middleware('permission:mail.delete|admin.access');
+        Route::get('/correspondences/{correspondence}/history', [CorrespondenceController::class, 'history']);
+
+        // Correspondances - Actions
+        Route::post('/correspondences/{correspondence}/register', [CorrespondenceController::class, 'register'])
+            ->middleware('permission:mail.update|admin.access');
+        Route::post('/correspondences/{correspondence}/reply', [CorrespondenceController::class, 'reply'])
+            ->middleware('permission:mail.create|admin.access');
+        Route::post('/correspondences/{correspondence}/submit-to-parapheur', [CorrespondenceController::class, 'submitToParapheur'])
+            ->middleware('permission:mail.update|documents.create|admin.access');
+        Route::post('/correspondences/{correspondence}/dispatch', [CorrespondenceController::class, 'dispatch'])
+            ->middleware('permission:mail.dispatch|admin.access');
+        Route::post('/correspondences/{correspondence}/acknowledge', [CorrespondenceController::class, 'acknowledge'])
+            ->middleware('permission:mail.update|admin.access');
+        Route::post('/correspondences/{correspondence}/parties', [CorrespondenceController::class, 'syncParties'])
+            ->middleware('permission:mail.update|admin.access');
+        Route::post('/correspondences/{correspondence}/archive', [CorrespondenceController::class, 'archive'])
+            ->middleware('permission:mail.update|admin.access');
+
+        // Affectations
+        Route::post('/correspondences/{correspondence}/assignments', [CorrespondenceAssignmentController::class, 'store'])
+            ->middleware('permission:mail.assign|admin.access');
+        Route::post('/correspondences/{correspondence}/assignments/take-charge', [CorrespondenceAssignmentController::class, 'takeCharge'])
+            ->middleware('permission:mail.process|admin.access');
+        Route::post('/correspondences/{correspondence}/assignments/reassign', [CorrespondenceAssignmentController::class, 'reassign'])
+            ->middleware('permission:mail.assign|admin.access');
+        Route::post('/correspondences/{correspondence}/assignments/return', [CorrespondenceAssignmentController::class, 'return'])
+            ->middleware('permission:mail.process|admin.access');
+        Route::post('/correspondences/{correspondence}/assignments/request-complement', [CorrespondenceAssignmentController::class, 'requestComplement'])
+            ->middleware('permission:mail.process|admin.access');
+
+        // Correspondants
+        Route::get('/correspondents', [CorrespondentController::class, 'index']);
+        Route::post('/correspondents', [CorrespondentController::class, 'store'])
+            ->middleware('permission:mail.update|admin.access');
+        Route::get('/correspondents/{correspondent}', [CorrespondentController::class, 'show']);
+        Route::put('/correspondents/{correspondent}', [CorrespondentController::class, 'update'])
+            ->middleware('permission:mail.update|admin.access');
+        Route::delete('/correspondents/{correspondent}', [CorrespondentController::class, 'destroy'])
+            ->middleware('permission:mail.delete|admin.access');
+
+        // Bordereaux de transmission
+        Route::get('/transmission-slips', [TransmissionSlipController::class, 'index']);
+        Route::post('/transmission-slips', [TransmissionSlipController::class, 'store'])
+            ->middleware('permission:mail.create|admin.access');
+        Route::get('/transmission-slips/{transmissionSlip}', [TransmissionSlipController::class, 'show']);
+        Route::put('/transmission-slips/{transmissionSlip}', [TransmissionSlipController::class, 'update'])
+            ->middleware('permission:mail.update|admin.access');
+        Route::delete('/transmission-slips/{transmissionSlip}', [TransmissionSlipController::class, 'destroy'])
+            ->middleware('permission:mail.delete|admin.access');
+        Route::post('/transmission-slips/{transmissionSlip}/items', [TransmissionSlipController::class, 'addItems'])
+            ->middleware('permission:mail.update|admin.access');
+        Route::delete('/transmission-slips/{transmissionSlip}/items/{itemId}', [TransmissionSlipController::class, 'removeItem'])
+            ->middleware('permission:mail.update|admin.access');
+        Route::post('/transmission-slips/{transmissionSlip}/generate', [TransmissionSlipController::class, 'generateDocument'])
+            ->middleware('permission:mail.update|admin.access');
+        Route::post('/transmission-slips/{transmissionSlip}/validate', [TransmissionSlipController::class, 'validate'])
+            ->middleware('permission:mail.update|admin.access');
+        Route::post('/transmission-slips/{transmissionSlip}/print', [TransmissionSlipController::class, 'print'])
+            ->middleware('permission:mail.update|admin.access');
+        Route::post('/transmission-slips/{transmissionSlip}/send', [TransmissionSlipController::class, 'send'])
+            ->middleware('permission:mail.dispatch|admin.access');
+        Route::post('/transmission-slips/{transmissionSlip}/acknowledge', [TransmissionSlipController::class, 'acknowledge'])
+            ->middleware('permission:mail.update|admin.access');
+
+        // Logs d'impression
+        Route::get('/print-logs', [TransmissionSlipController::class, 'printLogs']);
+
+        // Impression document correspondance
+        Route::post('/correspondences/{correspondence}/print', [CorrespondenceController::class, 'printDocument'])
+            ->middleware('permission:mail.view|admin.access');
+        
+        // Attacher version signée physiquement
+        Route::post('/correspondences/{correspondence}/attach-signed-version', [CorrespondenceController::class, 'attachSignedVersion'])
+            ->middleware('permission:mail.update|admin.access');
+        Route::get('/correspondences/{correspondence}/reminders', [CorrespondenceController::class, 'reminders']);
+        Route::post('/correspondences/{correspondence}/reminders', [CorrespondenceController::class, 'storeReminder'])
+            ->middleware('permission:mail.update|admin.access');
+        Route::post('/correspondences/{correspondence}/reminders/schedule', [CorrespondenceController::class, 'scheduleReminders'])
+            ->middleware('permission:mail.update|admin.access');
+        Route::post('/correspondences/{correspondence}/circulation-sheet', [CirculationSheetController::class, 'createForCorrespondence'])
+            ->middleware('permission:mail.create|admin.access');
+
+        // Administration des référentiels
+        Route::middleware('permission:mail.admin|admin.access')->prefix('admin')->group(function () {
+            Route::get('/channels', [MailAdminController::class, 'channelsIndex']);
+            Route::post('/channels', [MailAdminController::class, 'channelsStore']);
+            Route::put('/channels/{channel}', [MailAdminController::class, 'channelsUpdate']);
+            Route::post('/channels/{channel}/toggle', [MailAdminController::class, 'channelsToggle']);
+            Route::delete('/channels/{channel}', [MailAdminController::class, 'channelsDestroy']);
+
+            Route::get('/categories', [MailAdminController::class, 'categoriesIndex']);
+            Route::post('/categories', [MailAdminController::class, 'categoriesStore']);
+            Route::put('/categories/{category}', [MailAdminController::class, 'categoriesUpdate']);
+            Route::post('/categories/{category}/toggle', [MailAdminController::class, 'categoriesToggle']);
+            Route::delete('/categories/{category}', [MailAdminController::class, 'categoriesDestroy']);
+
+            Route::get('/qualifications', [MailAdminController::class, 'qualificationsIndex']);
+            Route::post('/qualifications', [MailAdminController::class, 'qualificationsStore']);
+            Route::put('/qualifications/{qualification}', [MailAdminController::class, 'qualificationsUpdate']);
+            Route::post('/qualifications/{qualification}/toggle', [MailAdminController::class, 'qualificationsToggle']);
+            Route::delete('/qualifications/{qualification}', [MailAdminController::class, 'qualificationsDestroy']);
+
+            Route::get('/actions', [MailAdminController::class, 'actionsIndex']);
+            Route::post('/actions', [MailAdminController::class, 'actionsStore']);
+            Route::put('/actions/{action}', [MailAdminController::class, 'actionsUpdate']);
+            Route::post('/actions/{action}/toggle', [MailAdminController::class, 'actionsToggle']);
+            Route::delete('/actions/{action}', [MailAdminController::class, 'actionsDestroy']);
+        });
+
+        // Fiches de circulation
+        Route::get('/circulation-sheets', [CirculationSheetController::class, 'index']);
+        Route::post('/circulation-sheets', [CirculationSheetController::class, 'store'])
+            ->middleware('permission:mail.create|admin.access');
+        Route::get('/circulation-sheets/{circulationSheet}', [CirculationSheetController::class, 'show']);
+        Route::post('/circulation-sheets/{circulationSheet}/generate', [CirculationSheetController::class, 'generateDocument'])
+            ->middleware('permission:mail.update|admin.access');
+
+        // Modèles documentaires
+        Route::middleware('permission:document_template.view|admin.access')->group(function () {
+            Route::get('/document-templates', [DocumentTemplateController::class, 'index']);
+            Route::get('/document-templates/{documentTemplate}', [DocumentTemplateController::class, 'show']);
+            
+            Route::middleware('permission:document_template.create|admin.access')->group(function () {
+                Route::post('/document-templates', [DocumentTemplateController::class, 'store']);
+                Route::post('/document-templates/{documentTemplate}/versions', [DocumentTemplateController::class, 'createVersion']);
+            });
+            
+            Route::middleware('permission:document_template.update|admin.access')->group(function () {
+                Route::put('/document-templates/{documentTemplate}', [DocumentTemplateController::class, 'update']);
+                Route::post('/document-templates/{documentTemplate}/publish', [DocumentTemplateController::class, 'publish']);
+            });
+            
+            Route::delete('/document-templates/{documentTemplate}', [DocumentTemplateController::class, 'destroy'])
+                ->middleware('permission:document_template.delete|admin.access');
+            
+            Route::post('/document-templates/{documentTemplate}/generate', [DocumentTemplateController::class, 'generate']);
+        });
+
+        // Recherche
+        Route::get('/search', [CorrespondenceController::class, 'search']);
     });
 });
 // Callback ONLYOFFICE Document Server (JWT, hors Sanctum)

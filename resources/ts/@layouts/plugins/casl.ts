@@ -68,6 +68,18 @@ export const canNavigate = (to: RouteLocationNormalized) => {
       return true;
   }
 
+  const courrierPath = String(to.path);
+  if (courrierPath.startsWith('/courrier')) {
+    if (courrierPath.startsWith('/courrier/admin'))
+      return ability.can('manage', 'CourrierAdmin');
+
+    if (courrierPath.startsWith('/courrier/modeles'))
+      return ability.can('read', 'DocumentTemplate') || ability.can('manage', 'DocumentTemplate');
+
+    if (ability.can('read', 'Courrier') || ability.can('manage', 'Courrier'))
+      return true;
+  }
+
   return to.matched.some(route => {
     const a = route.meta.action;
     const s = route.meta.subject;

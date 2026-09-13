@@ -96,6 +96,29 @@ class DatabaseSeeder extends Seeder
             'appointments.archive',
             'reporting.view',
             'delegations.manage',
+            'mail.view',
+            'mail.view_all',
+            'mail.view_confidential',
+            'mail.view_very_confidential',
+            'mail.create',
+            'mail.update',
+            'mail.delete',
+            'mail.assign',
+            'mail.process',
+            'mail.reply',
+            'mail.dispatch',
+            'mail.archive',
+            'mail.admin',
+            'mail.create_transmission_slip',
+            'mail.update_transmission_slip',
+            'mail.delete_transmission_slip',
+            'mail.validate_transmission_slip',
+            'document_template.view',
+            'document_template.view_all',
+            'document_template.create',
+            'document_template.update',
+            'document_template.delete',
+            'document_template.publish',
         ];
 
         foreach ($permissions as $permission) {
@@ -116,6 +139,19 @@ class DatabaseSeeder extends Seeder
         ];
         $workspaceManage = array_merge($workspaceBasic, [
             'workspace.create_shared', 'workspace.manage_quotas', 'library.moderate',
+        ]);
+
+        $mailBasic = [
+            'mail.view', 'mail.create', 'mail.process',
+        ];
+        $mailManage = array_merge($mailBasic, [
+            'mail.view_all', 'mail.update', 'mail.assign', 'mail.reply', 'mail.dispatch', 'mail.archive',
+            'mail.create_transmission_slip', 'mail.update_transmission_slip', 'mail.validate_transmission_slip',
+        ]);
+        $mailAdmin = array_merge($mailManage, [
+            'mail.view_confidential', 'mail.view_very_confidential', 'mail.delete', 'mail.admin',
+            'mail.delete_transmission_slip', 'document_template.view', 'document_template.view_all',
+            'document_template.create', 'document_template.update', 'document_template.delete', 'document_template.publish',
         ]);
 
         $appointmentManage = [
@@ -147,49 +183,58 @@ class DatabaseSeeder extends Seeder
                 ['documents.create', 'documents.act', 'documents.vise', 'documents.validate', 'dashboard.dg', 'instructions.manage', 'meetings.manage', 'reporting.view', 'delegations.manage'],
                 $gedManage,
                 $workspaceManage,
-                $appointmentManage
+                $appointmentManage,
+                $mailAdmin
             ),
             'DGA' => array_merge(
                 ['documents.create', 'documents.act', 'documents.vise', 'documents.validate', 'dashboard.dg', 'instructions.manage', 'meetings.manage', 'reporting.view'],
                 $gedManage,
                 $workspaceManage,
-                ['appointments.view', 'appointments.create', 'appointments.view_calendar', 'appointments.validate', 'appointments.manage_notes']
+                ['appointments.view', 'appointments.create', 'appointments.view_calendar', 'appointments.validate', 'appointments.manage_notes'],
+                $mailManage
             ),
             'Conseiller' => array_merge(
                 ['documents.create', 'documents.act', 'reporting.view', 'meetings.view', 'appointments.view', 'appointments.create', 'appointments.view_calendar'],
                 $gedBasic,
-                $workspaceBasic
+                $workspaceBasic,
+                $mailBasic
             ),
             'Secrétariat DG' => array_merge(
                 ['documents.create', 'documents.act', 'meetings.manage', 'meetings.view', 'meetings.create', 'meetings.take_official_notes', 'meetings.generate_minutes', 'reporting.view'],
                 $gedManage,
                 $workspaceManage,
-                $appointmentManage
+                $appointmentManage,
+                $mailAdmin
             ),
             'Directeur' => array_merge(
                 ['documents.create', 'documents.act', 'documents.vise', 'documents.validate', 'dashboard.direction', 'reporting.view', 'meetings.manage', 'meetings.view', 'appointments.view', 'appointments.create', 'appointments.view_calendar'],
                 $gedManage,
-                $workspaceBasic
+                $workspaceBasic,
+                $mailManage
             ),
             'Chef de division' => array_merge(
                 ['documents.create', 'documents.act', 'meetings.view', 'appointments.view', 'appointments.create'],
                 $gedBasic,
-                $workspaceBasic
+                $workspaceBasic,
+                $mailBasic
             ),
             'Chef de section' => array_merge(
                 ['documents.create', 'documents.act', 'meetings.view', 'appointments.view', 'appointments.create'],
                 $gedBasic,
-                $workspaceBasic
+                $workspaceBasic,
+                $mailBasic
             ),
             'Agent' => array_merge(
                 ['documents.create', 'documents.act', 'meetings.view', 'appointments.view', 'appointments.create'],
                 $gedBasic,
-                $workspaceBasic
+                $workspaceBasic,
+                $mailBasic
             ),
             'Lecteur' => array_merge(
                 ['meetings.view', 'appointments.view', 'appointments.view_calendar'],
                 ['ged.view', 'ged.search', 'ged.download'],
-                ['workspace.access', 'library.access']
+                ['workspace.access', 'library.access'],
+                ['mail.view']
             ),
         ];
 
@@ -364,6 +409,7 @@ class DatabaseSeeder extends Seeder
             Structure::query()->where('code', 'DGTCP')->first(),
             Structure::query()->where('code', 'DSI')->first(),
         );
+        $this->seedMailReferentials();
         $this->call(MeetingSeeder::class);
         $this->call(AppointmentSeeder::class);
     }
@@ -455,7 +501,7 @@ class DatabaseSeeder extends Seeder
             ],
             [
                 'reference' => 'ADM-2026-001',
-                'object' => 'Suivi paramétrage e-Parapheur',
+                'object' => 'Suivi paramétrage E-Tresor',
                 'document_type_id' => $note->id,
                 'structure_id' => $dsi->id,
                 'author_id' => $admin?->id ?? $agent->id,
@@ -643,6 +689,119 @@ class DatabaseSeeder extends Seeder
                     'sort_order' => $i + 1,
                     'is_active' => true,
                 ]
+            );
+        }
+    }
+
+    private function seedMailReferentials(): void
+    {
+        // Canaux de correspondance
+        $channels = [
+            ['code' => 'COURRIER', 'name' => 'Courrier postal', 'sort_order' => 1],
+            ['code' => 'EMAIL', 'name' => 'Email', 'sort_order' => 2],
+            ['code' => 'FAX', 'name' => 'Fax', 'sort_order' => 3],
+            ['code' => 'REMISE', 'name' => 'Remise en main propre', 'sort_order' => 4],
+            ['code' => 'PLATEFORME', 'name' => 'Plateforme électronique', 'sort_order' => 5],
+        ];
+        foreach ($channels as $channel) {
+            \App\Models\CorrespondenceChannel::query()->updateOrCreate(
+                ['code' => $channel['code']],
+                $channel + ['is_active' => true]
+            );
+        }
+
+        // Catégories de correspondance
+        $categories = [
+            ['code' => 'ADMIN', 'name' => 'Administratif', 'sort_order' => 1],
+            ['code' => 'TECH', 'name' => 'Technique', 'sort_order' => 2],
+            ['code' => 'FIN', 'name' => 'Financier', 'sort_order' => 3],
+            ['code' => 'JUR', 'name' => 'Juridique', 'sort_order' => 4],
+            ['code' => 'RH', 'name' => 'Ressources humaines', 'sort_order' => 5],
+        ];
+        foreach ($categories as $category) {
+            \App\Models\CorrespondenceCategory::query()->updateOrCreate(
+                ['code' => $category['code']],
+                $category + ['is_active' => true]
+            );
+        }
+
+        // Qualifications
+        $qualifications = [
+            ['code' => 'URGENT', 'name' => 'Urgent', 'sort_order' => 1],
+            ['code' => 'IMPORTANT', 'name' => 'Important', 'sort_order' => 2],
+            ['code' => 'CONFIDENTIEL', 'name' => 'Confidentiel', 'sort_order' => 3],
+            ['code' => 'POUR_INFO', 'name' => 'Pour information', 'sort_order' => 4],
+            ['code' => 'POUR_AVIS', 'name' => 'Pour avis', 'sort_order' => 5],
+        ];
+        foreach ($qualifications as $qualification) {
+            \App\Models\CorrespondenceQualification::query()->updateOrCreate(
+                ['code' => $qualification['code']],
+                $qualification + ['is_active' => true]
+            );
+        }
+
+        // Actions d'affectation
+        $actions = [
+            ['code' => 'TRAITER', 'name' => 'Traiter', 'sort_order' => 1],
+            ['code' => 'DONNER_AVIS', 'name' => 'Donner un avis', 'sort_order' => 2],
+            ['code' => 'PREPARER_REPONSE', 'name' => 'Préparer une réponse', 'sort_order' => 3],
+            ['code' => 'POUR_INFO', 'name' => 'Pour information', 'sort_order' => 4],
+            ['code' => 'ARCHIVER', 'name' => 'Archiver', 'sort_order' => 5],
+        ];
+        foreach ($actions as $action) {
+            \App\Models\CorrespondenceAssignmentAction::query()->updateOrCreate(
+                ['code' => $action['code']],
+                $action + ['is_active' => true]
+            );
+        }
+
+        // Séquences de numérotation pour l'année courante
+        $year = now()->year;
+        $sequences = [
+            ['code' => 'ARR', 'prefix' => 'ARR', 'padding' => 6, 'reset_yearly' => true],
+            ['code' => 'DEP', 'prefix' => 'DEP', 'padding' => 6, 'reset_yearly' => true],
+            ['code' => 'BT', 'prefix' => 'BT', 'padding' => 6, 'reset_yearly' => true],
+            ['code' => 'FC', 'prefix' => 'FC', 'padding' => 6, 'reset_yearly' => true],
+        ];
+        foreach ($sequences as $seq) {
+            \App\Models\NumberingSequence::query()->updateOrCreate(
+                ['code' => $seq['code'], 'year' => $year, 'structure_id' => null],
+                $seq + ['last_value' => 0]
+            );
+        }
+
+        // Correspondants de démo
+        $correspondents = [
+            [
+                'type' => 'personne_morale',
+                'name' => 'Ministère des Finances',
+                'organization' => 'Ministère des Finances',
+                'city' => 'Abidjan',
+                'country' => 'Côte d\'Ivoire',
+                'is_active' => true,
+            ],
+            [
+                'type' => 'personne_morale',
+                'name' => 'BCEAO',
+                'organization' => 'Banque Centrale des États de l\'Afrique de l\'Ouest',
+                'city' => 'Dakar',
+                'country' => 'Sénégal',
+                'is_active' => true,
+            ],
+            [
+                'type' => 'personne_physique',
+                'name' => 'M. Koné Mamadou',
+                'function' => 'Directeur',
+                'organization' => 'Entreprise ABC',
+                'city' => 'Abidjan',
+                'country' => 'Côte d\'Ivoire',
+                'is_active' => true,
+            ],
+        ];
+        foreach ($correspondents as $correspondent) {
+            \App\Models\Correspondent::query()->updateOrCreate(
+                ['name' => $correspondent['name']],
+                $correspondent
             );
         }
     }

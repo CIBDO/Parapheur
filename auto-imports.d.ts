@@ -17,6 +17,10 @@ declare global {
   const appointmentStatusLabel: typeof import('./resources/ts/utils/appointmentsUi')['appointmentStatusLabel']
   const archiveStatusLabels: typeof import('./resources/ts/utils/gedUi')['archiveStatusLabels']
   const archiveStatusOptions: typeof import('./resources/ts/utils/gedUi')['archiveStatusOptions']
+  const assignmentActionLabels: typeof import('./resources/ts/utils/courrierUi')['assignmentActionLabels']
+  const assignmentStatusColors: typeof import('./resources/ts/utils/courrierUi')['assignmentStatusColors']
+  const assignmentStatusLabel: typeof import('./resources/ts/utils/courrierUi')['assignmentStatusLabel']
+  const assignmentStatusLabels: typeof import('./resources/ts/utils/courrierUi')['assignmentStatusLabels']
   const asyncComputed: typeof import('@vueuse/core')['asyncComputed']
   const attachmentKindLabels: typeof import('./resources/ts/utils/gedUi')['attachmentKindLabels']
   const attendanceLabels: typeof import('./resources/ts/utils/meetingsUi')['attendanceLabels']
@@ -24,6 +28,8 @@ declare global {
   const avatarText: typeof import('./resources/ts/@core/utils/formatters')['avatarText']
   const betweenValidator: typeof import('./resources/ts/@core/utils/validators')['betweenValidator']
   const calendarEventColor: typeof import('./resources/ts/utils/appointmentsUi')['calendarEventColor']
+  const channelLabels: typeof import('./resources/ts/utils/courrierUi')['channelLabels']
+  const circulationSheetStatusLabels: typeof import('./resources/ts/utils/courrierUi')['circulationSheetStatusLabels']
   const computed: typeof import('vue')['computed']
   const computedAsync: typeof import('@vueuse/core')['computedAsync']
   const computedEager: typeof import('@vueuse/core')['computedEager']
@@ -34,6 +40,18 @@ declare global {
   const confirmedValidator: typeof import('./resources/ts/@core/utils/validators')['confirmedValidator']
   const controlledComputed: typeof import('@vueuse/core')['controlledComputed']
   const controlledRef: typeof import('@vueuse/core')['controlledRef']
+  const correspondenceConfidentialityColors: typeof import('./resources/ts/utils/courrierUi')['correspondenceConfidentialityColors']
+  const correspondenceConfidentialityLabels: typeof import('./resources/ts/utils/courrierUi')['correspondenceConfidentialityLabels']
+  const correspondenceDirectionColors: typeof import('./resources/ts/utils/courrierUi')['correspondenceDirectionColors']
+  const correspondenceDirectionLabels: typeof import('./resources/ts/utils/courrierUi')['correspondenceDirectionLabels']
+  const correspondenceMediumLabels: typeof import('./resources/ts/utils/courrierUi')['correspondenceMediumLabels']
+  const correspondencePriorityColors: typeof import('./resources/ts/utils/courrierUi')['correspondencePriorityColors']
+  const correspondencePriorityIcons: typeof import('./resources/ts/utils/courrierUi')['correspondencePriorityIcons']
+  const correspondencePriorityLabels: typeof import('./resources/ts/utils/courrierUi')['correspondencePriorityLabels']
+  const correspondenceStatusColors: typeof import('./resources/ts/utils/courrierUi')['correspondenceStatusColors']
+  const correspondenceStatusLabels: typeof import('./resources/ts/utils/courrierUi')['correspondenceStatusLabels']
+  const correspondenceTypeColors: typeof import('./resources/ts/utils/courrierUi')['correspondenceTypeColors']
+  const correspondenceTypeLabels: typeof import('./resources/ts/utils/courrierUi')['correspondenceTypeLabels']
   const createApp: typeof import('vue')['createApp']
   const createEventHook: typeof import('@vueuse/core')['createEventHook']
   const createGenericProjection: typeof import('@vueuse/math')['createGenericProjection']
@@ -56,7 +74,10 @@ declare global {
   const defineComponent: typeof import('vue')['defineComponent']
   const definePage: typeof import('unplugin-vue-router/runtime')['definePage']
   const defineStore: typeof import('pinia')['defineStore']
+  const detailRouteName: typeof import('./resources/ts/utils/courrierUi')['detailRouteName']
+  const directionLabel: typeof import('./resources/ts/utils/courrierUi')['directionLabel']
   const documentKindLabels: typeof import('./resources/ts/utils/meetingsUi')['documentKindLabels']
+  const documentTemplateKindLabels: typeof import('./resources/ts/utils/courrierUi')['documentTemplateKindLabels']
   const downloadMeetingHtml: typeof import('./resources/ts/utils/meetingsUi')['downloadMeetingHtml']
   const eagerComputed: typeof import('@vueuse/core')['eagerComputed']
   const effectScope: typeof import('vue')['effectScope']
@@ -67,13 +88,30 @@ declare global {
   const folderMeta: typeof import('./resources/ts/utils/parapheurUi')['folderMeta']
   const formatAppointmentSlot: typeof import('./resources/ts/utils/appointmentsUi')['formatAppointmentSlot']
   const formatBytes: typeof import('./resources/ts/utils/workspaceUi')['formatBytes']
+  const formatCorrespondenceNumber: typeof import('./resources/ts/utils/courrierUi')['formatCorrespondenceNumber']
   const formatDate: typeof import('./resources/ts/@core/utils/formatters')['formatDate']
   const formatDateFr: typeof import('./resources/ts/utils/parapheurUi')['formatDateFr']
   const formatDateTimeFr: typeof import('./resources/ts/utils/parapheurUi')['formatDateTimeFr']
   const formatDateToMonthShort: typeof import('./resources/ts/@core/utils/formatters')['formatDateToMonthShort']
   const getActivePinia: typeof import('pinia')['getActivePinia']
+  const getAssignmentActionLabel: typeof import('./resources/ts/utils/courrierUi')['getAssignmentActionLabel']
+  const getChannelLabel: typeof import('./resources/ts/utils/courrierUi')['getChannelLabel']
+  const getCirculationSheetStatusLabel: typeof import('./resources/ts/utils/courrierUi')['getCirculationSheetStatusLabel']
+  const getCorrespondenceConfidentialityColor: typeof import('./resources/ts/utils/courrierUi')['getCorrespondenceConfidentialityColor']
+  const getCorrespondenceConfidentialityLabel: typeof import('./resources/ts/utils/courrierUi')['getCorrespondenceConfidentialityLabel']
+  const getCorrespondenceDirectionLabel: typeof import('./resources/ts/utils/courrierUi')['getCorrespondenceDirectionLabel']
+  const getCorrespondencePriorityColor: typeof import('./resources/ts/utils/courrierUi')['getCorrespondencePriorityColor']
+  const getCorrespondencePriorityIcon: typeof import('./resources/ts/utils/courrierUi')['getCorrespondencePriorityIcon']
+  const getCorrespondencePriorityLabel: typeof import('./resources/ts/utils/courrierUi')['getCorrespondencePriorityLabel']
+  const getCorrespondenceStatusColor: typeof import('./resources/ts/utils/courrierUi')['getCorrespondenceStatusColor']
+  const getCorrespondenceStatusLabel: typeof import('./resources/ts/utils/courrierUi')['getCorrespondenceStatusLabel']
+  const getCorrespondenceTypeColor: typeof import('./resources/ts/utils/courrierUi')['getCorrespondenceTypeColor']
+  const getCorrespondenceTypeLabel: typeof import('./resources/ts/utils/courrierUi')['getCorrespondenceTypeLabel']
   const getCurrentInstance: typeof import('vue')['getCurrentInstance']
   const getCurrentScope: typeof import('vue')['getCurrentScope']
+  const getTemplateCategoryLabel: typeof import('./resources/ts/utils/courrierUi')['getTemplateCategoryLabel']
+  const getTemplateKindLabel: typeof import('./resources/ts/utils/courrierUi')['getTemplateKindLabel']
+  const getTransmissionSlipStatusLabel: typeof import('./resources/ts/utils/courrierUi')['getTransmissionSlipStatusLabel']
   const h: typeof import('vue')['h']
   const hexToRgb: typeof import('./resources/ts/@core/utils/colorConverter')['hexToRgb']
   const ignorableWatch: typeof import('@vueuse/core')['ignorableWatch']
@@ -95,6 +133,7 @@ declare global {
   const labelOf: typeof import('./resources/ts/utils/parapheurUi')['labelOf']
   const lengthValidator: typeof import('./resources/ts/@core/utils/validators')['lengthValidator']
   const linkRelationLabels: typeof import('./resources/ts/utils/gedUi')['linkRelationLabels']
+  const listItems: typeof import('./resources/ts/utils/courrierUi')['listItems']
   const logicAnd: typeof import('@vueuse/math')['logicAnd']
   const logicNot: typeof import('@vueuse/math')['logicNot']
   const logicOr: typeof import('@vueuse/math')['logicOr']
@@ -131,8 +170,12 @@ declare global {
   const onWatcherCleanup: typeof import('vue')['onWatcherCleanup']
   const openMeetingHtml: typeof import('./resources/ts/utils/meetingsUi')['openMeetingHtml']
   const originLabels: typeof import('./resources/ts/utils/gedUi')['originLabels']
+  const originOptions: typeof import('./resources/ts/utils/gedUi')['originOptions']
   const paginationMeta: typeof import('./resources/ts/utils/paginationMeta')['paginationMeta']
   const participationTypeLabels: typeof import('./resources/ts/utils/meetingsUi')['participationTypeLabels']
+  const partyRoleColors: typeof import('./resources/ts/utils/courrierUi')['partyRoleColors']
+  const partyRoleLabel: typeof import('./resources/ts/utils/courrierUi')['partyRoleLabel']
+  const partyRoleLabels: typeof import('./resources/ts/utils/courrierUi')['partyRoleLabels']
   const passwordValidator: typeof import('./resources/ts/@core/utils/validators')['passwordValidator']
   const pausableWatch: typeof import('@vueuse/core')['pausableWatch']
   const prefixWithPlus: typeof import('./resources/ts/@core/utils/formatters')['prefixWithPlus']
@@ -168,12 +211,14 @@ declare global {
   const shallowReadonly: typeof import('vue')['shallowReadonly']
   const shallowRef: typeof import('vue')['shallowRef']
   const statusColor: typeof import('./resources/ts/utils/parapheurUi')['statusColor']
+  const statusLabel: typeof import('./resources/ts/utils/courrierUi')['statusLabel']
   const statusLabels: typeof import('./resources/ts/utils/parapheurUi')['statusLabels']
   const statusOptions: typeof import('./resources/ts/utils/parapheurUi')['statusOptions']
   const storagePercent: typeof import('./resources/ts/utils/workspaceUi')['storagePercent']
   const storeToRefs: typeof import('pinia')['storeToRefs']
   const syncRef: typeof import('@vueuse/core')['syncRef']
   const syncRefs: typeof import('@vueuse/core')['syncRefs']
+  const templateCategoryLabels: typeof import('./resources/ts/utils/courrierUi')['templateCategoryLabels']
   const templateRef: typeof import('@vueuse/core')['templateRef']
   const throttledRef: typeof import('@vueuse/core')['throttledRef']
   const throttledWatch: typeof import('@vueuse/core')['throttledWatch']
@@ -182,6 +227,7 @@ declare global {
   const toRef: typeof import('vue')['toRef']
   const toRefs: typeof import('vue')['toRefs']
   const toValue: typeof import('vue')['toValue']
+  const transmissionSlipStatusLabels: typeof import('./resources/ts/utils/courrierUi')['transmissionSlipStatusLabels']
   const triggerRef: typeof import('vue')['triggerRef']
   const tryOnBeforeMount: typeof import('@vueuse/core')['tryOnBeforeMount']
   const tryOnBeforeUnmount: typeof import('@vueuse/core')['tryOnBeforeUnmount']
@@ -228,6 +274,7 @@ declare global {
   const useColorMode: typeof import('@vueuse/core')['useColorMode']
   const useConfirmDialog: typeof import('@vueuse/core')['useConfirmDialog']
   const useCookie: typeof import('./resources/ts/@core/composable/useCookie')['useCookie']
+  const useCorrespondence: typeof import('./resources/ts/composables/useCorrespondence')['useCorrespondence']
   const useCountdown: typeof import('@vueuse/core')['useCountdown']
   const useCounter: typeof import('@vueuse/core')['useCounter']
   const useCssModule: typeof import('vue')['useCssModule']
@@ -423,6 +470,9 @@ declare module 'vue' {
     readonly appointmentStatusLabel: UnwrapRef<typeof import('./resources/ts/utils/appointmentsUi')['appointmentStatusLabel']>
     readonly archiveStatusLabels: UnwrapRef<typeof import('./resources/ts/utils/gedUi')['archiveStatusLabels']>
     readonly archiveStatusOptions: UnwrapRef<typeof import('./resources/ts/utils/gedUi')['archiveStatusOptions']>
+    readonly assignmentStatusColors: UnwrapRef<typeof import('./resources/ts/utils/courrierUi')['assignmentStatusColors']>
+    readonly assignmentStatusLabel: UnwrapRef<typeof import('./resources/ts/utils/courrierUi')['assignmentStatusLabel']>
+    readonly assignmentStatusLabels: UnwrapRef<typeof import('./resources/ts/utils/courrierUi')['assignmentStatusLabels']>
     readonly asyncComputed: UnwrapRef<typeof import('@vueuse/core')['asyncComputed']>
     readonly attachmentKindLabels: UnwrapRef<typeof import('./resources/ts/utils/gedUi')['attachmentKindLabels']>
     readonly attendanceLabels: UnwrapRef<typeof import('./resources/ts/utils/meetingsUi')['attendanceLabels']>
@@ -440,6 +490,14 @@ declare module 'vue' {
     readonly confirmedValidator: UnwrapRef<typeof import('./resources/ts/@core/utils/validators')['confirmedValidator']>
     readonly controlledComputed: UnwrapRef<typeof import('@vueuse/core')['controlledComputed']>
     readonly controlledRef: UnwrapRef<typeof import('@vueuse/core')['controlledRef']>
+    readonly correspondenceConfidentialityLabels: UnwrapRef<typeof import('./resources/ts/utils/courrierUi')['correspondenceConfidentialityLabels']>
+    readonly correspondenceDirectionColors: UnwrapRef<typeof import('./resources/ts/utils/courrierUi')['correspondenceDirectionColors']>
+    readonly correspondenceDirectionLabels: UnwrapRef<typeof import('./resources/ts/utils/courrierUi')['correspondenceDirectionLabels']>
+    readonly correspondenceMediumLabels: UnwrapRef<typeof import('./resources/ts/utils/courrierUi')['correspondenceMediumLabels']>
+    readonly correspondencePriorityColors: UnwrapRef<typeof import('./resources/ts/utils/courrierUi')['correspondencePriorityColors']>
+    readonly correspondencePriorityLabels: UnwrapRef<typeof import('./resources/ts/utils/courrierUi')['correspondencePriorityLabels']>
+    readonly correspondenceStatusColors: UnwrapRef<typeof import('./resources/ts/utils/courrierUi')['correspondenceStatusColors']>
+    readonly correspondenceStatusLabels: UnwrapRef<typeof import('./resources/ts/utils/courrierUi')['correspondenceStatusLabels']>
     readonly createApp: UnwrapRef<typeof import('vue')['createApp']>
     readonly createEventHook: UnwrapRef<typeof import('@vueuse/core')['createEventHook']>
     readonly createGenericProjection: UnwrapRef<typeof import('@vueuse/math')['createGenericProjection']>
@@ -462,7 +520,10 @@ declare module 'vue' {
     readonly defineComponent: UnwrapRef<typeof import('vue')['defineComponent']>
     readonly definePage: UnwrapRef<typeof import('unplugin-vue-router/runtime')['definePage']>
     readonly defineStore: UnwrapRef<typeof import('pinia')['defineStore']>
+    readonly detailRouteName: UnwrapRef<typeof import('./resources/ts/utils/courrierUi')['detailRouteName']>
+    readonly directionLabel: UnwrapRef<typeof import('./resources/ts/utils/courrierUi')['directionLabel']>
     readonly documentKindLabels: UnwrapRef<typeof import('./resources/ts/utils/meetingsUi')['documentKindLabels']>
+    readonly documentTemplateKindLabels: UnwrapRef<typeof import('./resources/ts/utils/courrierUi')['documentTemplateKindLabels']>
     readonly downloadMeetingHtml: UnwrapRef<typeof import('./resources/ts/utils/meetingsUi')['downloadMeetingHtml']>
     readonly eagerComputed: UnwrapRef<typeof import('@vueuse/core')['eagerComputed']>
     readonly effectScope: UnwrapRef<typeof import('vue')['effectScope']>
@@ -473,13 +534,22 @@ declare module 'vue' {
     readonly folderMeta: UnwrapRef<typeof import('./resources/ts/utils/parapheurUi')['folderMeta']>
     readonly formatAppointmentSlot: UnwrapRef<typeof import('./resources/ts/utils/appointmentsUi')['formatAppointmentSlot']>
     readonly formatBytes: UnwrapRef<typeof import('./resources/ts/utils/workspaceUi')['formatBytes']>
+    readonly formatCorrespondenceNumber: UnwrapRef<typeof import('./resources/ts/utils/courrierUi')['formatCorrespondenceNumber']>
     readonly formatDate: UnwrapRef<typeof import('./resources/ts/@core/utils/formatters')['formatDate']>
     readonly formatDateFr: UnwrapRef<typeof import('./resources/ts/utils/parapheurUi')['formatDateFr']>
     readonly formatDateTimeFr: UnwrapRef<typeof import('./resources/ts/utils/parapheurUi')['formatDateTimeFr']>
     readonly formatDateToMonthShort: UnwrapRef<typeof import('./resources/ts/@core/utils/formatters')['formatDateToMonthShort']>
     readonly getActivePinia: UnwrapRef<typeof import('pinia')['getActivePinia']>
+    readonly getCorrespondenceConfidentialityLabel: UnwrapRef<typeof import('./resources/ts/utils/courrierUi')['getCorrespondenceConfidentialityLabel']>
+    readonly getCorrespondenceDirectionLabel: UnwrapRef<typeof import('./resources/ts/utils/courrierUi')['getCorrespondenceDirectionLabel']>
+    readonly getCorrespondencePriorityIcon: UnwrapRef<typeof import('./resources/ts/utils/courrierUi')['getCorrespondencePriorityIcon']>
+    readonly getCorrespondencePriorityLabel: UnwrapRef<typeof import('./resources/ts/utils/courrierUi')['getCorrespondencePriorityLabel']>
+    readonly getCorrespondenceStatusColor: UnwrapRef<typeof import('./resources/ts/utils/courrierUi')['getCorrespondenceStatusColor']>
+    readonly getCorrespondenceStatusLabel: UnwrapRef<typeof import('./resources/ts/utils/courrierUi')['getCorrespondenceStatusLabel']>
     readonly getCurrentInstance: UnwrapRef<typeof import('vue')['getCurrentInstance']>
     readonly getCurrentScope: UnwrapRef<typeof import('vue')['getCurrentScope']>
+    readonly getTemplateCategoryLabel: UnwrapRef<typeof import('./resources/ts/utils/courrierUi')['getTemplateCategoryLabel']>
+    readonly getTemplateKindLabel: UnwrapRef<typeof import('./resources/ts/utils/courrierUi')['getTemplateKindLabel']>
     readonly h: UnwrapRef<typeof import('vue')['h']>
     readonly hexToRgb: UnwrapRef<typeof import('./resources/ts/@core/utils/colorConverter')['hexToRgb']>
     readonly ignorableWatch: UnwrapRef<typeof import('@vueuse/core')['ignorableWatch']>
@@ -501,6 +571,7 @@ declare module 'vue' {
     readonly labelOf: UnwrapRef<typeof import('./resources/ts/utils/parapheurUi')['labelOf']>
     readonly lengthValidator: UnwrapRef<typeof import('./resources/ts/@core/utils/validators')['lengthValidator']>
     readonly linkRelationLabels: UnwrapRef<typeof import('./resources/ts/utils/gedUi')['linkRelationLabels']>
+    readonly listItems: UnwrapRef<typeof import('./resources/ts/utils/courrierUi')['listItems']>
     readonly logicAnd: UnwrapRef<typeof import('@vueuse/math')['logicAnd']>
     readonly logicNot: UnwrapRef<typeof import('@vueuse/math')['logicNot']>
     readonly logicOr: UnwrapRef<typeof import('@vueuse/math')['logicOr']>
@@ -537,8 +608,12 @@ declare module 'vue' {
     readonly onWatcherCleanup: UnwrapRef<typeof import('vue')['onWatcherCleanup']>
     readonly openMeetingHtml: UnwrapRef<typeof import('./resources/ts/utils/meetingsUi')['openMeetingHtml']>
     readonly originLabels: UnwrapRef<typeof import('./resources/ts/utils/gedUi')['originLabels']>
+    readonly originOptions: UnwrapRef<typeof import('./resources/ts/utils/gedUi')['originOptions']>
     readonly paginationMeta: UnwrapRef<typeof import('./resources/ts/utils/paginationMeta')['paginationMeta']>
     readonly participationTypeLabels: UnwrapRef<typeof import('./resources/ts/utils/meetingsUi')['participationTypeLabels']>
+    readonly partyRoleColors: UnwrapRef<typeof import('./resources/ts/utils/courrierUi')['partyRoleColors']>
+    readonly partyRoleLabel: UnwrapRef<typeof import('./resources/ts/utils/courrierUi')['partyRoleLabel']>
+    readonly partyRoleLabels: UnwrapRef<typeof import('./resources/ts/utils/courrierUi')['partyRoleLabels']>
     readonly passwordValidator: UnwrapRef<typeof import('./resources/ts/@core/utils/validators')['passwordValidator']>
     readonly pausableWatch: UnwrapRef<typeof import('@vueuse/core')['pausableWatch']>
     readonly prefixWithPlus: UnwrapRef<typeof import('./resources/ts/@core/utils/formatters')['prefixWithPlus']>
@@ -574,8 +649,8 @@ declare module 'vue' {
     readonly shallowReadonly: UnwrapRef<typeof import('vue')['shallowReadonly']>
     readonly shallowRef: UnwrapRef<typeof import('vue')['shallowRef']>
     readonly statusColor: UnwrapRef<typeof import('./resources/ts/utils/parapheurUi')['statusColor']>
+    readonly statusLabel: UnwrapRef<typeof import('./resources/ts/utils/courrierUi')['statusLabel']>
     readonly statusLabels: UnwrapRef<typeof import('./resources/ts/utils/parapheurUi')['statusLabels']>
-    readonly statusOptions: UnwrapRef<typeof import('./resources/ts/utils/gedUi')['statusOptions']>
     readonly statusOptions: UnwrapRef<typeof import('./resources/ts/utils/parapheurUi')['statusOptions']>
     readonly storagePercent: UnwrapRef<typeof import('./resources/ts/utils/workspaceUi')['storagePercent']>
     readonly storeToRefs: UnwrapRef<typeof import('pinia')['storeToRefs']>
@@ -589,6 +664,7 @@ declare module 'vue' {
     readonly toRef: UnwrapRef<typeof import('vue')['toRef']>
     readonly toRefs: UnwrapRef<typeof import('vue')['toRefs']>
     readonly toValue: UnwrapRef<typeof import('vue')['toValue']>
+    readonly transmissionSlipStatusLabels: UnwrapRef<typeof import('./resources/ts/utils/courrierUi')['transmissionSlipStatusLabels']>
     readonly triggerRef: UnwrapRef<typeof import('vue')['triggerRef']>
     readonly tryOnBeforeMount: UnwrapRef<typeof import('@vueuse/core')['tryOnBeforeMount']>
     readonly tryOnBeforeUnmount: UnwrapRef<typeof import('@vueuse/core')['tryOnBeforeUnmount']>
@@ -635,6 +711,7 @@ declare module 'vue' {
     readonly useColorMode: UnwrapRef<typeof import('@vueuse/core')['useColorMode']>
     readonly useConfirmDialog: UnwrapRef<typeof import('@vueuse/core')['useConfirmDialog']>
     readonly useCookie: UnwrapRef<typeof import('./resources/ts/@core/composable/useCookie')['useCookie']>
+    readonly useCorrespondence: UnwrapRef<typeof import('./resources/ts/composables/useCorrespondence')['useCorrespondence']>
     readonly useCountdown: UnwrapRef<typeof import('@vueuse/core')['useCountdown']>
     readonly useCounter: UnwrapRef<typeof import('@vueuse/core')['useCounter']>
     readonly useCssModule: UnwrapRef<typeof import('vue')['useCssModule']>

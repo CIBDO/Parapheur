@@ -67,7 +67,7 @@ class WorkspaceCompleteFeaturesTest extends TestCase
 
         $ws = $this->actingAs($owner, 'sanctum')
             ->postJson('/api/workspace', [
-                'name' => 'Projet e-Parapheur',
+                'name' => 'Projet E-Tresor',
                 'type' => 'project',
             ])
             ->assertCreated()

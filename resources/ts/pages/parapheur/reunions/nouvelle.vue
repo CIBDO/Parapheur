@@ -362,7 +362,7 @@ const submit = async () => {
       </div>
 
       <div class="text-subtitle-2 mb-2">
-        Internes (utilisateurs e-Parapheur)
+        Internes (utilisateurs E-Tresor)
       </div>
       <AppSelect
         v-model="form.participant_ids"

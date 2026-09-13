@@ -22,7 +22,7 @@ class UserAccountCreatedNotification extends Notification
 
     public function toMail(object $notifiable): MailMessage
     {
-        $appName = config('app.name', 'e-Parapheur');
+        $appName = config('app.name', 'E-Tresor');
         $loginUrl = url('/login');
 
         return (new MailMessage)

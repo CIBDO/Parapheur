@@ -1,4 +1,4 @@
-/** Libellés et helpers UI partagés — charte e-Parapheur / DGTCP */
+/** Libellés et helpers UI partagés — charte E-Tresor / DGTCP */
 
 export const statusLabels: Record<string, string> = {
   brouillon: 'Brouillon',

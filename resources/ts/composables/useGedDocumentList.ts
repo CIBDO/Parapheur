@@ -1,13 +1,13 @@
+import { originLabels } from '@/utils/gedUi'
 import {
   confidentialityLabels,
   formatDateFr,
   labelOf,
-  originLabels,
   priorityColor,
   priorityLabels,
   statusColor,
   statusLabels,
-} from '@/utils/gedUi'
+} from '@/utils/parapheurUi'
 
 export interface GedDocRow {
   id: number

@@ -4,7 +4,7 @@ import {
   confidentialityOptions,
   expectedActionOptions,
   priorityOptions,
-} from '@/utils/gedUi'
+} from '@/utils/parapheurUi'
 
 definePage({
   meta: {

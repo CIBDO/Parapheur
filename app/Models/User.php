@@ -210,6 +210,31 @@ class User extends Authenticatable
             $rules[] = ['action' => 'manage', 'subject' => 'WorkspaceAdmin'];
         }
 
+        if ($this->can('mail.view') || $this->can('mail.view_all')) {
+            $rules[] = ['action' => 'read', 'subject' => 'Courrier'];
+        }
+
+        if ($this->can('mail.create')) {
+            $rules[] = ['action' => 'create', 'subject' => 'Courrier'];
+        }
+
+        if ($this->can('mail.update') || $this->can('mail.assign') || $this->can('mail.process')) {
+            $rules[] = ['action' => 'update', 'subject' => 'Courrier'];
+            $rules[] = ['action' => 'manage', 'subject' => 'Courrier'];
+        }
+
+        if ($this->can('mail.view_all') || $this->can('mail.assign') || $this->can('mail.delete')) {
+            $rules[] = ['action' => 'manage', 'subject' => 'CourrierAdmin'];
+        }
+
+        if ($this->can('document_template.view') || $this->can('document_template.view_all')) {
+            $rules[] = ['action' => 'read', 'subject' => 'DocumentTemplate'];
+        }
+
+        if ($this->can('document_template.create') || $this->can('document_template.update')) {
+            $rules[] = ['action' => 'manage', 'subject' => 'DocumentTemplate'];
+        }
+
         return $rules;
     }
 }

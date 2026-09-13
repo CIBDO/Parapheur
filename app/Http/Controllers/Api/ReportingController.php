@@ -108,7 +108,7 @@ class ReportingController extends Controller
     <thead><tr><th>Indicateur</th><th>Valeur</th></tr></thead>
     <tbody>{$rows}</tbody>
   </table>
-  <p style="margin-top:24px;font-size:10px;color:#666">e-Parapheur — indicateurs CDC §32–33 (extrait Temps 1)</p>
+  <p style="margin-top:24px;font-size:10px;color:#666">E-Tresor — indicateurs CDC §32–33 (extrait Temps 1)</p>
 </body>
 </html>
 HTML;

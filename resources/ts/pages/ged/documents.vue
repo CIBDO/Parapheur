@@ -1,11 +1,8 @@
 <script setup lang="ts">
 import ParapheurPageHeader from '@/components/parapheur/ParapheurPageHeader.vue'
 import { useGedDocumentList } from '@/composables/useGedDocumentList'
-import {
-  confidentialityOptions,
-  originOptions,
-  statusOptions,
-} from '@/utils/gedUi'
+import { originOptions } from '@/utils/gedUi'
+import { confidentialityOptions, statusOptions } from '@/utils/parapheurUi'
 
 definePage({
   meta: {

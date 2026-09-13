@@ -78,14 +78,14 @@ class AppointmentSeeder extends Seeder
             'secretariat_id' => $secretariat->id,
             'priority' => 'importante',
             'context_note' => 'Point d’étape sur les livrables DSI et le planning 2026.',
-            'points_to_discuss' => "1. Avancement e-Parapheur\n2. Renforcement capacités\n3. Prochaines missions",
+            'points_to_discuss' => "1. Avancement E-Tresor\n2. Renforcement capacités\n3. Prochaines missions",
             'direct_schedule' => true,
             'participant_ids' => array_filter([$dg->id, $secretariat->id, $dsi?->id]),
         ]);
 
         if ($dsi) {
             $service->create($dsi, [
-                'subject' => 'Point technique e-Parapheur',
+                'subject' => 'Point technique E-Tresor',
                 'reason' => 'Arbitrage sur le module agenda',
                 'appointment_type_id' => $interneType?->id,
                 'requested_date' => now()->addDays(2)->toDateString(),

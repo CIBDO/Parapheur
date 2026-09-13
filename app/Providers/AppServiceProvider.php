@@ -6,11 +6,17 @@ use App\Contracts\DocumentPreviewDriver;
 use App\Contracts\IdentityProvider;
 use App\Contracts\Search\SearchEngineInterface;
 use App\Models\Appointment;
+use App\Models\Correspondence;
 use App\Models\Document;
+use App\Models\DocumentTemplate;
+use App\Models\TransmissionSlip;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Policies\AppointmentPolicy;
+use App\Policies\CorrespondencePolicy;
 use App\Policies\DocumentPolicy;
+use App\Policies\DocumentTemplatePolicy;
+use App\Policies\TransmissionSlipPolicy;
 use App\Policies\WorkspacePolicy;
 use App\Services\Identity\LdapIdentityProvider;
 use App\Services\Identity\LocalIdentityProvider;
@@ -56,6 +62,9 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(Appointment::class, AppointmentPolicy::class);
         Gate::policy(Document::class, DocumentPolicy::class);
         Gate::policy(Workspace::class, WorkspacePolicy::class);
+        Gate::policy(Correspondence::class, CorrespondencePolicy::class);
+        Gate::policy(TransmissionSlip::class, TransmissionSlipPolicy::class);
+        Gate::policy(DocumentTemplate::class, DocumentTemplatePolicy::class);
 
         if (config('onlyoffice.enabled')) {
             try {
@@ -101,7 +110,7 @@ class AppServiceProvider extends ServiceProvider
             ]));
 
             return (new \Illuminate\Notifications\Messages\MailMessage)
-                ->subject('[e-Parapheur] Réinitialisation du mot de passe')
+                ->subject('[E-Tresor] Réinitialisation du mot de passe')
                 ->greeting('Bonjour '.$user->name.',')
                 ->line('Vous recevez cet e-mail car une demande de réinitialisation de mot de passe a été effectuée pour votre compte.')
                 ->action('Choisir un nouveau mot de passe', $url)

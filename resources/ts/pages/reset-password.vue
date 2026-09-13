@@ -121,7 +121,7 @@ onMounted(() => {
               class="parapheur-cover__logo"
             >
           </span>
-          <span class="parapheur-cover__title">e-Parapheur</span>
+          <span class="parapheur-cover__title">E-Tresor</span>
           <span class="parapheur-cover__sub">DGTCP — Trésor Public</span>
           <span class="parapheur-cover__hint">
             {{ isOpen ? '' : 'Cliquer pour ouvrir' }}
@@ -142,7 +142,7 @@ onMounted(() => {
               >
             </div>
             <h1 class="parapheur-page__brand">
-              e-Parapheur
+              E-Tresor
             </h1>
             <p class="parapheur-page__text">
               Choisissez un nouveau mot de passe pour retrouver l’accès à votre bureau numérique.
@@ -167,7 +167,7 @@ onMounted(() => {
                 >
               </div>
               <h1 class="parapheur-page__brand">
-                e-Parapheur
+                E-Tresor
               </h1>
             </header>
 

@@ -25,7 +25,7 @@ class InstructionReminderNotification extends Notification
             : url('/parapheur/instructions');
 
         return (new MailMessage)
-            ->subject('[e-Parapheur] Relance instruction en retard')
+            ->subject('[E-Tresor] Relance instruction en retard')
             ->greeting('Bonjour '.$notifiable->name.',')
             ->line('Une instruction dont vous êtes responsable est en retard.')
             ->line('Titre : '.$this->instruction->title)

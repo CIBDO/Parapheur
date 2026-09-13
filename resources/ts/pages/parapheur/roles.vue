@@ -220,7 +220,7 @@ onMounted(load)
   <div>
     <ParapheurPageHeader
       title="Rôles & permissions"
-      subtitle="Paramétrage RBAC des profils e-Parapheur"
+      subtitle="Paramétrage RBAC des profils E-Tresor"
       icon="tabler-lock-access"
     >
       <template #actions>

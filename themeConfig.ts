@@ -8,7 +8,7 @@ import { AppContentLayoutNav, ContentWidth, FooterType, NavbarType } from '@layo
 
 export const { themeConfig, layoutConfig } = defineThemeConfig({
   app: {
-    title: 'E-Parapheur',
+    title: 'E-Tresor',
     logo: h(
       'div',
       {

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import ParapheurPageHeader from '@/components/parapheur/ParapheurPageHeader.vue'
-import { formatDateFr, labelOf, originLabels, statusColor, statusLabels } from '@/utils/gedUi'
+import { originLabels } from '@/utils/gedUi'
+import { formatDateFr, labelOf, statusColor, statusLabels } from '@/utils/parapheurUi'
 
 definePage({
   meta: {
