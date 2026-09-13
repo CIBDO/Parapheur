@@ -54,6 +54,8 @@ interface UserOption {
 const route = useRoute()
 const router = useRouter()
 
+const primaryFolderKeys = ['a_traiter', 'a_valider', 'a_viser', 'envoyes'] as const
+
 const folderFromQuery = () => {
   const raw = route.query.folder
   const key = Array.isArray(raw) ? raw[0] : raw
@@ -67,6 +69,7 @@ const activeFolder = ref<string | null>(folderFromQuery())
 const counts = ref<Record<string, number>>({})
 const documents = ref<DocItem[]>([])
 const loading = ref(false)
+const countsLoading = ref(true)
 const showAdvanced = ref(false)
 
 const structures = ref<StructureOption[]>([])
@@ -94,8 +97,85 @@ const activeFolderMeta = computed(() =>
   folderMeta.find(f => f.key === activeFolder.value) || folderMeta[0],
 )
 
+const primaryCards = computed(() => {
+  const hints: Record<string, string> = {
+    a_traiter: 'Intervention requise',
+    a_valider: 'Décision attendue',
+    a_viser: 'Visa à apposer',
+    envoyes: 'Dossiers transmis',
+  }
+
+  return primaryFolderKeys.map((key) => {
+    const meta = folderMeta.find(f => f.key === key)!
+
+    return {
+      key,
+      title: meta.title,
+      icon: meta.icon,
+      color: meta.color,
+      hint: hints[key],
+      value: counts.value[key] ?? 0,
+    }
+  })
+})
+
+const secondaryFolders = computed(() =>
+  folderMeta.filter(f => !primaryFolderKeys.includes(f.key as typeof primaryFolderKeys[number])),
+)
+
+const urgentCount = computed(() => counts.value.urgents ?? 0)
+
+const activeFilterCount = computed(() => {
+  let n = 0
+  const f = filters.value
+  if (f.reference)
+    n++
+  if (f.object)
+    n++
+  if (f.document_type_id)
+    n++
+  if (f.structure_id)
+    n++
+  if (f.author_id)
+    n++
+  if (f.status)
+    n++
+  if (f.priority)
+    n++
+  if (f.confidentiality)
+    n++
+  if (f.keywords)
+    n++
+  if (f.document_date_from)
+    n++
+  if (f.document_date_to)
+    n++
+  if (f.due_date_from)
+    n++
+  if (f.due_date_to)
+    n++
+
+  return n
+})
+
+const headers = [
+  { title: 'Référence', key: 'reference', width: '140px' },
+  { title: 'Objet', key: 'object' },
+  { title: 'Structure', key: 'structure', width: '110px' },
+  { title: 'Action', key: 'expected_action', width: '120px' },
+  { title: 'Priorité', key: 'priority', width: '120px' },
+  { title: 'Statut', key: 'status', width: '130px' },
+  { title: 'Échéance', key: 'due_date', width: '120px' },
+]
+
 const loadCounts = async () => {
-  counts.value = await $api('/parapheur/counts')
+  countsLoading.value = true
+  try {
+    counts.value = await $api('/parapheur/counts')
+  }
+  finally {
+    countsLoading.value = false
+  }
 }
 
 const loadMeta = async () => {
@@ -160,6 +240,10 @@ const selectFolder = async (key: string) => {
   await loadDocuments()
 }
 
+const refreshAll = async () => {
+  await Promise.all([loadCounts(), loadDocuments()])
+}
+
 watch(
   () => route.query.folder,
   async () => {
@@ -188,7 +272,12 @@ const resetFilters = async () => {
     due_date_from: '',
     due_date_to: '',
   }
+  showAdvanced.value = false
   await loadDocuments()
+}
+
+const openDoc = (item: DocItem) => {
+  router.push({ name: 'parapheur-id', params: { id: item.id } })
 }
 
 onMounted(async () => {
@@ -197,15 +286,22 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div>
+  <div class="parapheur-dashboard">
     <ParapheurPageHeader
       title="Mon parapheur"
-      :subtitle="activeFolder === 'envoyes'
-        ? 'Suivi des dossiers que vous avez transmis'
-        : 'Documents nécessitant votre intervention'"
+      subtitle="Pilotage, recherche et traitement de vos dossiers"
       icon="tabler-briefcase"
     >
       <template #actions>
+        <VBtn
+          variant="tonal"
+          color="primary"
+          prepend-icon="tabler-refresh"
+          :loading="loading || countsLoading"
+          @click="refreshAll"
+        >
+          Actualiser
+        </VBtn>
         <VBtn
           color="primary"
           prepend-icon="tabler-file-plus"
@@ -216,173 +312,62 @@ onMounted(async () => {
       </template>
     </ParapheurPageHeader>
 
-    <VRow class="mb-6">
-      <VCol
-        v-for="folder in folderMeta"
-        :key="folder.key"
-        cols="6"
-        sm="4"
-        md="3"
-        lg="2"
-      >
-        <VCard
-          class="parapheur-folder-tile"
-          :class="{ 'parapheur-folder-tile--active': activeFolder === folder.key }"
-          @click="selectFolder(folder.key)"
-        >
-          <VCardText class="py-4 px-3">
-            <div class="d-flex align-center justify-space-between mb-2">
-              <VAvatar
-                :color="folder.color"
-                variant="tonal"
-                size="36"
-                rounded
-              >
-                <VIcon
-                  :icon="folder.icon"
-                  size="20"
-                />
-              </VAvatar>
-              <span class="text-h5 font-weight-bold">
-                {{ counts[folder.key] ?? 0 }}
-              </span>
-            </div>
-            <div class="text-caption text-medium-emphasis text-truncate">
-              {{ folder.title }}
-            </div>
-          </VCardText>
-        </VCard>
-      </VCol>
-
-      <VCol
-        cols="6"
-        sm="4"
-        md="3"
-        lg="2"
-      >
-        <VCard
-          color="error"
-          variant="tonal"
-          class="parapheur-folder-tile"
-        >
-          <VCardText class="py-4 px-3">
-            <div class="d-flex align-center justify-space-between mb-2">
-              <VAvatar
-                color="error"
-                variant="flat"
-                size="36"
-                rounded
-              >
-                <VIcon
-                  icon="tabler-alert-triangle"
-                  size="20"
-                />
-              </VAvatar>
-              <span class="text-h5 font-weight-bold">
-                {{ counts.urgents ?? 0 }}
-              </span>
-            </div>
-            <div class="text-caption">
-              Urgents
-            </div>
-          </VCardText>
-        </VCard>
-      </VCol>
-    </VRow>
-
-    <VCard class="mb-6 parapheur-section-card">
-      <VCardItem>
-        <VCardTitle class="d-flex align-center gap-2">
-          <VIcon
-            icon="tabler-search"
-            size="22"
+    <!-- Recherche -->
+    <VCard class="mb-4 search-panel">
+      <VCardText class="pb-2">
+        <div class="d-flex flex-wrap align-center gap-3">
+          <AppTextField
+            v-model="filters.q"
+            class="search-field flex-grow-1"
+            label="Recherche rapide"
+            placeholder="Référence, objet…"
+            prepend-inner-icon="tabler-search"
+            hide-details
+            clearable
+            @keyup.enter="loadDocuments"
           />
-          Rechercher
-        </VCardTitle>
-        <VCardSubtitle>
-          Filtrez rapidement votre {{ activeFolderMeta.title.toLowerCase() }}
-        </VCardSubtitle>
-      </VCardItem>
-      <VDivider />
-      <VCardText>
-        <VRow>
-          <VCol
-            cols="12"
-            md="5"
-          >
-            <AppTextField
-              v-model="filters.q"
-              label="Recherche libre"
-              placeholder="Référence, objet…"
-              prepend-inner-icon="tabler-search"
-              clearable
-              @keyup.enter="loadDocuments"
-            />
-          </VCol>
-          <VCol
-            cols="12"
-            md="3"
-          >
-            <AppSelect
-              v-model="filters.structure_id"
-              :items="structures"
-              :item-title="(i: StructureOption) => `${i.code} — ${i.name}`"
-              item-value="id"
-              label="Structure"
-              clearable
-            />
-          </VCol>
-          <VCol
-            cols="12"
-            md="2"
-          >
-            <AppSelect
-              v-model="filters.priority"
-              :items="priorityOptions"
-              item-title="title"
-              item-value="value"
-              label="Priorité"
-              clearable
-            />
-          </VCol>
-          <VCol
-            cols="12"
-            md="2"
-            class="d-flex align-center gap-2"
-          >
-            <VBtn
-              color="primary"
-              :loading="loading"
-              block
-              @click="loadDocuments"
-            >
-              Filtrer
-            </VBtn>
-          </VCol>
-        </VRow>
-
-        <div class="d-flex flex-wrap align-center gap-2 mt-3">
           <VBtn
-            size="small"
-            variant="text"
-            :prepend-icon="showAdvanced ? 'tabler-chevron-up' : 'tabler-chevron-down'"
+            color="primary"
+            prepend-icon="tabler-search"
+            :loading="loading"
+            @click="loadDocuments"
+          >
+            Rechercher
+          </VBtn>
+          <VBtn
+            :variant="showAdvanced ? 'flat' : 'tonal'"
+            :color="showAdvanced || activeFilterCount ? 'primary' : 'default'"
+            prepend-icon="tabler-adjustments-horizontal"
             @click="showAdvanced = !showAdvanced"
           >
-            {{ showAdvanced ? 'Masquer les filtres avancés' : 'Filtres avancés' }}
+            Avancée
+            <VChip
+              v-if="activeFilterCount"
+              class="ms-2"
+              size="x-small"
+              color="primary"
+              variant="elevated"
+            >
+              {{ activeFilterCount }}
+            </VChip>
           </VBtn>
           <VBtn
-            size="small"
+            v-if="filters.q || activeFilterCount"
             variant="text"
             color="secondary"
+            prepend-icon="tabler-x"
             @click="resetFilters"
           >
-            Réinitialiser
+            Effacer
           </VBtn>
         </div>
+      </VCardText>
 
-        <VExpandTransition>
-          <div v-show="showAdvanced">
-            <VRow class="mt-1">
+      <VExpandTransition>
+        <div v-show="showAdvanced">
+          <VDivider />
+          <VCardText>
+            <VRow dense>
               <VCol
                 cols="12"
                 md="3"
@@ -391,6 +376,7 @@ onMounted(async () => {
                   v-model="filters.reference"
                   label="Référence"
                   clearable
+                  hide-details
                 />
               </VCol>
               <VCol
@@ -401,6 +387,7 @@ onMounted(async () => {
                   v-model="filters.object"
                   label="Objet"
                   clearable
+                  hide-details
                 />
               </VCol>
               <VCol
@@ -414,6 +401,21 @@ onMounted(async () => {
                   item-value="id"
                   label="Type"
                   clearable
+                  hide-details
+                />
+              </VCol>
+              <VCol
+                cols="12"
+                md="3"
+              >
+                <AppSelect
+                  v-model="filters.structure_id"
+                  :items="structures"
+                  :item-title="(i: StructureOption) => `${i.code} — ${i.name}`"
+                  item-value="id"
+                  label="Structure"
+                  clearable
+                  hide-details
                 />
               </VCol>
               <VCol
@@ -427,6 +429,7 @@ onMounted(async () => {
                   item-value="id"
                   label="Auteur"
                   clearable
+                  hide-details
                 />
               </VCol>
               <VCol
@@ -440,6 +443,21 @@ onMounted(async () => {
                   item-value="value"
                   label="Statut"
                   clearable
+                  hide-details
+                />
+              </VCol>
+              <VCol
+                cols="12"
+                md="3"
+              >
+                <AppSelect
+                  v-model="filters.priority"
+                  :items="priorityOptions"
+                  item-title="title"
+                  item-value="value"
+                  label="Priorité"
+                  clearable
+                  hide-details
                 />
               </VCol>
               <VCol
@@ -453,74 +471,193 @@ onMounted(async () => {
                   item-value="value"
                   label="Confidentialité"
                   clearable
+                  hide-details
                 />
               </VCol>
               <VCol
                 cols="12"
-                md="6"
+                md="4"
               >
                 <AppTextField
                   v-model="filters.keywords"
                   label="Mots-clés"
                   placeholder="ex: dette, DGTCP"
                   clearable
+                  hide-details
                 />
               </VCol>
               <VCol
                 cols="12"
-                md="3"
+                sm="6"
+                md="2"
               >
                 <AppTextField
                   v-model="filters.document_date_from"
                   type="date"
-                  label="Date dossier depuis"
+                  label="Dossier du"
+                  hide-details
                 />
               </VCol>
               <VCol
                 cols="12"
-                md="3"
+                sm="6"
+                md="2"
               >
                 <AppTextField
                   v-model="filters.document_date_to"
                   type="date"
-                  label="Date dossier jusqu’à"
+                  label="Dossier au"
+                  hide-details
                 />
               </VCol>
               <VCol
                 cols="12"
-                md="3"
+                sm="6"
+                md="2"
               >
                 <AppTextField
                   v-model="filters.due_date_from"
                   type="date"
-                  label="Échéance depuis"
+                  label="Échéance du"
+                  hide-details
                 />
               </VCol>
               <VCol
                 cols="12"
-                md="3"
+                sm="6"
+                md="2"
               >
                 <AppTextField
                   v-model="filters.due_date_to"
                   type="date"
-                  label="Échéance jusqu’à"
+                  label="Échéance au"
+                  hide-details
                 />
               </VCol>
             </VRow>
-          </div>
-        </VExpandTransition>
+            <div class="d-flex justify-end gap-2 mt-4">
+              <VBtn
+                variant="text"
+                @click="showAdvanced = false"
+              >
+                Masquer
+              </VBtn>
+              <VBtn
+                color="primary"
+                prepend-icon="tabler-filter"
+                :loading="loading"
+                @click="loadDocuments"
+              >
+                Appliquer les filtres
+              </VBtn>
+            </div>
+          </VCardText>
+        </div>
+      </VExpandTransition>
+    </VCard>
+
+    <!-- Autres dossiers + urgents -->
+    <VCard class="mb-4">
+      <VCardText class="d-flex flex-wrap align-center gap-2 py-3">
+        <VChip
+          v-for="folder in secondaryFolders"
+          :key="folder.key"
+          :color="activeFolder === folder.key ? folder.color : undefined"
+          :variant="activeFolder === folder.key ? 'flat' : 'tonal'"
+          class="cursor-pointer"
+          prepend-icon="tabler-folder"
+          @click="selectFolder(folder.key)"
+        >
+          {{ folder.title }}
+          <span class="ms-1 font-weight-bold">{{ counts[folder.key] ?? 0 }}</span>
+        </VChip>
+        <VChip
+          color="error"
+          :variant="urgentCount > 0 ? 'flat' : 'tonal'"
+          prepend-icon="tabler-alert-triangle"
+        >
+          Urgents
+          <span class="ms-1 font-weight-bold">{{ urgentCount }}</span>
+        </VChip>
       </VCardText>
     </VCard>
 
-    <VCard class="parapheur-section-card">
+    <!-- KPI principaux -->
+    <div
+      v-if="countsLoading && !Object.keys(counts).length"
+      class="text-center py-8"
+    >
+      <VProgressCircular indeterminate />
+    </div>
+    <VRow
+      v-else
+      dense
+      class="mb-4"
+    >
+      <VCol
+        v-for="card in primaryCards"
+        :key="card.key"
+        cols="12"
+        sm="6"
+        md="3"
+      >
+        <VCard
+          class="kpi-card cursor-pointer h-100"
+          :class="{ 'kpi-card--active': activeFolder === card.key }"
+          @click="selectFolder(card.key)"
+        >
+          <VCardText class="d-flex align-center gap-4 pa-4">
+            <VAvatar
+              :color="card.color"
+              variant="tonal"
+              rounded
+              size="48"
+            >
+              <VIcon
+                :icon="card.icon"
+                size="26"
+              />
+            </VAvatar>
+            <div class="min-w-0">
+              <div class="text-h4 font-weight-semibold lh-1 mb-1">
+                {{ card.value }}
+              </div>
+              <div class="text-body-2 font-weight-medium text-truncate">
+                {{ card.title }}
+              </div>
+              <div class="text-caption text-medium-emphasis">
+                {{ card.hint }}
+              </div>
+            </div>
+          </VCardText>
+        </VCard>
+      </VCol>
+    </VRow>
+
+    <!-- Liste -->
+    <VCard>
       <VCardItem>
-        <VCardTitle class="d-flex align-center gap-2">
-          <VIcon
-            :icon="activeFolderMeta.icon"
-            size="22"
-          />
+        <template #prepend>
+          <VAvatar
+            :color="activeFolderMeta.color"
+            variant="tonal"
+            rounded
+            size="36"
+          >
+            <VIcon
+              :icon="activeFolderMeta.icon"
+              size="20"
+            />
+          </VAvatar>
+        </template>
+        <VCardTitle class="text-h6">
           {{ activeFolderMeta.title }}
         </VCardTitle>
+        <VCardSubtitle>
+          {{ activeFolder === 'envoyes'
+            ? 'Dossiers que vous avez transmis'
+            : 'Documents nécessitant votre intervention' }}
+        </VCardSubtitle>
         <template #append>
           <VChip
             label
@@ -532,55 +669,30 @@ onMounted(async () => {
           </VChip>
         </template>
       </VCardItem>
+
       <VDivider />
 
-      <div
-        v-if="!loading && !documents.length"
-        class="parapheur-empty"
-      >
-        <VIcon
-          icon="tabler-folder-off"
-          size="40"
-          class="mb-3 text-medium-emphasis"
-        />
-        <div class="text-h6 mb-1">
-          Aucun document dans ce dossier
-        </div>
-        <p class="mb-4">
-          Changez de corbeille ou créez un nouveau document.
-        </p>
-        <VBtn
-          color="primary"
-          variant="tonal"
-          :to="{ name: 'parapheur-nouveau' }"
-        >
-          Nouveau document
-        </VBtn>
-      </div>
-
       <VDataTable
-        v-else
+        :headers="headers"
         :items="documents"
         :loading="loading"
-        :headers="[
-          { title: 'Référence', key: 'reference' },
-          { title: 'Objet', key: 'object' },
-          { title: 'Structure', key: 'structure' },
-          { title: 'Action', key: 'expected_action' },
-          { title: 'Priorité', key: 'priority' },
-          { title: 'Statut', key: 'status' },
-          { title: 'Échéance', key: 'due_date' },
-          { title: '', key: 'actions', sortable: false, align: 'end' },
-        ]"
         item-value="id"
-        class="text-no-wrap"
         hover
+        class="text-no-wrap"
+        @click:row="(_: any, { item }: any) => openDoc(item)"
       >
         <template #item.reference="{ item }">
-          <span class="font-weight-medium text-primary">{{ item.reference }}</span>
+          <RouterLink
+            class="font-weight-medium text-primary"
+            :to="{ name: 'parapheur-id', params: { id: item.id } }"
+            @click.stop
+          >
+            {{ item.reference }}
+          </RouterLink>
         </template>
+
         <template #item.object="{ item }">
-          <div class="text-wrap" style="max-inline-size: 280px;">
+          <div class="text-wrap subject-cell">
             {{ item.object }}
             <div
               v-if="item.type?.name"
@@ -590,6 +702,7 @@ onMounted(async () => {
             </div>
           </div>
         </template>
+
         <template #item.structure="{ item }">
           <VChip
             size="small"
@@ -599,42 +712,87 @@ onMounted(async () => {
             {{ item.structure?.code || '—' }}
           </VChip>
         </template>
+
         <template #item.expected_action="{ item }">
           {{ labelOf(actionLabels, item.expected_action) }}
         </template>
+
         <template #item.priority="{ item }">
           <VChip
             size="small"
             :color="priorityColor(item.priority)"
-            label
+            variant="tonal"
           >
             {{ labelOf(priorityLabels, item.priority) }}
           </VChip>
         </template>
+
         <template #item.status="{ item }">
           <VChip
             size="small"
             :color="statusColor(item.status)"
-            label
             variant="tonal"
           >
             {{ labelOf(statusLabels, item.status) }}
           </VChip>
         </template>
+
         <template #item.due_date="{ item }">
           {{ formatDateFr(item.due_date) }}
         </template>
-        <template #item.actions="{ item }">
-          <VBtn
-            size="small"
-            color="primary"
-            variant="tonal"
-            :to="{ name: 'parapheur-id', params: { id: item.id } }"
-          >
-            Ouvrir
-          </VBtn>
+
+        <template #no-data>
+          <div class="text-center py-10 text-medium-emphasis">
+            <VIcon
+              icon="tabler-folder-off"
+              size="40"
+              class="mb-2"
+            />
+            <div class="text-h6 mb-1 text-high-emphasis">
+              Aucun document dans ce dossier
+            </div>
+            <p class="mb-4">
+              Changez de corbeille ou créez un nouveau document.
+            </p>
+            <VBtn
+              color="primary"
+              variant="tonal"
+              :to="{ name: 'parapheur-nouveau' }"
+            >
+              Nouveau document
+            </VBtn>
+          </div>
         </template>
       </VDataTable>
     </VCard>
   </div>
 </template>
+
+<style scoped>
+.search-panel {
+  border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
+}
+
+.search-field {
+  min-inline-size: min(100%, 320px);
+}
+
+.kpi-card {
+  transition: box-shadow 0.18s ease, transform 0.18s ease, outline 0.18s ease;
+}
+
+.kpi-card:hover {
+  box-shadow: 0 6px 18px rgba(var(--v-theme-on-surface), 0.08);
+  transform: translateY(-1px);
+}
+
+.kpi-card--active {
+  outline: 2px solid rgb(var(--v-theme-primary));
+  outline-offset: 1px;
+}
+
+.subject-cell {
+  max-inline-size: 320px;
+  white-space: normal;
+}
+</style>
