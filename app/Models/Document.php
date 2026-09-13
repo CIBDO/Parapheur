@@ -215,6 +215,11 @@ class Document extends Model
         return $this->hasMany(DocumentFavorite::class);
     }
 
+    public function workspaceLinks(): HasMany
+    {
+        return $this->hasMany(WorkspaceDocumentLink::class);
+    }
+
     public function views(): HasMany
     {
         return $this->hasMany(DocumentView::class);

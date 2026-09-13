@@ -49,6 +49,13 @@ class DatabaseSeeder extends Seeder
             'ged.manage_categories',
             'ged.view_audit',
             'ged.manage_retention',
+            'workspace.access',
+            'workspace.create_shared',
+            'workspace.manage_own',
+            'workspace.manage_quotas',
+            'library.access',
+            'library.manage_own',
+            'library.moderate',
             'meetings.view',
             'meetings.create',
             'meetings.update',
@@ -104,6 +111,13 @@ class DatabaseSeeder extends Seeder
             'ged.manage_classification', 'ged.manage_types', 'ged.manage_categories', 'ged.view_audit',
         ]);
 
+        $workspaceBasic = [
+            'workspace.access', 'workspace.manage_own', 'library.access', 'library.manage_own',
+        ];
+        $workspaceManage = array_merge($workspaceBasic, [
+            'workspace.create_shared', 'workspace.manage_quotas', 'library.moderate',
+        ]);
+
         $appointmentManage = [
             'appointments.view',
             'appointments.create',
@@ -132,41 +146,50 @@ class DatabaseSeeder extends Seeder
             'Directeur Général' => array_merge(
                 ['documents.create', 'documents.act', 'documents.vise', 'documents.validate', 'dashboard.dg', 'instructions.manage', 'meetings.manage', 'reporting.view', 'delegations.manage'],
                 $gedManage,
+                $workspaceManage,
                 $appointmentManage
             ),
             'DGA' => array_merge(
                 ['documents.create', 'documents.act', 'documents.vise', 'documents.validate', 'dashboard.dg', 'instructions.manage', 'meetings.manage', 'reporting.view'],
                 $gedManage,
+                $workspaceManage,
                 ['appointments.view', 'appointments.create', 'appointments.view_calendar', 'appointments.validate', 'appointments.manage_notes']
             ),
             'Conseiller' => array_merge(
                 ['documents.create', 'documents.act', 'reporting.view', 'meetings.view', 'appointments.view', 'appointments.create', 'appointments.view_calendar'],
-                $gedBasic
+                $gedBasic,
+                $workspaceBasic
             ),
             'Secrétariat DG' => array_merge(
                 ['documents.create', 'documents.act', 'meetings.manage', 'meetings.view', 'meetings.create', 'meetings.take_official_notes', 'meetings.generate_minutes', 'reporting.view'],
                 $gedManage,
+                $workspaceManage,
                 $appointmentManage
             ),
             'Directeur' => array_merge(
                 ['documents.create', 'documents.act', 'documents.vise', 'documents.validate', 'dashboard.direction', 'reporting.view', 'meetings.manage', 'meetings.view', 'appointments.view', 'appointments.create', 'appointments.view_calendar'],
-                $gedManage
+                $gedManage,
+                $workspaceBasic
             ),
             'Chef de division' => array_merge(
                 ['documents.create', 'documents.act', 'meetings.view', 'appointments.view', 'appointments.create'],
-                $gedBasic
+                $gedBasic,
+                $workspaceBasic
             ),
             'Chef de section' => array_merge(
                 ['documents.create', 'documents.act', 'meetings.view', 'appointments.view', 'appointments.create'],
-                $gedBasic
+                $gedBasic,
+                $workspaceBasic
             ),
             'Agent' => array_merge(
                 ['documents.create', 'documents.act', 'meetings.view', 'appointments.view', 'appointments.create'],
-                $gedBasic
+                $gedBasic,
+                $workspaceBasic
             ),
             'Lecteur' => array_merge(
                 ['meetings.view', 'appointments.view', 'appointments.view_calendar'],
-                ['ged.view', 'ged.search', 'ged.download']
+                ['ged.view', 'ged.search', 'ged.download'],
+                ['workspace.access', 'library.access']
             ),
         ];
 
@@ -584,6 +607,40 @@ class DatabaseSeeder extends Seeder
                     'target_classification_node_id' => $notesNode->id,
                     'trigger_status' => 'valide',
                     'priority' => 10,
+                    'is_active' => true,
+                ]
+            );
+        }
+
+        if (! \App\Models\WorkspaceStoragePolicy::query()->exists()) {
+            \App\Models\WorkspaceStoragePolicy::query()->create([]);
+        }
+
+        $referenceTypes = [
+            ['code' => 'LOI', 'name' => 'Loi'],
+            ['code' => 'DECRET', 'name' => 'Décret'],
+            ['code' => 'ARRETE', 'name' => 'Arrêté'],
+            ['code' => 'INSTRUCTION', 'name' => 'Instruction'],
+            ['code' => 'CIRCULAIRE', 'name' => 'Circulaire'],
+            ['code' => 'DECISION', 'name' => 'Décision'],
+            ['code' => 'REGLEMENT', 'name' => 'Règlement'],
+            ['code' => 'GUIDE', 'name' => 'Guide'],
+            ['code' => 'MANUEL', 'name' => 'Manuel'],
+            ['code' => 'RAPPORT', 'name' => 'Rapport'],
+            ['code' => 'ETUDE', 'name' => 'Étude'],
+            ['code' => 'NORME', 'name' => 'Norme'],
+            ['code' => 'ARTICLE', 'name' => 'Article'],
+            ['code' => 'PUBLICATION', 'name' => 'Publication'],
+            ['code' => 'DOCUMENT_TECHNIQUE', 'name' => 'Document technique'],
+            ['code' => 'AUTRE', 'name' => 'Autre'],
+        ];
+
+        foreach ($referenceTypes as $i => $type) {
+            \App\Models\ReferenceType::query()->updateOrCreate(
+                ['code' => $type['code']],
+                [
+                    'name' => $type['name'],
+                    'sort_order' => $i + 1,
                     'is_active' => true,
                 ]
             );

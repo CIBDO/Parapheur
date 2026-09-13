@@ -15,7 +15,10 @@ declare global {
   const alphaValidator: typeof import('./resources/ts/@core/utils/validators')['alphaValidator']
   const appointmentStatusColor: typeof import('./resources/ts/utils/appointmentsUi')['appointmentStatusColor']
   const appointmentStatusLabel: typeof import('./resources/ts/utils/appointmentsUi')['appointmentStatusLabel']
+  const archiveStatusLabels: typeof import('./resources/ts/utils/gedUi')['archiveStatusLabels']
+  const archiveStatusOptions: typeof import('./resources/ts/utils/gedUi')['archiveStatusOptions']
   const asyncComputed: typeof import('@vueuse/core')['asyncComputed']
+  const attachmentKindLabels: typeof import('./resources/ts/utils/gedUi')['attachmentKindLabels']
   const attendanceLabels: typeof import('./resources/ts/utils/meetingsUi')['attendanceLabels']
   const autoResetRef: typeof import('@vueuse/core')['autoResetRef']
   const avatarText: typeof import('./resources/ts/@core/utils/formatters')['avatarText']
@@ -63,6 +66,7 @@ declare global {
   const extendRef: typeof import('@vueuse/core')['extendRef']
   const folderMeta: typeof import('./resources/ts/utils/parapheurUi')['folderMeta']
   const formatAppointmentSlot: typeof import('./resources/ts/utils/appointmentsUi')['formatAppointmentSlot']
+  const formatBytes: typeof import('./resources/ts/utils/workspaceUi')['formatBytes']
   const formatDate: typeof import('./resources/ts/@core/utils/formatters')['formatDate']
   const formatDateFr: typeof import('./resources/ts/utils/parapheurUi')['formatDateFr']
   const formatDateTimeFr: typeof import('./resources/ts/utils/parapheurUi')['formatDateTimeFr']
@@ -90,6 +94,7 @@ declare global {
   const kFormatter: typeof import('./resources/ts/@core/utils/formatters')['kFormatter']
   const labelOf: typeof import('./resources/ts/utils/parapheurUi')['labelOf']
   const lengthValidator: typeof import('./resources/ts/@core/utils/validators')['lengthValidator']
+  const linkRelationLabels: typeof import('./resources/ts/utils/gedUi')['linkRelationLabels']
   const logicAnd: typeof import('@vueuse/math')['logicAnd']
   const logicNot: typeof import('@vueuse/math')['logicNot']
   const logicOr: typeof import('@vueuse/math')['logicOr']
@@ -125,6 +130,7 @@ declare global {
   const onUpdated: typeof import('vue')['onUpdated']
   const onWatcherCleanup: typeof import('vue')['onWatcherCleanup']
   const openMeetingHtml: typeof import('./resources/ts/utils/meetingsUi')['openMeetingHtml']
+  const originLabels: typeof import('./resources/ts/utils/gedUi')['originLabels']
   const paginationMeta: typeof import('./resources/ts/utils/paginationMeta')['paginationMeta']
   const participationTypeLabels: typeof import('./resources/ts/utils/meetingsUi')['participationTypeLabels']
   const passwordValidator: typeof import('./resources/ts/@core/utils/validators')['passwordValidator']
@@ -164,6 +170,7 @@ declare global {
   const statusColor: typeof import('./resources/ts/utils/parapheurUi')['statusColor']
   const statusLabels: typeof import('./resources/ts/utils/parapheurUi')['statusLabels']
   const statusOptions: typeof import('./resources/ts/utils/parapheurUi')['statusOptions']
+  const storagePercent: typeof import('./resources/ts/utils/workspaceUi')['storagePercent']
   const storeToRefs: typeof import('pinia')['storeToRefs']
   const syncRef: typeof import('@vueuse/core')['syncRef']
   const syncRefs: typeof import('@vueuse/core')['syncRefs']
@@ -260,6 +267,7 @@ declare global {
   const useFps: typeof import('@vueuse/core')['useFps']
   const useFullscreen: typeof import('@vueuse/core')['useFullscreen']
   const useGamepad: typeof import('@vueuse/core')['useGamepad']
+  const useGedDocumentList: typeof import('./resources/ts/composables/useGedDocumentList')['useGedDocumentList']
   const useGenerateImageVariant: typeof import('./resources/ts/@core/composable/useGenerateImageVariant')['useGenerateImageVariant']
   const useGeolocation: typeof import('@vueuse/core')['useGeolocation']
   const useI18n: typeof import('vue-i18n')['useI18n']
@@ -370,6 +378,8 @@ declare global {
   const useWindowFocus: typeof import('@vueuse/core')['useWindowFocus']
   const useWindowScroll: typeof import('@vueuse/core')['useWindowScroll']
   const useWindowSize: typeof import('@vueuse/core')['useWindowSize']
+  const useWorkspaceExplorer: typeof import('./resources/ts/composables/useWorkspace')['useWorkspaceExplorer']
+  const useWorkspaceHome: typeof import('./resources/ts/composables/useWorkspace')['useWorkspaceHome']
   const watch: typeof import('vue')['watch']
   const watchArray: typeof import('@vueuse/core')['watchArray']
   const watchAtMost: typeof import('@vueuse/core')['watchAtMost']
@@ -386,6 +396,9 @@ declare global {
   const watchTriggerable: typeof import('@vueuse/core')['watchTriggerable']
   const watchWithFilter: typeof import('@vueuse/core')['watchWithFilter']
   const whenever: typeof import('@vueuse/core')['whenever']
+  const workspaceMemberRoleLabels: typeof import('./resources/ts/utils/workspaceUi')['workspaceMemberRoleLabels']
+  const workspaceShareAbilityLabels: typeof import('./resources/ts/utils/workspaceUi')['workspaceShareAbilityLabels']
+  const workspaceTypeLabels: typeof import('./resources/ts/utils/workspaceUi')['workspaceTypeLabels']
 }
 // for type re-export
 declare global {
@@ -408,7 +421,10 @@ declare module 'vue' {
     readonly alphaValidator: UnwrapRef<typeof import('./resources/ts/@core/utils/validators')['alphaValidator']>
     readonly appointmentStatusColor: UnwrapRef<typeof import('./resources/ts/utils/appointmentsUi')['appointmentStatusColor']>
     readonly appointmentStatusLabel: UnwrapRef<typeof import('./resources/ts/utils/appointmentsUi')['appointmentStatusLabel']>
+    readonly archiveStatusLabels: UnwrapRef<typeof import('./resources/ts/utils/gedUi')['archiveStatusLabels']>
+    readonly archiveStatusOptions: UnwrapRef<typeof import('./resources/ts/utils/gedUi')['archiveStatusOptions']>
     readonly asyncComputed: UnwrapRef<typeof import('@vueuse/core')['asyncComputed']>
+    readonly attachmentKindLabels: UnwrapRef<typeof import('./resources/ts/utils/gedUi')['attachmentKindLabels']>
     readonly attendanceLabels: UnwrapRef<typeof import('./resources/ts/utils/meetingsUi')['attendanceLabels']>
     readonly autoResetRef: UnwrapRef<typeof import('@vueuse/core')['autoResetRef']>
     readonly avatarText: UnwrapRef<typeof import('./resources/ts/@core/utils/formatters')['avatarText']>
@@ -456,6 +472,7 @@ declare module 'vue' {
     readonly extendRef: UnwrapRef<typeof import('@vueuse/core')['extendRef']>
     readonly folderMeta: UnwrapRef<typeof import('./resources/ts/utils/parapheurUi')['folderMeta']>
     readonly formatAppointmentSlot: UnwrapRef<typeof import('./resources/ts/utils/appointmentsUi')['formatAppointmentSlot']>
+    readonly formatBytes: UnwrapRef<typeof import('./resources/ts/utils/workspaceUi')['formatBytes']>
     readonly formatDate: UnwrapRef<typeof import('./resources/ts/@core/utils/formatters')['formatDate']>
     readonly formatDateFr: UnwrapRef<typeof import('./resources/ts/utils/parapheurUi')['formatDateFr']>
     readonly formatDateTimeFr: UnwrapRef<typeof import('./resources/ts/utils/parapheurUi')['formatDateTimeFr']>
@@ -483,6 +500,7 @@ declare module 'vue' {
     readonly kFormatter: UnwrapRef<typeof import('./resources/ts/@core/utils/formatters')['kFormatter']>
     readonly labelOf: UnwrapRef<typeof import('./resources/ts/utils/parapheurUi')['labelOf']>
     readonly lengthValidator: UnwrapRef<typeof import('./resources/ts/@core/utils/validators')['lengthValidator']>
+    readonly linkRelationLabels: UnwrapRef<typeof import('./resources/ts/utils/gedUi')['linkRelationLabels']>
     readonly logicAnd: UnwrapRef<typeof import('@vueuse/math')['logicAnd']>
     readonly logicNot: UnwrapRef<typeof import('@vueuse/math')['logicNot']>
     readonly logicOr: UnwrapRef<typeof import('@vueuse/math')['logicOr']>
@@ -518,6 +536,7 @@ declare module 'vue' {
     readonly onUpdated: UnwrapRef<typeof import('vue')['onUpdated']>
     readonly onWatcherCleanup: UnwrapRef<typeof import('vue')['onWatcherCleanup']>
     readonly openMeetingHtml: UnwrapRef<typeof import('./resources/ts/utils/meetingsUi')['openMeetingHtml']>
+    readonly originLabels: UnwrapRef<typeof import('./resources/ts/utils/gedUi')['originLabels']>
     readonly paginationMeta: UnwrapRef<typeof import('./resources/ts/utils/paginationMeta')['paginationMeta']>
     readonly participationTypeLabels: UnwrapRef<typeof import('./resources/ts/utils/meetingsUi')['participationTypeLabels']>
     readonly passwordValidator: UnwrapRef<typeof import('./resources/ts/@core/utils/validators')['passwordValidator']>
@@ -556,7 +575,9 @@ declare module 'vue' {
     readonly shallowRef: UnwrapRef<typeof import('vue')['shallowRef']>
     readonly statusColor: UnwrapRef<typeof import('./resources/ts/utils/parapheurUi')['statusColor']>
     readonly statusLabels: UnwrapRef<typeof import('./resources/ts/utils/parapheurUi')['statusLabels']>
+    readonly statusOptions: UnwrapRef<typeof import('./resources/ts/utils/gedUi')['statusOptions']>
     readonly statusOptions: UnwrapRef<typeof import('./resources/ts/utils/parapheurUi')['statusOptions']>
+    readonly storagePercent: UnwrapRef<typeof import('./resources/ts/utils/workspaceUi')['storagePercent']>
     readonly storeToRefs: UnwrapRef<typeof import('pinia')['storeToRefs']>
     readonly syncRef: UnwrapRef<typeof import('@vueuse/core')['syncRef']>
     readonly syncRefs: UnwrapRef<typeof import('@vueuse/core')['syncRefs']>
@@ -653,6 +674,7 @@ declare module 'vue' {
     readonly useFps: UnwrapRef<typeof import('@vueuse/core')['useFps']>
     readonly useFullscreen: UnwrapRef<typeof import('@vueuse/core')['useFullscreen']>
     readonly useGamepad: UnwrapRef<typeof import('@vueuse/core')['useGamepad']>
+    readonly useGedDocumentList: UnwrapRef<typeof import('./resources/ts/composables/useGedDocumentList')['useGedDocumentList']>
     readonly useGenerateImageVariant: UnwrapRef<typeof import('./resources/ts/@core/composable/useGenerateImageVariant')['useGenerateImageVariant']>
     readonly useGeolocation: UnwrapRef<typeof import('@vueuse/core')['useGeolocation']>
     readonly useI18n: UnwrapRef<typeof import('vue-i18n')['useI18n']>
@@ -763,6 +785,8 @@ declare module 'vue' {
     readonly useWindowFocus: UnwrapRef<typeof import('@vueuse/core')['useWindowFocus']>
     readonly useWindowScroll: UnwrapRef<typeof import('@vueuse/core')['useWindowScroll']>
     readonly useWindowSize: UnwrapRef<typeof import('@vueuse/core')['useWindowSize']>
+    readonly useWorkspaceExplorer: UnwrapRef<typeof import('./resources/ts/composables/useWorkspace')['useWorkspaceExplorer']>
+    readonly useWorkspaceHome: UnwrapRef<typeof import('./resources/ts/composables/useWorkspace')['useWorkspaceHome']>
     readonly watch: UnwrapRef<typeof import('vue')['watch']>
     readonly watchArray: UnwrapRef<typeof import('@vueuse/core')['watchArray']>
     readonly watchAtMost: UnwrapRef<typeof import('@vueuse/core')['watchAtMost']>
@@ -779,5 +803,8 @@ declare module 'vue' {
     readonly watchTriggerable: UnwrapRef<typeof import('@vueuse/core')['watchTriggerable']>
     readonly watchWithFilter: UnwrapRef<typeof import('@vueuse/core')['watchWithFilter']>
     readonly whenever: UnwrapRef<typeof import('@vueuse/core')['whenever']>
+    readonly workspaceMemberRoleLabels: UnwrapRef<typeof import('./resources/ts/utils/workspaceUi')['workspaceMemberRoleLabels']>
+    readonly workspaceShareAbilityLabels: UnwrapRef<typeof import('./resources/ts/utils/workspaceUi')['workspaceShareAbilityLabels']>
+    readonly workspaceTypeLabels: UnwrapRef<typeof import('./resources/ts/utils/workspaceUi')['workspaceTypeLabels']>
   }
 }

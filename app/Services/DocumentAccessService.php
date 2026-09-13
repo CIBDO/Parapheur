@@ -28,6 +28,10 @@ class DocumentAccessService
             return true;
         }
 
+        if ($this->hasWorkspaceAccess($user, $document)) {
+            return true;
+        }
+
         return $this->hasViewClearance($user, $document);
     }
 
@@ -42,7 +46,8 @@ class DocumentAccessService
         }
 
         return $this->hasExplicitAcl($user, $document, DocumentAccessAbility::Download)
-            || $this->isCircuitParty($user, $document);
+            || $this->isCircuitParty($user, $document)
+            || $this->hasWorkspaceAccess($user, $document);
     }
 
     public function canEdit(User $user, Document $document): bool
@@ -217,6 +222,44 @@ class DocumentAccessService
     }
 
     /**
+     * Accès via espace de travail (membre) ou partage workspace explicite.
+     */
+    public function hasWorkspaceAccess(User $user, Document $document): bool
+    {
+        if ($document->workspaceLinks()
+            ->whereHas('workspace.members', fn (Builder $m) => $m->where('user_id', $user->id))
+            ->exists()) {
+            return true;
+        }
+
+        return $document->workspaceLinks()
+            ->whereHas('workspace.shares', function (Builder $s) use ($user, $document) {
+                $s->where('grantee_user_id', $user->id)
+                    ->where(function (Builder $scope) use ($document) {
+                        $scope->where('document_id', $document->id)
+                            ->orWhereNull('document_id');
+                    })
+                    ->where(function (Builder $exp) {
+                        $exp->whereNull('valid_from')->orWhere('valid_from', '<=', now());
+                    })
+                    ->where(function (Builder $exp) {
+                        $exp->whereNull('valid_until')->orWhere('valid_until', '>', now());
+                    });
+            })
+            ->exists()
+            || \App\Models\WorkspaceShare::query()
+                ->where('document_id', $document->id)
+                ->where('grantee_user_id', $user->id)
+                ->where(function (Builder $exp) {
+                    $exp->whereNull('valid_from')->orWhere('valid_from', '<=', now());
+                })
+                ->where(function (Builder $exp) {
+                    $exp->whereNull('valid_until')->orWhere('valid_until', '>', now());
+                })
+                ->exists();
+    }
+
+    /**
      * Scope de sécurité intégré à la requête (jamais filtrer après coup).
      */
     public function scopeVisibleTo(Builder $query, User $user): Builder
@@ -225,7 +268,12 @@ class DocumentAccessService
             return $query;
         }
 
-        return $query->where(function (Builder $q) use ($user) {
+        $workspaceOrigins = [
+            DocumentOrigin::Personal->value,
+            DocumentOrigin::Workspace->value,
+        ];
+
+        return $query->where(function (Builder $q) use ($user, $workspaceOrigins) {
             // Circuit need-to-know
             $q->where('author_id', $user->id)
                 ->orWhere('current_assignee_id', $user->id)
@@ -252,25 +300,48 @@ class DocumentAccessService
                             $exp->whereNull('expires_at')->orWhere('expires_at', '>', now());
                         })
                         ->where('ability', DocumentAccessAbility::View->value);
+                })
+                // Membre d’un workspace lié au document
+                ->orWhereHas('workspaceLinks.workspace.members', function (Builder $m) use ($user) {
+                    $m->where('user_id', $user->id);
+                })
+                // Partage workspace explicite
+                ->orWhereExists(function ($sub) use ($user) {
+                    $sub->selectRaw('1')
+                        ->from('workspace_shares')
+                        ->whereColumn('workspace_shares.document_id', 'documents.id')
+                        ->where('workspace_shares.grantee_user_id', $user->id)
+                        ->where(function ($exp) {
+                            $exp->whereNull('workspace_shares.valid_from')
+                                ->orWhere('workspace_shares.valid_from', '<=', now());
+                        })
+                        ->where(function ($exp) {
+                            $exp->whereNull('workspace_shares.valid_until')
+                                ->orWhere('workspace_shares.valid_until', '>', now());
+                        });
                 });
 
-            // Clearance hors circuit selon confidentialité (aligné historique parapheur)
+            // Clearance hors circuit : JAMAIS pour origines personal/workspace
             if ($user->can('dashboard.dg')) {
-                $q->orWhereIn('confidentiality', [
-                    DocumentConfidentiality::Normal->value,
-                    DocumentConfidentiality::Restreint->value,
-                    DocumentConfidentiality::Confidentiel->value,
-                ]);
+                $q->orWhere(function (Builder $dg) use ($workspaceOrigins) {
+                    $dg->whereNotIn('origin', $workspaceOrigins)
+                        ->whereIn('confidentiality', [
+                            DocumentConfidentiality::Normal->value,
+                            DocumentConfidentiality::Restreint->value,
+                            DocumentConfidentiality::Confidentiel->value,
+                        ]);
+                });
             } elseif ($user->can('documents.act') || $user->can('documents.create') || $user->can('ged.view')) {
-                // Restreint : même structure uniquement
+                // Restreint : même structure uniquement (hors personal/workspace)
                 if ($user->structure_id) {
-                    $q->orWhere(function (Builder $rest) use ($user) {
-                        $rest->where('confidentiality', DocumentConfidentiality::Restreint->value)
+                    $q->orWhere(function (Builder $rest) use ($user, $workspaceOrigins) {
+                        $rest->whereNotIn('origin', $workspaceOrigins)
+                            ->where('confidentiality', DocumentConfidentiality::Restreint->value)
                             ->where('structure_id', $user->structure_id);
                     });
                 }
 
-                // Documents GED « normal » : auteur, structure émettrice ou propriétaire (pas d’élargissement parapheur)
+                // Documents GED « normal » : auteur, structure émettrice ou propriétaire
                 $q->orWhere(function (Builder $ged) use ($user) {
                     $ged->where('origin', DocumentOrigin::Ged->value)
                         ->where('confidentiality', DocumentConfidentiality::Normal->value)
@@ -310,9 +381,18 @@ class DocumentAccessService
 
     /**
      * Accès hors circuit selon la classification (aligné réunions / agenda).
+     * Les documents personal/workspace n’utilisent JAMAIS la clearance structure GED.
      */
     private function hasViewClearance(User $user, Document $document): bool
     {
+        $origin = $document->origin instanceof DocumentOrigin
+            ? $document->origin
+            : DocumentOrigin::tryFrom((string) $document->origin);
+
+        if ($origin?->isWorkspaceBound()) {
+            return false;
+        }
+
         $confidentiality = $this->resolveConfidentiality($document);
 
         if ($confidentiality === DocumentConfidentiality::TresConfidentiel) {

@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Enums\DocumentArchiveStatus;
+use App\Enums\DocumentOrigin;
 use App\Models\Document;
 use App\Models\User;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
@@ -35,6 +36,17 @@ class DocumentSearchService
 
         $this->access->scopeVisibleTo($query, $user);
         $criteria['_user_id'] = $user->id;
+
+        // Catalogue GED : exclure personal/workspace sauf demande explicite
+        if (! array_key_exists('origin', $criteria) || $criteria['origin'] === '' || $criteria['origin'] === null) {
+            if (empty($criteria['include_workspace_origins'])) {
+                $query->whereNotIn('origin', [
+                    DocumentOrigin::Personal->value,
+                    DocumentOrigin::Workspace->value,
+                ]);
+            }
+        }
+
         $this->applyFilters($query, $criteria);
 
         $sort = $criteria['sort'] ?? 'created_at';
@@ -56,7 +68,13 @@ class DocumentSearchService
      */
     public function dashboardCounts(User $user): array
     {
-        $base = fn (): Builder => $this->access->scopeVisibleTo(Document::query(), $user);
+        $base = function () use ($user) {
+            return $this->access->scopeVisibleTo(Document::query(), $user)
+                ->whereNotIn('origin', [
+                    DocumentOrigin::Personal->value,
+                    DocumentOrigin::Workspace->value,
+                ]);
+        };
 
         return [
             'actifs' => (clone $base())->where('archive_status', DocumentArchiveStatus::Actif->value)->count(),
@@ -93,7 +111,12 @@ class DocumentSearchService
      */
     public function indicators(User $user): array
     {
-        $visibleIds = $this->access->scopeVisibleTo(Document::query(), $user)->pluck('id');
+        $visibleIds = $this->access->scopeVisibleTo(Document::query(), $user)
+            ->whereNotIn('origin', [
+                DocumentOrigin::Personal->value,
+                DocumentOrigin::Workspace->value,
+            ])
+            ->pluck('id');
 
         $base = Document::query()->whereIn('id', $visibleIds);
 

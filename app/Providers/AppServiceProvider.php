@@ -8,8 +8,10 @@ use App\Contracts\Search\SearchEngineInterface;
 use App\Models\Appointment;
 use App\Models\Document;
 use App\Models\User;
+use App\Models\Workspace;
 use App\Policies\AppointmentPolicy;
 use App\Policies\DocumentPolicy;
+use App\Policies\WorkspacePolicy;
 use App\Services\Identity\LdapIdentityProvider;
 use App\Services\Identity\LocalIdentityProvider;
 use App\Services\Identity\SsoIdentityProvider;
@@ -53,6 +55,7 @@ class AppServiceProvider extends ServiceProvider
     {
         Gate::policy(Appointment::class, AppointmentPolicy::class);
         Gate::policy(Document::class, DocumentPolicy::class);
+        Gate::policy(Workspace::class, WorkspacePolicy::class);
 
         if (config('onlyoffice.enabled')) {
             try {

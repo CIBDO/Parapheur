@@ -9,6 +9,8 @@ enum DocumentOrigin: string
     case Meeting = 'meeting';
     case Appointment = 'appointment';
     case Instruction = 'instruction';
+    case Personal = 'personal';
+    case Workspace = 'workspace';
 
     public function label(): string
     {
@@ -18,6 +20,14 @@ enum DocumentOrigin: string
             self::Meeting => 'Réunion',
             self::Appointment => 'Rendez-vous',
             self::Instruction => 'Instruction',
+            self::Personal => 'Personnel',
+            self::Workspace => 'Espace de travail',
         };
     }
+
+    public function isWorkspaceBound(): bool
+    {
+        return $this === self::Personal || $this === self::Workspace;
+    }
 }
+

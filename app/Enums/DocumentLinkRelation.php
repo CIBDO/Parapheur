@@ -11,6 +11,9 @@ enum DocumentLinkRelation: string
     case ResponseTo = 'response_to';
     case GeneratedFrom = 'generated_from';
     case VersionOf = 'version_of';
+    case CopiedFrom = 'copied_from';
+    case DerivedFrom = 'derived_from';
+    case ReferenceTo = 'reference_to';
 
     public function label(): string
     {
@@ -22,6 +25,10 @@ enum DocumentLinkRelation: string
             self::ResponseTo => 'Réponse à',
             self::GeneratedFrom => 'Généré depuis',
             self::VersionOf => 'Version de',
+            self::CopiedFrom => 'Copié depuis',
+            self::DerivedFrom => 'Dérivé de',
+            self::ReferenceTo => 'Référence à',
         };
     }
 }
+

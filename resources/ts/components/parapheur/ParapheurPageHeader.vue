@@ -37,10 +37,12 @@ defineProps<{
     </div>
 
     <div
-      v-if="$slots.actions"
+      v-if="$slots.actions || $slots.default"
       class="d-flex flex-wrap align-center gap-2"
     >
-      <slot name="actions" />
+      <slot name="actions">
+        <slot />
+      </slot>
     </div>
   </div>
 </template>

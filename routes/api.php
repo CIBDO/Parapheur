@@ -7,6 +7,16 @@ use App\Http\Controllers\Api\Ged\GedDocumentController;
 use App\Http\Controllers\Api\Ged\GedEngagementController;
 use App\Http\Controllers\Api\Ged\GedLifecycleController;
 use App\Http\Controllers\Api\Ged\GedTagController;
+use App\Http\Controllers\Api\Library\BibliographicReferenceController;
+use App\Http\Controllers\Api\Library\ReferenceCollectionController;
+use App\Http\Controllers\Api\Workspace\WorkspaceBridgeController;
+use App\Http\Controllers\Api\Workspace\WorkspaceController;
+use App\Http\Controllers\Api\Workspace\WorkspaceDocumentController;
+use App\Http\Controllers\Api\Workspace\WorkspaceFolderController;
+use App\Http\Controllers\Api\Workspace\WorkspaceMemberController;
+use App\Http\Controllers\Api\Workspace\WorkspaceQuotaAdminController;
+use App\Http\Controllers\Api\Workspace\WorkspaceShareController;
+use App\Http\Controllers\Api\UnifiedSearchController;
 use App\Http\Controllers\Api\AppointmentController;
 use App\Http\Controllers\Api\AppointmentTypeController;
 use App\Http\Controllers\Api\AuditLogController;
@@ -286,6 +296,74 @@ Route::middleware(['auth:sanctum', 'password.changed'])->group(function () {
     Route::get('/meetings/{meeting}/minutes/{minute}/preview', [MeetingMinutesController::class, 'preview']);
 
     Route::get('/reporting/export', [ReportingController::class, 'export']);
+
+    Route::get('/search', UnifiedSearchController::class);
+
+    // ——— Mon espace documentaire ———
+    Route::middleware('permission:workspace.access|admin.access')->prefix('workspace')->group(function () {
+        Route::get('/home', [WorkspaceController::class, 'home']);
+        Route::get('/collaborative', [WorkspaceController::class, 'collaborative']);
+        Route::post('/', [WorkspaceController::class, 'store'])->middleware('permission:workspace.create_shared|admin.access');
+        Route::get('/shared-with-me', [WorkspaceController::class, 'sharedWithMe']);
+        Route::get('/favorites', [WorkspaceController::class, 'favorites']);
+        Route::post('/favorites/toggle', [WorkspaceController::class, 'toggleFavorite']);
+        Route::get('/recent', [WorkspaceController::class, 'recent']);
+
+        Route::middleware('permission:workspace.manage_quotas|admin.access')->prefix('admin')->group(function () {
+            Route::get('/storage-policy', [WorkspaceQuotaAdminController::class, 'policy']);
+            Route::put('/storage-policy', [WorkspaceQuotaAdminController::class, 'updatePolicy']);
+            Route::get('/quota-overrides', [WorkspaceQuotaAdminController::class, 'overrides']);
+            Route::post('/quota-overrides', [WorkspaceQuotaAdminController::class, 'storeOverride']);
+            Route::delete('/quota-overrides/{override}', [WorkspaceQuotaAdminController::class, 'destroyOverride']);
+            Route::post('/workspaces/{workspace}/recalculate-storage', [WorkspaceQuotaAdminController::class, 'recalculate']);
+        });
+
+        Route::get('/{workspace}', [WorkspaceController::class, 'show']);
+        Route::get('/{workspace}/browse', [WorkspaceController::class, 'browse']);
+        Route::get('/{workspace}/storage', [WorkspaceController::class, 'storage']);
+        Route::get('/{workspace}/trash', [WorkspaceController::class, 'trash']);
+        Route::post('/{workspace}/trash/{id}/restore', [WorkspaceController::class, 'restoreTrash']);
+
+        Route::get('/{workspace}/folders', [WorkspaceFolderController::class, 'index']);
+        Route::post('/{workspace}/folders', [WorkspaceFolderController::class, 'store']);
+        Route::put('/{workspace}/folders/{folder}', [WorkspaceFolderController::class, 'update']);
+        Route::post('/{workspace}/folders/{folder}/move', [WorkspaceFolderController::class, 'move']);
+        Route::delete('/{workspace}/folders/{folder}', [WorkspaceFolderController::class, 'destroy']);
+
+        Route::get('/{workspace}/documents', [WorkspaceDocumentController::class, 'index']);
+        Route::post('/{workspace}/documents', [WorkspaceDocumentController::class, 'upload']);
+        Route::post('/{workspace}/documents/{document}/move', [WorkspaceDocumentController::class, 'move']);
+        Route::delete('/{workspace}/documents/{document}', [WorkspaceDocumentController::class, 'destroy']);
+
+        Route::post('/{workspace}/shares', [WorkspaceShareController::class, 'store']);
+        Route::delete('/{workspace}/shares/{share}', [WorkspaceShareController::class, 'destroy']);
+
+        Route::get('/{workspace}/members', [WorkspaceMemberController::class, 'index']);
+        Route::post('/{workspace}/members', [WorkspaceMemberController::class, 'store']);
+        Route::put('/{workspace}/members/{member}', [WorkspaceMemberController::class, 'update']);
+        Route::delete('/{workspace}/members/{member}', [WorkspaceMemberController::class, 'destroy']);
+        Route::get('/{workspace}/activity', [WorkspaceMemberController::class, 'activity']);
+
+        Route::post('/{workspace}/documents/{document}/submit-ged', [WorkspaceBridgeController::class, 'submitToGed']);
+        Route::post('/{workspace}/documents/{document}/submit-parapheur', [WorkspaceBridgeController::class, 'submitToParapheur']);
+        Route::post('/{workspace}/documents/{document}/working-copy', [WorkspaceBridgeController::class, 'workingCopy']);
+        Route::post('/{workspace}/documents/{document}/attach-meeting', [WorkspaceBridgeController::class, 'attachMeeting']);
+        Route::post('/{workspace}/documents/{document}/attach-appointment', [WorkspaceBridgeController::class, 'attachAppointment']);
+        Route::post('/{workspace}/documents/{document}/attach-instruction', [WorkspaceBridgeController::class, 'attachInstruction']);
+    });
+
+    // ——— Bibliothèque de références ———
+    Route::middleware('permission:library.access|admin.access')->prefix('library')->group(function () {
+        Route::get('/reference-types', [BibliographicReferenceController::class, 'types']);
+        Route::get('/collections', [BibliographicReferenceController::class, 'collections']);
+        Route::post('/collections', [BibliographicReferenceController::class, 'storeCollection']);
+        Route::get('/references', [BibliographicReferenceController::class, 'index']);
+        Route::post('/references', [BibliographicReferenceController::class, 'store']);
+        Route::get('/references/{reference}', [BibliographicReferenceController::class, 'show']);
+        Route::post('/references/{reference}/propose', [BibliographicReferenceController::class, 'propose']);
+        Route::post('/references/{reference}/moderate', [BibliographicReferenceController::class, 'moderate']);
+        Route::post('/references/{reference}/note', [BibliographicReferenceController::class, 'upsertNote']);
+    });
 });
 // Callback ONLYOFFICE Document Server (JWT, hors Sanctum)
 Route::post('/onlyoffice/callback/{document}', [OnlyOfficeController::class, 'callback'])

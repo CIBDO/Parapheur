@@ -79,6 +79,9 @@ class User extends Authenticatable
                 ['action' => 'manage', 'subject' => 'AppointmentType'],
                 ['action' => 'manage', 'subject' => 'Ged'],
                 ['action' => 'manage', 'subject' => 'GedAdmin'],
+                ['action' => 'manage', 'subject' => 'Workspace'],
+                ['action' => 'manage', 'subject' => 'WorkspaceAdmin'],
+                ['action' => 'manage', 'subject' => 'Library'],
                 ['action' => 'read', 'subject' => 'AuditLog'],
                 ['action' => 'read', 'subject' => 'Notification'],
                 ['action' => 'read', 'subject' => 'Parapheur'],
@@ -178,6 +181,33 @@ class User extends Authenticatable
 
         if ($this->can('ged.manage_classification') || $this->can('ged.manage_categories') || $this->can('ged.manage_types')) {
             $rules[] = ['action' => 'manage', 'subject' => 'GedAdmin'];
+        }
+
+        if ($this->can('workspace.access')) {
+            $rules[] = ['action' => 'read', 'subject' => 'Workspace'];
+        }
+
+        if ($this->can('workspace.create_shared') || $this->can('workspace.manage_own')) {
+            $rules[] = ['action' => 'create', 'subject' => 'Workspace'];
+            $rules[] = ['action' => 'manage', 'subject' => 'Workspace'];
+        }
+
+        if ($this->can('workspace.manage_quotas')) {
+            $rules[] = ['action' => 'manage', 'subject' => 'WorkspaceAdmin'];
+        }
+
+        if ($this->can('library.access')) {
+            $rules[] = ['action' => 'read', 'subject' => 'Library'];
+        }
+
+        if ($this->can('library.manage_own')) {
+            $rules[] = ['action' => 'manage', 'subject' => 'Library'];
+            $rules[] = ['action' => 'create', 'subject' => 'Library'];
+        }
+
+        if ($this->can('library.moderate')) {
+            $rules[] = ['action' => 'manage', 'subject' => 'Library'];
+            $rules[] = ['action' => 'manage', 'subject' => 'WorkspaceAdmin'];
         }
 
         return $rules;

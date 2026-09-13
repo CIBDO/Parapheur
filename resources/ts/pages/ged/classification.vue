@@ -3,7 +3,11 @@ import ParapheurPageHeader from '@/components/parapheur/ParapheurPageHeader.vue'
 import { useAbility } from '@/plugins/casl/composables/useAbility'
 
 definePage({
-  meta: { action: 'read', subject: 'Ged' },
+  meta: {
+    layout: 'default',
+    action: 'read',
+    subject: 'Ged',
+  },
 })
 
 const ability = useAbility()
@@ -12,23 +16,27 @@ const canManage = computed(() => ability.can('manage', 'GedAdmin') || ability.ca
 const tree = ref<any[]>([])
 const loading = ref(true)
 const dialog = ref(false)
+const editingId = ref<number | null>(null)
 const form = ref({
   parent_id: null as number | null,
   code: '',
   name: '',
   structure_id: null as number | null,
+  sort_order: 0,
 })
 const structures = ref<Array<{ id: number; name: string }>>([])
 const flatParents = ref<Array<{ id: number; label: string }>>([])
 const errorMessage = ref('')
 
-const flatten = (nodes: any[], prefix = ''): Array<{ id: number; label: string }> => {
+const flatten = (nodes: any[], prefix = '', excludeId: number | null = null): Array<{ id: number; label: string }> => {
   const out: Array<{ id: number; label: string }> = []
   for (const n of nodes) {
+    if (excludeId && n.id === excludeId)
+      continue
     const label = prefix ? `${prefix} / ${n.name}` : n.name
     out.push({ id: n.id, label })
     if (n.children?.length)
-      out.push(...flatten(n.children, label))
+      out.push(...flatten(n.children, label, excludeId))
   }
 
   return out
@@ -39,7 +47,7 @@ const load = async () => {
   try {
     const res = await $api('/ged/classification-nodes', { query: { all: 1 } })
     tree.value = res.data || []
-    flatParents.value = flatten(tree.value)
+    flatParents.value = flatten(tree.value, '', editingId.value)
   }
   finally {
     loading.value = false
@@ -52,17 +60,40 @@ onMounted(async () => {
 })
 
 const openCreate = (parentId: number | null = null) => {
-  form.value = { parent_id: parentId, code: '', name: '', structure_id: null }
+  editingId.value = null
+  form.value = { parent_id: parentId, code: '', name: '', structure_id: null, sort_order: 0 }
+  flatParents.value = flatten(tree.value)
+  dialog.value = true
+}
+
+const openEdit = (node: any) => {
+  editingId.value = node.id
+  form.value = {
+    parent_id: node.parent_id,
+    code: node.code,
+    name: node.name,
+    structure_id: node.structure_id,
+    sort_order: node.sort_order ?? 0,
+  }
+  flatParents.value = flatten(tree.value, '', node.id)
   dialog.value = true
 }
 
 const save = async () => {
   errorMessage.value = ''
   try {
-    await $api('/ged/classification-nodes', {
-      method: 'POST',
-      body: form.value,
-    })
+    if (editingId.value) {
+      await $api(`/ged/classification-nodes/${editingId.value}`, {
+        method: 'PUT',
+        body: form.value,
+      })
+    }
+    else {
+      await $api('/ged/classification-nodes', {
+        method: 'POST',
+        body: form.value,
+      })
+    }
     dialog.value = false
     await load()
   }
@@ -88,17 +119,19 @@ const remove = async (id: number) => {
   <div>
     <ParapheurPageHeader
       title="Plan de classement"
-      subtitle="Arborescence logique (indépendante du stockage physique)"
+      subtitle="Arborescence logique dynamique (indépendante du stockage physique)"
       icon="tabler-sitemap"
     >
-      <VBtn
-        v-if="canManage"
-        color="primary"
-        prepend-icon="tabler-plus"
-        @click="openCreate(null)"
-      >
-        Nœud racine
-      </VBtn>
+      <template #actions>
+        <VBtn
+          v-if="canManage"
+          color="primary"
+          prepend-icon="tabler-plus"
+          @click="openCreate(null)"
+        >
+          Nœud racine
+        </VBtn>
+      </template>
     </ParapheurPageHeader>
 
     <VCard
@@ -106,89 +139,18 @@ const remove = async (id: number) => {
       :loading="loading"
     >
       <VCardText>
-        <template
-          v-for="node in tree"
-          :key="node.id"
-        >
-          <div class="mb-2">
-            <div class="d-flex align-center gap-2">
-              <VIcon icon="tabler-folder" />
-              <strong>{{ node.code }}</strong>
-              — {{ node.name }}
-              <VSpacer />
-              <VBtn
-                v-if="canManage"
-                size="x-small"
-                variant="text"
-                icon="tabler-plus"
-                @click="openCreate(node.id)"
-              />
-              <VBtn
-                v-if="canManage"
-                size="x-small"
-                variant="text"
-                color="error"
-                icon="tabler-trash"
-                @click="remove(node.id)"
-              />
-            </div>
-            <div
-              v-for="child in node.children || []"
-              :key="child.id"
-              class="ms-6 mt-2"
-            >
-              <div class="d-flex align-center gap-2">
-                <VIcon
-                  icon="tabler-folder"
-                  size="18"
-                />
-                <span><strong>{{ child.code }}</strong> — {{ child.name }}</span>
-                <VSpacer />
-                <VBtn
-                  v-if="canManage"
-                  size="x-small"
-                  variant="text"
-                  icon="tabler-plus"
-                  @click="openCreate(child.id)"
-                />
-                <VBtn
-                  v-if="canManage"
-                  size="x-small"
-                  variant="text"
-                  color="error"
-                  icon="tabler-trash"
-                  @click="remove(child.id)"
-                />
-              </div>
-              <div
-                v-for="grand in child.children || []"
-                :key="grand.id"
-                class="ms-6 mt-1 text-body-2"
-              >
-                <VIcon
-                  icon="tabler-file"
-                  size="16"
-                  class="me-1"
-                />
-                <strong>{{ grand.code }}</strong> — {{ grand.name }}
-                <VBtn
-                  v-if="canManage"
-                  size="x-small"
-                  variant="text"
-                  color="error"
-                  icon="tabler-trash"
-                  class="ms-2"
-                  @click="remove(grand.id)"
-                />
-              </div>
-            </div>
-          </div>
-        </template>
+        <ClassificationTreeNodes
+          :nodes="tree"
+          :can-manage="canManage"
+          @add="openCreate"
+          @edit="openEdit"
+          @remove="remove"
+        />
         <div
           v-if="!loading && !tree.length"
           class="parapheur-empty text-center py-8"
         >
-          Aucun nœud de classement.
+          Aucun nœud de classement. Créez un nœud racine pour commencer.
         </div>
       </VCardText>
     </VCard>
@@ -198,7 +160,7 @@ const remove = async (id: number) => {
       max-width="520"
     >
       <VCard>
-        <VCardTitle>Nouveau nœud</VCardTitle>
+        <VCardTitle>{{ editingId ? 'Modifier le nœud' : 'Nouveau nœud' }}</VCardTitle>
         <VCardText>
           <VAlert
             v-if="errorMessage"
@@ -212,7 +174,7 @@ const remove = async (id: number) => {
             :items="flatParents"
             item-title="label"
             item-value="id"
-            label="Parent"
+            label="Parent (vide = racine)"
             clearable
             class="mb-3"
           />
@@ -231,8 +193,14 @@ const remove = async (id: number) => {
             :items="structures"
             item-title="name"
             item-value="id"
-            label="Structure"
+            label="Structure (optionnel)"
             clearable
+            class="mb-3"
+          />
+          <AppTextField
+            v-model.number="form.sort_order"
+            label="Ordre d’affichage"
+            type="number"
           />
         </VCardText>
         <VCardActions>
