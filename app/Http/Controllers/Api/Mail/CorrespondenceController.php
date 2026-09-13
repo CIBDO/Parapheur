@@ -101,6 +101,8 @@ class CorrespondenceController extends Controller
             'parties.*.function' => 'nullable|string|max:200',
             'sender_name' => 'nullable|string|max:200',
             'recipient_name' => 'nullable|string|max:200',
+            'sender_structure_id' => 'nullable|exists:structures,id',
+            'recipient_structure_id' => 'nullable|exists:structures,id',
         ]);
 
         $direction = $validated['direction'];

@@ -114,6 +114,8 @@ class MailRegisterController extends Controller
             'parties.*.name' => 'nullable|string|max:200',
             'sender_name' => 'nullable|string|max:200',
             'recipient_name' => 'nullable|string|max:200',
+            'sender_structure_id' => 'nullable|exists:structures,id',
+            'recipient_structure_id' => 'nullable|exists:structures,id',
         ]);
 
         $correspondence = $this->correspondenceService->createInternal($request->user(), $validated);

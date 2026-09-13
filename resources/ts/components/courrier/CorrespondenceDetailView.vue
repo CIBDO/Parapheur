@@ -181,6 +181,7 @@ const latestAcknowledgement = computed(() => {
 })
 
 const isSortant = computed(() => (props.direction || props.correspondence.direction) === 'sortant')
+const isInterne = computed(() => (props.direction || props.correspondence.direction) === 'interne')
 
 const canRegisterDeparture = computed(() =>
   isSortant.value && !props.correspondence.departure_number
@@ -939,7 +940,7 @@ async function archiveCorrespondence() {
                   </div>
                   <div class="mb-3">
                     <div class="text-body-2 font-weight-medium mb-1">
-                      {{ isSortant ? 'Émetteur (nous)' : 'Expéditeur' }}
+                      {{ isSortant ? 'Émetteur (nous)' : (isInterne ? 'Structure / service expéditeur' : 'Expéditeur') }}
                     </div>
                     <div v-if="fromParty">
                       {{ partyDisplayName(fromParty) || '—' }}
@@ -959,7 +960,7 @@ async function archiveCorrespondence() {
                   </div>
                   <div>
                     <div class="text-body-2 font-weight-medium mb-1">
-                      {{ isSortant ? 'Destinataire externe' : 'Destinataire(s)' }}
+                      {{ isSortant ? 'Destinataire externe' : (isInterne ? 'Structure / service destinataire' : 'Destinataire(s)') }}
                     </div>
                     <div v-if="toParties.length">
                       <div

@@ -113,8 +113,11 @@ class CorrespondenceService
     public function createInternal(User $user, array $data): Correspondence
     {
         return DB::transaction(function () use ($user, $data) {
+            $senderStructureId = $data['sender_structure_id'] ?? null;
             [$data, $parties] = $this->extractPartiesInput($data);
-            $data['structure_id'] = $data['structure_id'] ?? $user->structure_id;
+
+            // Structure de rattachement = structure émettrice interne si fournie
+            $data['structure_id'] = $data['structure_id'] ?? $senderStructureId ?? $user->structure_id;
 
             $correspondence = Correspondence::query()->create([
                 ...$data,
@@ -492,6 +495,33 @@ class CorrespondenceService
         $parties = is_array($data['parties'] ?? null) ? array_values($data['parties']) : [];
         $roles = collect($parties)->pluck('role');
 
+        $senderStructureId = $data['sender_structure_id'] ?? null;
+        $recipientStructureId = $data['recipient_structure_id'] ?? null;
+
+        if ($senderStructureId && ! $roles->contains('from')) {
+            $structure = Structure::query()->find($senderStructureId);
+            if ($structure) {
+                $parties[] = [
+                    'role' => 'from',
+                    'name' => $structure->name,
+                    'organization' => $structure->code ?: $structure->name,
+                ];
+                $roles->push('from');
+            }
+        }
+
+        if ($recipientStructureId && ! $roles->contains('to')) {
+            $structure = Structure::query()->find($recipientStructureId);
+            if ($structure) {
+                $parties[] = [
+                    'role' => 'to',
+                    'name' => $structure->name,
+                    'organization' => $structure->code ?: $structure->name,
+                ];
+                $roles->push('to');
+            }
+        }
+
         $senderName = trim((string) ($data['sender_name'] ?? ''));
         $recipientName = trim((string) ($data['recipient_name'] ?? ''));
 
@@ -502,7 +532,14 @@ class CorrespondenceService
             $parties[] = ['role' => 'to', 'name' => $recipientName];
         }
 
-        unset($data['parties'], $data['sender_name'], $data['recipient_name'], $data['document_data']);
+        unset(
+            $data['parties'],
+            $data['sender_name'],
+            $data['recipient_name'],
+            $data['document_data'],
+            $data['sender_structure_id'],
+            $data['recipient_structure_id'],
+        );
 
         return [$data, $parties];
     }

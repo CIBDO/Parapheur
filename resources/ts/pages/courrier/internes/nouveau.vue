@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useCorrespondence } from '@/composables/useCorrespondence'
 import {
@@ -7,6 +7,7 @@ import {
   correspondenceMediumLabels,
   correspondencePriorityLabels,
 } from '@/utils/courrierUi'
+import { $api } from '@/utils/api'
 
 definePage({
   meta: { layout: 'default', action: 'create', subject: 'Courrier' },
@@ -14,7 +15,10 @@ definePage({
 
 const router = useRouter()
 const { createCorrespondence, loading } = useCorrespondence()
+const userData = useCookie<Record<string, any> | null>('userData')
 const errorMsg = ref('')
+
+const structures = ref<any[]>([])
 
 const form = ref({
   direction: 'interne',
@@ -24,19 +28,62 @@ const form = ref({
   priority: 'normale',
   confidentiality: 'normal',
   correspondence_date: new Date().toISOString().split('T')[0],
-  received_at: new Date().toISOString().slice(0, 16),
-  sender_name: '',
-  recipient_name: '',
+  sender_structure_id: null as number | null,
+  recipient_structure_id: null as number | null,
+})
+
+const structureItems = computed(() =>
+  structures.value.map(s => ({
+    value: s.id,
+    title: s.code ? `${s.code} — ${s.name}` : (s.name || `#${s.id}`),
+  })),
+)
+
+onMounted(async () => {
+  form.value.sender_structure_id = userData.value?.structure?.id
+    ?? userData.value?.structure_id
+    ?? null
+
+  try {
+    const structs = await $api('/meta/structures')
+    structures.value = Array.isArray(structs) ? structs : []
+  }
+  catch {
+    structures.value = []
+  }
 })
 
 async function submit() {
   errorMsg.value = ''
+  if (!form.value.sender_structure_id) {
+    errorMsg.value = 'Sélectionnez la structure / le service expéditeur.'
+
+    return
+  }
+  if (!form.value.recipient_structure_id) {
+    errorMsg.value = 'Sélectionnez la structure / le service destinataire.'
+
+    return
+  }
+  if (form.value.sender_structure_id === form.value.recipient_structure_id) {
+    errorMsg.value = 'L’expéditeur et le destinataire doivent être des structures différentes.'
+
+    return
+  }
+
   try {
-    const created = await createCorrespondence(form.value)
+    const created = await createCorrespondence({
+      ...form.value,
+      structure_id: form.value.sender_structure_id,
+    })
     router.push({ name: 'courrier-internes-id', params: { id: created.id } })
   }
   catch (e: any) {
-    errorMsg.value = e?.data?.message || e.message || 'Erreur'
+    const errors = e?.data?.errors
+    if (errors && typeof errors === 'object')
+      errorMsg.value = Object.values(errors).flat().join(' ')
+    else
+      errorMsg.value = e?.data?.message || e.message || 'Erreur'
   }
 }
 </script>
@@ -45,8 +92,17 @@ async function submit() {
   <div>
     <ParapheurPageHeader
       title="Nouveau courrier interne"
-      subtitle="Transmission entre directions"
+      subtitle="Transmission entre structures / services"
     />
+
+    <VAlert
+      type="info"
+      variant="tonal"
+      class="mb-4"
+    >
+      Choisissez les structures existantes pour l’émetteur et le destinataire (directions, services, cabinets…).
+    </VAlert>
+
     <VAlert
       v-if="errorMsg"
       type="error"
@@ -55,6 +111,7 @@ async function submit() {
     >
       {{ errorMsg }}
     </VAlert>
+
     <VCard>
       <VCardText>
         <VForm @submit.prevent="submit">
@@ -70,18 +127,26 @@ async function submit() {
               cols="12"
               md="6"
             >
-              <AppTextField
-                v-model="form.sender_name"
-                label="Expéditeur"
+              <AppSelect
+                v-model="form.sender_structure_id"
+                :items="structureItems"
+                label="Structure / service expéditeur *"
+                hint="Service qui émet le courrier interne"
+                persistent-hint
+                :disabled="!structureItems.length"
               />
             </VCol>
             <VCol
               cols="12"
               md="6"
             >
-              <AppTextField
-                v-model="form.recipient_name"
-                label="Destinataire"
+              <AppSelect
+                v-model="form.recipient_structure_id"
+                :items="structureItems"
+                label="Structure / service destinataire *"
+                hint="Service destinataire de la transmission"
+                persistent-hint
+                :disabled="!structureItems.length"
               />
             </VCol>
             <VCol
@@ -112,6 +177,16 @@ async function submit() {
                 v-model="form.priority"
                 :items="Object.entries(correspondencePriorityLabels).map(([value, title]) => ({ value, title }))"
                 label="Priorité"
+              />
+            </VCol>
+            <VCol
+              cols="12"
+              md="6"
+            >
+              <AppSelect
+                v-model="form.confidentiality"
+                :items="Object.entries(correspondenceConfidentialityLabels).map(([value, title]) => ({ value, title }))"
+                label="Confidentialité"
               />
             </VCol>
             <VCol cols="12">
