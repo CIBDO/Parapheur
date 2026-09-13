@@ -4,15 +4,19 @@ namespace App\Providers;
 
 use App\Contracts\DocumentPreviewDriver;
 use App\Contracts\IdentityProvider;
+use App\Contracts\Search\SearchEngineInterface;
 use App\Models\Appointment;
+use App\Models\Document;
 use App\Models\User;
 use App\Policies\AppointmentPolicy;
+use App\Policies\DocumentPolicy;
 use App\Services\Identity\LdapIdentityProvider;
 use App\Services\Identity\LocalIdentityProvider;
 use App\Services\Identity\SsoIdentityProvider;
 use App\Services\OnlyOffice\OnlyOfficeJwt;
 use App\Services\Preview\NativeDocumentPreviewDriver;
 use App\Services\Preview\OnlyOfficeDocumentPreviewDriver;
+use App\Services\Search\DatabaseSearchEngine;
 use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
@@ -34,6 +38,8 @@ class AppServiceProvider extends ServiceProvider
             return $app->make(NativeDocumentPreviewDriver::class);
         });
 
+        $this->app->bind(SearchEngineInterface::class, DatabaseSearchEngine::class);
+
         $this->app->singleton(IdentityProvider::class, function ($app) {
             return match ((string) config('identity.driver', 'local')) {
                 'ldap' => $app->make(LdapIdentityProvider::class),
@@ -46,6 +52,7 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         Gate::policy(Appointment::class, AppointmentPolicy::class);
+        Gate::policy(Document::class, DocumentPolicy::class);
 
         if (config('onlyoffice.enabled')) {
             try {

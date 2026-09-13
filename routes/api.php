@@ -1,5 +1,12 @@
 <?php
 
+use App\Http\Controllers\Api\Ged\GedCategoryController;
+use App\Http\Controllers\Api\Ged\GedClassificationController;
+use App\Http\Controllers\Api\Ged\GedDashboardController;
+use App\Http\Controllers\Api\Ged\GedDocumentController;
+use App\Http\Controllers\Api\Ged\GedEngagementController;
+use App\Http\Controllers\Api\Ged\GedLifecycleController;
+use App\Http\Controllers\Api\Ged\GedTagController;
 use App\Http\Controllers\Api\AppointmentController;
 use App\Http\Controllers\Api\AppointmentTypeController;
 use App\Http\Controllers\Api\AuditLogController;
@@ -112,6 +119,51 @@ Route::middleware(['auth:sanctum', 'password.changed'])->group(function () {
     Route::post('/parapheur/documents', [DocumentController::class, 'store']);
     Route::get('/parapheur/documents', [DocumentController::class, 'index']);
     Route::get('/parapheur/documents/{document}', [DocumentController::class, 'show']);
+
+    // ——— GED (référentiel documentaire transversal) ———
+    Route::get('/ged/dashboard', GedDashboardController::class);
+    Route::get('/ged/documents', [GedDocumentController::class, 'index']);
+    Route::post('/ged/documents', [GedDocumentController::class, 'store']);
+    Route::get('/ged/documents/{document}', [GedDocumentController::class, 'show']);
+    Route::put('/ged/documents/{document}', [GedDocumentController::class, 'update']);
+    Route::delete('/ged/documents/{document}', [GedDocumentController::class, 'destroy']);
+    Route::post('/ged/documents/{document}/classify', [GedDocumentController::class, 'classify']);
+    Route::post('/ged/documents/{document}/archive', [GedDocumentController::class, 'archive']);
+    Route::post('/ged/documents/{document}/versions', [GedDocumentController::class, 'addVersion']);
+    Route::post('/ged/documents/{document}/attachments', [GedDocumentController::class, 'addAttachment']);
+    Route::post('/ged/documents/{document}/links', [GedDocumentController::class, 'link']);
+    Route::delete('/ged/documents/{document}/links/{link}', [GedDocumentController::class, 'unlink']);
+    Route::post('/ged/documents/{document}/share', [GedDocumentController::class, 'share']);
+    Route::delete('/ged/documents/{document}/share/{rule}', [GedDocumentController::class, 'revokeShare']);
+
+    Route::get('/ged/classification-nodes', [GedClassificationController::class, 'index']);
+    Route::post('/ged/classification-nodes', [GedClassificationController::class, 'store']);
+    Route::put('/ged/classification-nodes/{classificationNode}', [GedClassificationController::class, 'update']);
+    Route::delete('/ged/classification-nodes/{classificationNode}', [GedClassificationController::class, 'destroy']);
+
+    Route::get('/ged/categories', [GedCategoryController::class, 'index']);
+    Route::post('/ged/categories', [GedCategoryController::class, 'store']);
+    Route::put('/ged/categories/{documentCategory}', [GedCategoryController::class, 'update']);
+    Route::delete('/ged/categories/{documentCategory}', [GedCategoryController::class, 'destroy']);
+
+    Route::get('/ged/tags', [GedTagController::class, 'index']);
+    Route::get('/ged/favorites', [GedEngagementController::class, 'favorites']);
+    Route::get('/ged/recent', [GedEngagementController::class, 'recent']);
+    Route::post('/ged/documents/{document}/favorite', [GedEngagementController::class, 'toggleFavorite']);
+    Route::post('/ged/documents/{document}/legal-hold', [GedLifecycleController::class, 'legalHold']);
+    Route::delete('/ged/documents/{document}/legal-hold', [GedLifecycleController::class, 'releaseLegalHold']);
+    Route::post('/ged/documents/{document}/reindex', [GedLifecycleController::class, 'reindex']);
+    Route::get('/ged/documents/{document}/export', [GedLifecycleController::class, 'export']);
+    Route::get('/ged/indicators', [GedLifecycleController::class, 'indicators']);
+    Route::get('/ged/retention-rules', [GedLifecycleController::class, 'retentionRules']);
+    Route::post('/ged/retention-rules', [GedLifecycleController::class, 'storeRetentionRule']);
+    Route::get('/ged/classification-rules', [GedLifecycleController::class, 'classificationRules']);
+    Route::post('/ged/classification-rules', [GedLifecycleController::class, 'storeClassificationRule']);
+
+    Route::get('/meta/document-categories', [GedCategoryController::class, 'index']);
+    Route::get('/meta/classification-nodes', [GedClassificationController::class, 'index']);
+    Route::get('/meta/document-tags', [GedTagController::class, 'index']);
+
     Route::post('/parapheur/documents/{document}/transmit', [DocumentController::class, 'transmit']);
     Route::post('/parapheur/documents/{document}/reassign', [DocumentController::class, 'reassign']);
     Route::post('/parapheur/documents/{document}/acknowledge', [DocumentController::class, 'acknowledge']);

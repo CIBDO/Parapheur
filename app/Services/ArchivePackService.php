@@ -12,18 +12,22 @@ use ZipArchive;
 
 class ArchivePackService
 {
-    public function build(Document $document, User $actor): array
+    public function build(Document $document, User $actor, bool $allowActive = false): array
     {
-        if ($document->status !== DocumentStatus::Archive) {
+        if (! $allowActive && $document->status !== DocumentStatus::Archive) {
             throw new InvalidArgumentException('Seuls les dossiers archivés peuvent être exportés en pack.');
         }
 
         $document->load([
             'type',
+            'category',
             'structure',
+            'ownerStructure',
+            'classificationNode',
             'author',
             'versions',
             'attachments',
+            'tags',
             'comments.user',
             'actions.actor',
             'actions.delegator',
@@ -34,6 +38,8 @@ class ArchivePackService
             'instructions.assignee',
             'transmissions.fromUser',
             'transmissions.toUser',
+            'outgoingLinks.target',
+            'officialVersion',
         ]);
 
         $tmpDir = storage_path('app/tmp/packs');
@@ -56,16 +62,49 @@ class ArchivePackService
                 'id' => $document->id,
                 'uuid' => $document->uuid,
                 'reference' => $document->reference,
+                'dossier_number' => $document->dossier_number,
                 'object' => $document->object,
-                'status' => $document->status->value,
+                'title' => $document->title,
+                'description' => $document->description,
+                'status' => $document->status->value ?? $document->status,
                 'priority' => $document->priority->value ?? $document->priority,
                 'confidentiality' => $document->confidentiality->value ?? $document->confidentiality,
+                'origin' => $document->origin->value ?? $document->origin,
+                'archive_status' => $document->archive_status->value ?? $document->archive_status,
                 'type' => $document->type?->name,
+                'category' => $document->category?->name,
+                'classification' => $document->classificationNode?->path,
                 'structure' => $document->structure?->only(['code', 'name']),
                 'author' => $document->author?->name,
+                'tags' => $document->tags->pluck('name'),
+                'official_version' => $document->officialVersion?->version_number,
                 'archived_at' => optional($document->archived_at)->toIso8601String(),
+                'retention_until' => optional($document->retention_until)?->toDateString(),
             ],
+            'linked_documents' => $document->outgoingLinks->map(fn ($l) => [
+                'relation' => $l->relation_type,
+                'target_id' => $l->target_document_id,
+                'target_reference' => $l->target?->reference,
+                'target_object' => $l->target?->object,
+            ]),
         ], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+
+        $zip->addFromString('synthese.txt', implode("\n", [
+            'FICHE DE SYNTHÈSE GED',
+            str_repeat('=', 60),
+            'Référence : '.$document->reference,
+            'N° dossier : '.($document->dossier_number ?: '—'),
+            'Objet : '.$document->object,
+            'Titre : '.($document->title ?: '—'),
+            'Type : '.($document->type?->name ?: '—'),
+            'Auteur : '.($document->author?->name ?: '—'),
+            'Structure : '.($document->structure?->name ?: '—'),
+            'Statut : '.($document->status->value ?? $document->status),
+            'Confidentialité : '.($document->confidentiality->value ?? $document->confidentiality),
+            'Classement : '.($document->classificationNode?->path ?: '—'),
+            'Version officielle : '.($document->officialVersion?->version_number ?: '—'),
+            'Tags : '.$document->tags->pluck('name')->join(', '),
+        ]));
 
         $zip->addFromString('historique.json', json_encode([
             'actions' => $document->actions,

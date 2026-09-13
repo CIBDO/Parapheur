@@ -20,14 +20,17 @@ class DocumentVersion extends Model
         'size',
         'checksum',
         'is_main',
+        'is_official',
         'uploaded_by',
         'change_note',
+        'change_source',
     ];
 
     protected function casts(): array
     {
         return [
             'is_main' => 'boolean',
+            'is_official' => 'boolean',
         ];
     }
 

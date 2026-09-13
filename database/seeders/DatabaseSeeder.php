@@ -3,8 +3,10 @@
 namespace Database\Seeders;
 
 use App\Models\Document;
+use App\Models\DocumentCategory;
 use App\Models\DocumentTransmission;
 use App\Models\DocumentType;
+use App\Models\ClassificationNode;
 use App\Models\Structure;
 use App\Models\StructureType;
 use App\Models\User;
@@ -29,6 +31,24 @@ class DatabaseSeeder extends Seeder
             'dashboard.dg',
             'dashboard.direction',
             'instructions.manage',
+            'ged.view',
+            'ged.search',
+            'ged.create',
+            'ged.update',
+            'ged.upload',
+            'ged.download',
+            'ged.comment',
+            'ged.create_version',
+            'ged.classify',
+            'ged.archive',
+            'ged.restore',
+            'ged.share',
+            'ged.manage_metadata',
+            'ged.manage_classification',
+            'ged.manage_types',
+            'ged.manage_categories',
+            'ged.view_audit',
+            'ged.manage_retention',
             'meetings.view',
             'meetings.create',
             'meetings.update',
@@ -75,6 +95,15 @@ class DatabaseSeeder extends Seeder
             Permission::findOrCreate($permission);
         }
 
+        $gedBasic = [
+            'ged.view', 'ged.search', 'ged.create', 'ged.update', 'ged.upload',
+            'ged.download', 'ged.comment', 'ged.create_version', 'ged.classify', 'ged.share',
+        ];
+        $gedManage = array_merge($gedBasic, [
+            'ged.archive', 'ged.restore', 'ged.manage_metadata',
+            'ged.manage_classification', 'ged.manage_types', 'ged.manage_categories', 'ged.view_audit',
+        ]);
+
         $appointmentManage = [
             'appointments.view',
             'appointments.create',
@@ -102,22 +131,43 @@ class DatabaseSeeder extends Seeder
             'Administrateur' => $permissions,
             'Directeur Général' => array_merge(
                 ['documents.create', 'documents.act', 'documents.vise', 'documents.validate', 'dashboard.dg', 'instructions.manage', 'meetings.manage', 'reporting.view', 'delegations.manage'],
+                $gedManage,
                 $appointmentManage
             ),
             'DGA' => array_merge(
                 ['documents.create', 'documents.act', 'documents.vise', 'documents.validate', 'dashboard.dg', 'instructions.manage', 'meetings.manage', 'reporting.view'],
+                $gedManage,
                 ['appointments.view', 'appointments.create', 'appointments.view_calendar', 'appointments.validate', 'appointments.manage_notes']
             ),
-            'Conseiller' => ['documents.create', 'documents.act', 'reporting.view', 'meetings.view', 'appointments.view', 'appointments.create', 'appointments.view_calendar'],
+            'Conseiller' => array_merge(
+                ['documents.create', 'documents.act', 'reporting.view', 'meetings.view', 'appointments.view', 'appointments.create', 'appointments.view_calendar'],
+                $gedBasic
+            ),
             'Secrétariat DG' => array_merge(
                 ['documents.create', 'documents.act', 'meetings.manage', 'meetings.view', 'meetings.create', 'meetings.take_official_notes', 'meetings.generate_minutes', 'reporting.view'],
+                $gedManage,
                 $appointmentManage
             ),
-            'Directeur' => ['documents.create', 'documents.act', 'documents.vise', 'documents.validate', 'dashboard.direction', 'reporting.view', 'meetings.manage', 'meetings.view', 'appointments.view', 'appointments.create', 'appointments.view_calendar'],
-            'Chef de division' => ['documents.create', 'documents.act', 'meetings.view', 'appointments.view', 'appointments.create'],
-            'Chef de section' => ['documents.create', 'documents.act', 'meetings.view', 'appointments.view', 'appointments.create'],
-            'Agent' => ['documents.create', 'documents.act', 'meetings.view', 'appointments.view', 'appointments.create'],
-            'Lecteur' => ['meetings.view', 'appointments.view', 'appointments.view_calendar'],
+            'Directeur' => array_merge(
+                ['documents.create', 'documents.act', 'documents.vise', 'documents.validate', 'dashboard.direction', 'reporting.view', 'meetings.manage', 'meetings.view', 'appointments.view', 'appointments.create', 'appointments.view_calendar'],
+                $gedManage
+            ),
+            'Chef de division' => array_merge(
+                ['documents.create', 'documents.act', 'meetings.view', 'appointments.view', 'appointments.create'],
+                $gedBasic
+            ),
+            'Chef de section' => array_merge(
+                ['documents.create', 'documents.act', 'meetings.view', 'appointments.view', 'appointments.create'],
+                $gedBasic
+            ),
+            'Agent' => array_merge(
+                ['documents.create', 'documents.act', 'meetings.view', 'appointments.view', 'appointments.create'],
+                $gedBasic
+            ),
+            'Lecteur' => array_merge(
+                ['meetings.view', 'appointments.view', 'appointments.view_calendar'],
+                ['ged.view', 'ged.search', 'ged.download']
+            ),
         ];
 
         foreach ($roles as $roleName => $perms) {
@@ -287,6 +337,10 @@ class DatabaseSeeder extends Seeder
         }
 
         $this->seedDemoDocuments();
+        $this->seedGedReferentials(
+            Structure::query()->where('code', 'DGTCP')->first(),
+            Structure::query()->where('code', 'DSI')->first(),
+        );
         $this->call(MeetingSeeder::class);
         $this->call(AppointmentSeeder::class);
     }
@@ -414,6 +468,125 @@ class DatabaseSeeder extends Seeder
                 'expected_action' => $sample['expected_action'],
                 'message' => 'Document de démonstration',
             ]);
+        }
+    }
+
+    private function seedGedReferentials(?Structure $dgtcp, ?Structure $dsi): void
+    {
+        $categories = [
+            ['code' => 'ADMIN', 'name' => 'Administratif', 'sort_order' => 1],
+            ['code' => 'TECH', 'name' => 'Technique', 'sort_order' => 2],
+            ['code' => 'FIN', 'name' => 'Financier', 'sort_order' => 3],
+            ['code' => 'JUR', 'name' => 'Juridique', 'sort_order' => 4],
+            ['code' => 'RH', 'name' => 'Ressources humaines', 'sort_order' => 5],
+        ];
+        foreach ($categories as $cat) {
+            DocumentCategory::query()->updateOrCreate(['code' => $cat['code']], $cat + ['is_active' => true]);
+        }
+
+        if (! $dgtcp) {
+            return;
+        }
+
+        $root = ClassificationNode::query()->updateOrCreate(
+            ['parent_id' => null, 'code' => 'DGTCP'],
+            [
+                'structure_id' => $dgtcp->id,
+                'name' => 'DGTCP',
+                'path' => 'DGTCP',
+                'depth' => 0,
+                'sort_order' => 1,
+                'is_active' => true,
+            ]
+        );
+
+        $nodes = [
+            ['code' => 'DG', 'name' => 'Direction Générale', 'sort_order' => 1],
+            ['code' => 'DSI', 'name' => 'DSI', 'sort_order' => 2, 'structure_id' => $dsi?->id],
+            ['code' => 'CP', 'name' => 'Comptabilité publique', 'sort_order' => 3],
+            ['code' => 'TRES', 'name' => 'Trésorerie', 'sort_order' => 4],
+            ['code' => 'RH', 'name' => 'Ressources humaines', 'sort_order' => 5],
+            ['code' => 'ARCH', 'name' => 'Archives institutionnelles', 'sort_order' => 6],
+        ];
+
+        foreach ($nodes as $n) {
+            $child = ClassificationNode::query()->updateOrCreate(
+                ['parent_id' => $root->id, 'code' => $n['code']],
+                [
+                    'structure_id' => $n['structure_id'] ?? $dgtcp->id,
+                    'name' => $n['name'],
+                    'path' => 'DGTCP/'.$n['code'],
+                    'depth' => 1,
+                    'sort_order' => $n['sort_order'],
+                    'is_active' => true,
+                ]
+            );
+
+            if ($n['code'] === 'DSI') {
+                foreach ([
+                    ['code' => 'PROJETS', 'name' => 'Projets'],
+                    ['code' => 'NOTES', 'name' => 'Notes techniques'],
+                    ['code' => 'RAPPORTS', 'name' => 'Rapports'],
+                    ['code' => 'MARCHES', 'name' => 'Marchés'],
+                ] as $i => $sub) {
+                    ClassificationNode::query()->updateOrCreate(
+                        ['parent_id' => $child->id, 'code' => $sub['code']],
+                        [
+                            'structure_id' => $dsi?->id ?? $dgtcp->id,
+                            'name' => $sub['name'],
+                            'path' => 'DGTCP/DSI/'.$sub['code'],
+                            'depth' => 2,
+                            'sort_order' => $i + 1,
+                            'is_active' => true,
+                        ]
+                    );
+                }
+            }
+        }
+
+        $noteType = \App\Models\DocumentType::query()->where('code', 'NOTE')->first()
+            ?? \App\Models\DocumentType::query()->where('code', 'NOTE_TECH')->first();
+        $notesNode = ClassificationNode::query()->where('code', 'NOTES')->first();
+
+        \App\Models\DocumentRetentionRule::query()->updateOrCreate(
+            ['code' => 'DEFAULT_10Y'],
+            [
+                'name' => 'Conservation standard 10 ans',
+                'document_type_id' => null,
+                'category_id' => null,
+                'retention_years' => 10,
+                'final_disposition' => 'archiver',
+                'is_active' => true,
+                'notes' => 'Règle par défaut — aucune destruction automatique.',
+            ]
+        );
+
+        if ($noteType) {
+            \App\Models\DocumentRetentionRule::query()->updateOrCreate(
+                ['code' => 'NOTE_15Y'],
+                [
+                    'name' => 'Notes — 15 ans',
+                    'document_type_id' => $noteType->id,
+                    'retention_years' => 15,
+                    'final_disposition' => 'conserver',
+                    'is_active' => true,
+                ]
+            );
+        }
+
+        if ($notesNode && $noteType && $dsi) {
+            \App\Models\DocumentClassificationRule::query()->updateOrCreate(
+                ['code' => 'AUTO_NOTE_DSI'],
+                [
+                    'name' => 'Notes DSI → Notes techniques',
+                    'document_type_id' => $noteType->id,
+                    'structure_id' => $dsi->id,
+                    'target_classification_node_id' => $notesNode->id,
+                    'trigger_status' => 'valide',
+                    'priority' => 10,
+                    'is_active' => true,
+                ]
+            );
         }
     }
 }

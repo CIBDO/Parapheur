@@ -77,6 +77,8 @@ class User extends Authenticatable
                 ['action' => 'manage', 'subject' => 'MeetingType'],
                 ['action' => 'manage', 'subject' => 'MeetingTemplate'],
                 ['action' => 'manage', 'subject' => 'AppointmentType'],
+                ['action' => 'manage', 'subject' => 'Ged'],
+                ['action' => 'manage', 'subject' => 'GedAdmin'],
                 ['action' => 'read', 'subject' => 'AuditLog'],
                 ['action' => 'read', 'subject' => 'Notification'],
                 ['action' => 'read', 'subject' => 'Parapheur'],
@@ -157,6 +159,25 @@ class User extends Authenticatable
         if ($this->can('delegations.manage')) {
             $rules[] = ['action' => 'manage', 'subject' => 'Delegation'];
             $rules[] = ['action' => 'read', 'subject' => 'DashboardDg'];
+        }
+
+        if ($this->can('ged.view') || $this->can('ged.search')) {
+            $rules[] = ['action' => 'read', 'subject' => 'Ged'];
+            $rules[] = ['action' => 'read', 'subject' => 'Document'];
+        }
+
+        if ($this->can('ged.create')) {
+            $rules[] = ['action' => 'create', 'subject' => 'Ged'];
+            $rules[] = ['action' => 'create', 'subject' => 'Document'];
+        }
+
+        if ($this->can('ged.update') || $this->can('ged.classify') || $this->can('ged.archive')) {
+            $rules[] = ['action' => 'update', 'subject' => 'Ged'];
+            $rules[] = ['action' => 'manage', 'subject' => 'Ged'];
+        }
+
+        if ($this->can('ged.manage_classification') || $this->can('ged.manage_categories') || $this->can('ged.manage_types')) {
+            $rules[] = ['action' => 'manage', 'subject' => 'GedAdmin'];
         }
 
         return $rules;

@@ -205,7 +205,7 @@ onMounted(async () => {
   const [u, s, docs] = await Promise.all([
     $api('/meta/users'),
     $api('/meta/structures'),
-    $api('/parapheur/documents', { query: { per_page: 50 } }).catch(() => ({ data: [] })),
+    $api('/ged/documents', { query: { per_page: 50 } }).catch(() => ({ data: [] })),
   ])
   users.value = u
   structures.value = s

@@ -82,7 +82,7 @@ const load = async () => {
 onMounted(async () => {
   const [people, docs] = await Promise.all([
     $api('/meta/users'),
-    $api('/parapheur/documents').catch(() => ({ data: [] })),
+    $api('/ged/documents', { query: { per_page: 50 } }).catch(() => ({ data: [] })),
   ])
   users.value = people
   documents.value = docs.data ?? docs

@@ -23,6 +23,8 @@ export type Subjects =
   | 'AuditLog'
   | 'Notification'
   | 'Delegation'
+  | 'Ged'
+  | 'GedAdmin'
   | 'Post'
   | 'Comment'
   | 'AclDemo'

@@ -43,6 +43,8 @@ export const actionLabels: Record<string, string> = {
   instruction: 'Pour instruction',
   visa: 'Pour visa',
   validation: 'Pour validation',
+  revision: 'Pour révision',
+  signature: 'Pour signature',
 }
 
 export const folderMeta: Array<{

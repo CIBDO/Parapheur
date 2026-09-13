@@ -568,6 +568,14 @@ const circuitSteps = computed(() => {
         </div>
       </div>
       <div class="d-flex flex-wrap align-center gap-2">
+        <VBtn
+          variant="tonal"
+          size="small"
+          prepend-icon="tabler-folders"
+          :to="{ name: 'ged-id', params: { id: String(dossier.id) } }"
+        >
+          Fiche GED
+        </VBtn>
         <VChip
           label
           :color="statusColor(dossier.status)"
@@ -1183,6 +1191,37 @@ const circuitSteps = computed(() => {
                   </template>
                   <span v-else>—</span>
                 </div>
+              </div>
+              <div>
+                <div class="text-caption text-medium-emphasis">
+                  Classement GED
+                </div>
+                <div>{{ dossier.classification_node?.path || dossier.classification_node?.name || '—' }}</div>
+              </div>
+              <div>
+                <div class="text-caption text-medium-emphasis">
+                  Tags GED
+                </div>
+                <div>
+                  <template v-if="dossier.tags?.length">
+                    <VChip
+                      v-for="tag in dossier.tags"
+                      :key="tag.id"
+                      size="small"
+                      class="me-1 mb-1"
+                      label
+                    >
+                      #{{ tag.name }}
+                    </VChip>
+                  </template>
+                  <span v-else>—</span>
+                </div>
+              </div>
+              <div v-if="dossier.official_version">
+                <div class="text-caption text-medium-emphasis">
+                  Version officielle
+                </div>
+                <div>v{{ dossier.official_version.version_number }}</div>
               </div>
             </div>
           </VCardText>

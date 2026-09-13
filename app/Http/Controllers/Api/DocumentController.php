@@ -181,11 +181,15 @@ class DocumentController extends Controller
 
         $document->load([
             'type',
+            'category',
             'structure',
+            'ownerStructure',
+            'classificationNode',
             'author',
             'currentAssignee',
             'versions.uploader',
             'attachments.uploader',
+            'tags',
             'comments.user',
             'actions.actor',
             'actions.delegator',
@@ -195,6 +199,9 @@ class DocumentController extends Controller
             'transmissions.toUser',
             'instructions.assignee',
             'workflowInstance.workflow.steps',
+            'officialVersion',
+            'outgoingLinks.target.type',
+            'incomingLinks.source.type',
         ]);
 
         $userId = $request->user()->id;
@@ -557,6 +564,7 @@ class DocumentController extends Controller
         abort_unless($version->document_id === $document->id, 404);
         $user = User::query()->findOrFail($request->integer('user'));
         $this->access->authorize($user, $document);
+        abort_if($document->antivirus_status === 'infected', 422, 'Fichier identifié comme dangereux : accès refusé.');
         $this->signedDownloads->consume($request, $document, $user, [
             SignedDownloadService::PURPOSE_DOWNLOAD,
             SignedDownloadService::PURPOSE_ONLYOFFICE,
@@ -571,6 +579,7 @@ class DocumentController extends Controller
         abort_unless($version->document_id === $document->id, 404);
         $user = User::query()->findOrFail($request->integer('user'));
         $this->access->authorize($user, $document);
+        abort_if($document->antivirus_status === 'infected', 422, 'Fichier identifié comme dangereux : accès refusé.');
         $this->signedDownloads->consume($request, $document, $user, [
             SignedDownloadService::PURPOSE_STREAM,
         ]);
@@ -586,6 +595,7 @@ class DocumentController extends Controller
         abort_unless($attachment->document_id === $document->id, 404);
         $user = User::query()->findOrFail($request->integer('user'));
         $this->access->authorize($user, $document);
+        abort_if($document->antivirus_status === 'infected', 422, 'Fichier identifié comme dangereux : accès refusé.');
         $this->signedDownloads->consume($request, $document, $user, [
             SignedDownloadService::PURPOSE_DOWNLOAD,
         ]);

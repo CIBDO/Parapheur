@@ -72,7 +72,7 @@ onMounted(async () => {
     $api('/meta/users'),
     $api('/meetings/types'),
     $api('/meta/structures'),
-    $api('/parapheur/documents').catch(() => ({ data: [] })),
+    $api('/ged/documents', { query: { per_page: 50 } }).catch(() => ({ data: [] })),
     $api('/meetings', { query: { per_page: 50 } }),
   ])
   users.value = people

@@ -40,9 +40,16 @@ class DocumentWorkflowService
             $document = Document::query()->create([
                 'uuid' => (string) Str::uuid(),
                 'reference' => $data['reference'] ?? $this->generateReference($author),
+                'dossier_number' => $data['dossier_number'] ?? null,
                 'object' => $data['object'],
+                'title' => $data['title'] ?? $data['object'],
+                'description' => $data['description'] ?? null,
+                'summary' => $data['summary'] ?? null,
                 'document_type_id' => $data['document_type_id'],
+                'category_id' => $data['category_id'] ?? null,
                 'structure_id' => $data['structure_id'] ?? $author->structure_id,
+                'owner_structure_id' => $data['owner_structure_id'] ?? ($data['structure_id'] ?? $author->structure_id),
+                'classification_node_id' => $data['classification_node_id'] ?? null,
                 'author_id' => $author->id,
                 'status' => DocumentStatus::Brouillon,
                 'priority' => $data['priority'] ?? 'normale',
@@ -51,6 +58,10 @@ class DocumentWorkflowService
                 'document_date' => $data['document_date'] ?? now()->toDateString(),
                 'due_date' => $data['due_date'] ?? null,
                 'keywords' => $data['keywords'] ?? [],
+                'origin' => $data['origin'] ?? 'parapheur',
+                'language' => $data['language'] ?? 'fr',
+                'source' => $data['source'] ?? null,
+                'archive_status' => $data['archive_status'] ?? 'actif',
                 'current_version' => $mainFile ? 1 : 0,
             ]);
 
@@ -684,6 +695,12 @@ class DocumentWorkflowService
                 'decided_at' => now(),
             ]);
 
+            // Marquer la version principale comme version officielle validée.
+            DocumentVersion::query()
+                ->where('document_id', $document->id)
+                ->where('is_main', true)
+                ->update(['is_official' => true]);
+
             $suffix = $delegator
                 ? sprintf(' (par délégation de %s)', $delegator->name)
                 : '';
@@ -718,7 +735,17 @@ class DocumentWorkflowService
                 }
             }
 
-            return $result->fresh(['type', 'structure', 'author', 'currentAssignee', 'visas', 'approvals']);
+            $result = $result->fresh(['type', 'structure', 'author', 'currentAssignee', 'visas', 'approvals']);
+
+            // P1 : classement automatique + règle de conservation
+            try {
+                app(DocumentAutoClassificationService::class)->applyAfterStatus($result, 'valide', $actor);
+                app(DocumentRetentionService::class)->applyMatchingRule($result);
+            } catch (\Throwable $e) {
+                report($e);
+            }
+
+            return $result->fresh(['type', 'structure', 'author', 'currentAssignee', 'visas', 'approvals', 'classificationNode']);
         });
     }
 
@@ -844,8 +871,10 @@ class DocumentWorkflowService
                 'size' => $stored['size'],
                 'checksum' => $stored['checksum'],
                 'is_main' => true,
+                'is_official' => false,
                 'uploaded_by' => $user->id,
                 'change_note' => $note,
+                'change_source' => 'onlyoffice',
             ]);
 
             $document->current_version = $version->version_number;
@@ -1096,8 +1125,10 @@ class DocumentWorkflowService
             'size' => $stored['size'],
             'checksum' => $stored['checksum'],
             'is_main' => true,
+            'is_official' => false,
             'uploaded_by' => $user->id,
             'change_note' => $note,
+            'change_source' => 'upload',
         ]);
     }
 
@@ -1121,9 +1152,9 @@ class DocumentWorkflowService
     {
         return match ($action) {
             ExpectedAction::Information => ParapheurFolder::PourInformation,
-            ExpectedAction::Consultation, ExpectedAction::Avis, ExpectedAction::Observations, ExpectedAction::Instruction => ParapheurFolder::AConsulter,
+            ExpectedAction::Consultation, ExpectedAction::Avis, ExpectedAction::Observations, ExpectedAction::Instruction, ExpectedAction::Revision => ParapheurFolder::AConsulter,
             ExpectedAction::Visa => ParapheurFolder::AViser,
-            ExpectedAction::Validation => ParapheurFolder::AValider,
+            ExpectedAction::Validation, ExpectedAction::Signature => ParapheurFolder::AValider,
         };
     }
 

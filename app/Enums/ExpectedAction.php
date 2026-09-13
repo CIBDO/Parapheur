@@ -11,6 +11,8 @@ enum ExpectedAction: string
     case Instruction = 'instruction';
     case Visa = 'visa';
     case Validation = 'validation';
+    case Revision = 'revision';
+    case Signature = 'signature';
 
     public function label(): string
     {
@@ -22,6 +24,8 @@ enum ExpectedAction: string
             self::Instruction => 'Pour instruction',
             self::Visa => 'Pour visa',
             self::Validation => 'Pour validation',
+            self::Revision => 'Pour révision',
+            self::Signature => 'Pour signature',
         };
     }
 }

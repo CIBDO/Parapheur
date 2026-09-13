@@ -166,7 +166,10 @@ class DocumentConfidentialityAccessTest extends TestCase
                 'expected_action' => 'validation',
             ])
             ->assertStatus(422)
-            ->assertJsonFragment(['message' => 'Le destinataire n’a pas le niveau d’habilitation requis pour ce document.']);
+            ->assertJsonFragment(['message' => sprintf(
+                'Le destinataire %s n’a pas le niveau d’habilitation requis pour ce document.',
+                $plainAgent->name
+            )]);
     }
 
     public function test_upload_rejects_disallowed_extension(): void
