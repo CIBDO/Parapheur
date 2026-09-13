@@ -6,6 +6,7 @@ import {
   correspondenceStatusColors,
   detailRouteName,
   formatCorrespondenceNumber,
+  formatCourrierDate,
   listItems,
   statusLabel,
 } from '@/utils/courrierUi'
@@ -143,6 +144,9 @@ async function performSearch() {
           >
             {{ statusLabel(item.status) }}
           </VChip>
+        </template>
+        <template #item.correspondence_date="{ item }">
+          {{ formatCourrierDate(item.correspondence_date) }}
         </template>
       </VDataTable>
     </VCard>

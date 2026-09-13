@@ -230,6 +230,7 @@ class CorrespondenceService
         $query = Correspondence::query()
             ->with([
                 'structure', 'registeredBy', 'channel', 'category', 'qualification', 'document',
+                'parties.correspondent',
                 'assignments.toUser:id,name', 'assignments.toStructure:id,name,code',
             ]);
 

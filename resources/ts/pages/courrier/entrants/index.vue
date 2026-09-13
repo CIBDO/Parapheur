@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { useCorrespondence } from '@/composables/useCorrespondence'
-import { directionLabel, formatCorrespondenceNumber, statusLabel, correspondenceStatusColors, correspondencePriorityColors } from '@/utils/courrierUi'
+import { formatCorrespondenceNumber, formatCourrierDateTime, statusLabel, correspondenceStatusColors, correspondencePriorityColors } from '@/utils/courrierUi'
 
 definePage({
   meta: {
@@ -30,7 +30,6 @@ const headers = [
   { title: 'Objet', key: 'subject' },
   { title: 'Priorité', key: 'priority' },
   { title: 'Statut', key: 'status' },
-  { title: 'Échéance', key: 'due_date' },
   { title: 'Reçu le', key: 'received_at' },
 ]
 </script>
@@ -99,7 +98,7 @@ const headers = [
           </VChip>
         </template>
         <template #item.received_at="{ item }">
-          {{ item.received_at ? new Date(item.received_at).toLocaleString() : '—' }}
+          {{ formatCourrierDateTime(item.received_at) }}
         </template>
       </VDataTable>
     </VCard>

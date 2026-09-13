@@ -89,6 +89,8 @@ declare global {
   const formatAppointmentSlot: typeof import('./resources/ts/utils/appointmentsUi')['formatAppointmentSlot']
   const formatBytes: typeof import('./resources/ts/utils/workspaceUi')['formatBytes']
   const formatCorrespondenceNumber: typeof import('./resources/ts/utils/courrierUi')['formatCorrespondenceNumber']
+  const formatCourrierDate: typeof import('./resources/ts/utils/courrierUi')['formatCourrierDate']
+  const formatCourrierDateTime: typeof import('./resources/ts/utils/courrierUi')['formatCourrierDateTime']
   const formatDate: typeof import('./resources/ts/@core/utils/formatters')['formatDate']
   const formatDateFr: typeof import('./resources/ts/utils/parapheurUi')['formatDateFr']
   const formatDateTimeFr: typeof import('./resources/ts/utils/parapheurUi')['formatDateTimeFr']
@@ -111,6 +113,8 @@ declare global {
   const getCurrentScope: typeof import('vue')['getCurrentScope']
   const getTemplateCategoryLabel: typeof import('./resources/ts/utils/courrierUi')['getTemplateCategoryLabel']
   const getTemplateKindLabel: typeof import('./resources/ts/utils/courrierUi')['getTemplateKindLabel']
+  const getTransmissionSlipNatureLabel: typeof import('./resources/ts/utils/courrierUi')['getTransmissionSlipNatureLabel']
+  const getTransmissionSlipStatusColor: typeof import('./resources/ts/utils/courrierUi')['getTransmissionSlipStatusColor']
   const getTransmissionSlipStatusLabel: typeof import('./resources/ts/utils/courrierUi')['getTransmissionSlipStatusLabel']
   const h: typeof import('vue')['h']
   const hexToRgb: typeof import('./resources/ts/@core/utils/colorConverter')['hexToRgb']
@@ -230,6 +234,8 @@ declare global {
   const toRef: typeof import('vue')['toRef']
   const toRefs: typeof import('vue')['toRefs']
   const toValue: typeof import('vue')['toValue']
+  const transmissionSlipNatureLabels: typeof import('./resources/ts/utils/courrierUi')['transmissionSlipNatureLabels']
+  const transmissionSlipStatusColors: typeof import('./resources/ts/utils/courrierUi')['transmissionSlipStatusColors']
   const transmissionSlipStatusLabels: typeof import('./resources/ts/utils/courrierUi')['transmissionSlipStatusLabels']
   const triggerRef: typeof import('vue')['triggerRef']
   const tryOnBeforeMount: typeof import('@vueuse/core')['tryOnBeforeMount']
@@ -538,6 +544,8 @@ declare module 'vue' {
     readonly formatAppointmentSlot: UnwrapRef<typeof import('./resources/ts/utils/appointmentsUi')['formatAppointmentSlot']>
     readonly formatBytes: UnwrapRef<typeof import('./resources/ts/utils/workspaceUi')['formatBytes']>
     readonly formatCorrespondenceNumber: UnwrapRef<typeof import('./resources/ts/utils/courrierUi')['formatCorrespondenceNumber']>
+    readonly formatCourrierDate: UnwrapRef<typeof import('./resources/ts/utils/courrierUi')['formatCourrierDate']>
+    readonly formatCourrierDateTime: UnwrapRef<typeof import('./resources/ts/utils/courrierUi')['formatCourrierDateTime']>
     readonly formatDate: UnwrapRef<typeof import('./resources/ts/@core/utils/formatters')['formatDate']>
     readonly formatDateFr: UnwrapRef<typeof import('./resources/ts/utils/parapheurUi')['formatDateFr']>
     readonly formatDateTimeFr: UnwrapRef<typeof import('./resources/ts/utils/parapheurUi')['formatDateTimeFr']>
@@ -553,6 +561,9 @@ declare module 'vue' {
     readonly getCurrentScope: UnwrapRef<typeof import('vue')['getCurrentScope']>
     readonly getTemplateCategoryLabel: UnwrapRef<typeof import('./resources/ts/utils/courrierUi')['getTemplateCategoryLabel']>
     readonly getTemplateKindLabel: UnwrapRef<typeof import('./resources/ts/utils/courrierUi')['getTemplateKindLabel']>
+    readonly getTransmissionSlipNatureLabel: UnwrapRef<typeof import('./resources/ts/utils/courrierUi')['getTransmissionSlipNatureLabel']>
+    readonly getTransmissionSlipStatusColor: UnwrapRef<typeof import('./resources/ts/utils/courrierUi')['getTransmissionSlipStatusColor']>
+    readonly getTransmissionSlipStatusLabel: UnwrapRef<typeof import('./resources/ts/utils/courrierUi')['getTransmissionSlipStatusLabel']>
     readonly h: UnwrapRef<typeof import('vue')['h']>
     readonly hexToRgb: UnwrapRef<typeof import('./resources/ts/@core/utils/colorConverter')['hexToRgb']>
     readonly ignorableWatch: UnwrapRef<typeof import('@vueuse/core')['ignorableWatch']>
@@ -670,6 +681,8 @@ declare module 'vue' {
     readonly toRef: UnwrapRef<typeof import('vue')['toRef']>
     readonly toRefs: UnwrapRef<typeof import('vue')['toRefs']>
     readonly toValue: UnwrapRef<typeof import('vue')['toValue']>
+    readonly transmissionSlipNatureLabels: UnwrapRef<typeof import('./resources/ts/utils/courrierUi')['transmissionSlipNatureLabels']>
+    readonly transmissionSlipStatusColors: UnwrapRef<typeof import('./resources/ts/utils/courrierUi')['transmissionSlipStatusColors']>
     readonly transmissionSlipStatusLabels: UnwrapRef<typeof import('./resources/ts/utils/courrierUi')['transmissionSlipStatusLabels']>
     readonly triggerRef: UnwrapRef<typeof import('vue')['triggerRef']>
     readonly tryOnBeforeMount: UnwrapRef<typeof import('@vueuse/core')['tryOnBeforeMount']>

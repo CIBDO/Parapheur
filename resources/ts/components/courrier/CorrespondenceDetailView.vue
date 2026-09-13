@@ -108,10 +108,15 @@ const traitementForm = ref({
   structure_id: null as number | null,
   channel_id: null as number | null,
   category_id: null as number | null,
+  from_structure_id: null as number | null,
+  to_structure_id: null as number | null,
 })
 
 const structureItems = computed(() =>
-  structures.value.map(s => ({ value: s.id, title: s.name || s.code })),
+  structures.value.map(s => ({
+    value: s.id,
+    title: s.code ? `${s.code} — ${s.name}` : (s.name || s.code),
+  })),
 )
 const channelItems = computed(() =>
   channels.value.map(c => ({ value: c.id, title: c.name || c.code })),
@@ -378,6 +383,22 @@ function startEditParties() {
   editingParties.value = true
 }
 
+function findStructureIdByParty(party: any): number | null {
+  if (!party)
+    return null
+  const name = (partyDisplayName(party) || '').trim().toLowerCase()
+  const org = String(party.organization || party.correspondent?.organization || '').trim().toLowerCase()
+  const match = structures.value.find((s: any) => {
+    const sName = String(s.name || '').trim().toLowerCase()
+    const sCode = String(s.code || '').trim().toLowerCase()
+
+    return (name && (sName === name || sCode === name))
+      || (org && (sCode === org || sName === org))
+  })
+
+  return match?.id ?? null
+}
+
 function startEditTraitement() {
   traitementForm.value = {
     structure_id: props.correspondence.structure?.id
@@ -389,6 +410,8 @@ function startEditTraitement() {
     category_id: props.correspondence.category?.id
       ?? (props.correspondence as any).category_id
       ?? null,
+    from_structure_id: isInterne.value ? findStructureIdByParty(fromParty.value) : null,
+    to_structure_id: isInterne.value ? findStructureIdByParty(toParties.value[0]) : null,
   }
   editingTraitement.value = true
 }
@@ -396,11 +419,51 @@ function startEditTraitement() {
 async function saveTraitement() {
   savingTraitement.value = true
   try {
-    await updateCorrespondence(props.correspondence.id, {
-      structure_id: traitementForm.value.structure_id,
-      channel_id: traitementForm.value.channel_id,
-      category_id: traitementForm.value.category_id,
-    })
+    if (isInterne.value) {
+      const fromId = traitementForm.value.from_structure_id
+      const toId = traitementForm.value.to_structure_id
+      if (!fromId || !toId) {
+        alert('Sélectionnez les structures expéditrice et destinataire.')
+
+        return
+      }
+      if (fromId === toId) {
+        alert('L’expéditeur et le destinataire doivent être des structures différentes.')
+
+        return
+      }
+
+      await updateCorrespondence(props.correspondence.id, {
+        structure_id: traitementForm.value.structure_id || fromId,
+        channel_id: traitementForm.value.channel_id,
+        category_id: traitementForm.value.category_id,
+      })
+
+      const from = structures.value.find((s: any) => s.id === fromId)
+      const to = structures.value.find((s: any) => s.id === toId)
+      if (from && to) {
+        await syncParties(props.correspondence.id, [
+          {
+            role: 'from',
+            name: from.name,
+            organization: from.code || from.name,
+          },
+          {
+            role: 'to',
+            name: to.name,
+            organization: to.code || to.name,
+          },
+        ])
+      }
+    }
+    else {
+      await updateCorrespondence(props.correspondence.id, {
+        structure_id: traitementForm.value.structure_id,
+        channel_id: traitementForm.value.channel_id,
+        category_id: traitementForm.value.category_id,
+      })
+    }
+
     editingTraitement.value = false
     emit('refresh')
   }
@@ -827,7 +890,7 @@ async function archiveCorrespondence() {
                     Identification
                   </div>
                   <div class="courrier-meta-grid">
-                    <template v-if="!isSortant">
+                    <template v-if="!isSortant && !isInterne">
                       <div class="courrier-meta-grid__label">
                         N° arrivée
                       </div>
@@ -835,12 +898,14 @@ async function archiveCorrespondence() {
                         {{ correspondence.arrival_number || '—' }}
                       </div>
                     </template>
-                    <div class="courrier-meta-grid__label">
-                      {{ isSortant ? 'N° départ (DEP)' : 'N° départ' }}
-                    </div>
-                    <div class="courrier-meta-grid__value font-weight-medium">
-                      {{ correspondence.departure_number || (isSortant ? 'Non attribué (projet)' : '—') }}
-                    </div>
+                    <template v-if="!isInterne">
+                      <div class="courrier-meta-grid__label">
+                        {{ isSortant ? 'N° départ (DEP)' : 'N° départ' }}
+                      </div>
+                      <div class="courrier-meta-grid__value font-weight-medium">
+                        {{ correspondence.departure_number || (isSortant ? 'Non attribué (projet)' : '—') }}
+                      </div>
+                    </template>
                     <div class="courrier-meta-grid__label">
                       Réf. externe
                     </div>
@@ -853,7 +918,7 @@ async function archiveCorrespondence() {
                     <div class="courrier-meta-grid__value">
                       {{ formatDate(correspondence.correspondence_date) }}
                     </div>
-                    <template v-if="!isSortant">
+                    <template v-if="!isSortant && !isInterne">
                       <div class="courrier-meta-grid__label">
                         Réception
                       </div>
@@ -992,7 +1057,7 @@ async function archiveCorrespondence() {
                         icon="tabler-git-fork"
                         size="20"
                       />
-                      {{ isSortant ? 'Préparation / envoi' : 'Traitement' }}
+                      {{ isSortant ? 'Préparation / envoi' : (isInterne ? 'Transmission interne' : 'Traitement') }}
                     </div>
                     <div class="d-flex ga-2">
                       <template v-if="!editingTraitement">
@@ -1030,7 +1095,28 @@ async function archiveCorrespondence() {
                     v-if="editingTraitement"
                     class="d-flex flex-column ga-3"
                   >
+                    <template v-if="isInterne">
+                      <AppSelect
+                        v-model="traitementForm.from_structure_id"
+                        :items="structureItems"
+                        label="Structure / service expéditeur *"
+                      />
+                      <AppSelect
+                        v-model="traitementForm.to_structure_id"
+                        :items="structureItems"
+                        label="Structure / service destinataire *"
+                      />
+                      <AppSelect
+                        v-model="traitementForm.structure_id"
+                        :items="structureItems"
+                        label="Structure de rattachement"
+                        clearable
+                        hint="Par défaut : structure émettrice"
+                        persistent-hint
+                      />
+                    </template>
                     <AppSelect
+                      v-else
                       v-model="traitementForm.structure_id"
                       :items="structureItems"
                       :label="isSortant ? 'Structure émettrice' : 'Structure'"
@@ -1039,7 +1125,7 @@ async function archiveCorrespondence() {
                     <AppSelect
                       v-model="traitementForm.channel_id"
                       :items="channelItems"
-                      :label="isSortant ? 'Canal d\'envoi' : 'Canal'"
+                      :label="isSortant || isInterne ? 'Canal de transmission' : 'Canal'"
                       clearable
                     />
                     <AppSelect
@@ -1054,14 +1140,58 @@ async function archiveCorrespondence() {
                     v-else
                     class="courrier-meta-grid"
                   >
+                    <template v-if="isInterne">
+                      <div class="courrier-meta-grid__label">
+                        De (émetteur)
+                      </div>
+                      <div class="courrier-meta-grid__value">
+                        {{ partyDisplayName(fromParty) || '—' }}
+                        <div
+                          v-if="fromParty?.organization"
+                          class="text-caption text-medium-emphasis"
+                        >
+                          {{ fromParty.organization }}
+                        </div>
+                      </div>
+                      <div class="courrier-meta-grid__label">
+                        À (destinataire)
+                      </div>
+                      <div class="courrier-meta-grid__value">
+                        <template v-if="toParties.length">
+                          <div
+                            v-for="(party, idx) in toParties"
+                            :key="party.id || idx"
+                          >
+                            {{ partyDisplayName(party) || '—' }}
+                            <span
+                              v-if="party.organization"
+                              class="text-caption text-medium-emphasis"
+                            >
+                              ({{ party.organization }})
+                            </span>
+                          </div>
+                        </template>
+                        <template v-else>
+                          —
+                        </template>
+                      </div>
+                      <div class="courrier-meta-grid__label">
+                        Rattachement
+                      </div>
+                      <div class="courrier-meta-grid__value">
+                        {{ correspondence.structure?.name || '—' }}
+                      </div>
+                    </template>
+                    <template v-else>
+                      <div class="courrier-meta-grid__label">
+                        {{ isSortant ? 'Structure émettrice' : 'Structure' }}
+                      </div>
+                      <div class="courrier-meta-grid__value">
+                        {{ correspondence.structure?.name || '—' }}
+                      </div>
+                    </template>
                     <div class="courrier-meta-grid__label">
-                      {{ isSortant ? 'Structure émettrice' : 'Structure' }}
-                    </div>
-                    <div class="courrier-meta-grid__value">
-                      {{ correspondence.structure?.name || '—' }}
-                    </div>
-                    <div class="courrier-meta-grid__label">
-                      {{ isSortant ? 'Canal d\'envoi' : 'Canal' }}
+                      {{ isSortant || isInterne ? 'Canal de transmission' : 'Canal' }}
                     </div>
                     <div class="courrier-meta-grid__value">
                       {{ correspondence.channel?.name || '—' }}
@@ -1103,6 +1233,20 @@ async function archiveCorrespondence() {
                         {{ correspondence.owner_user?.name || correspondence.registered_by?.name || '—' }}
                       </div>
                     </template>
+                    <template v-else-if="isInterne">
+                      <div class="courrier-meta-grid__label">
+                        Enregistré par
+                      </div>
+                      <div class="courrier-meta-grid__value">
+                        {{ correspondence.registered_by?.name || '—' }}
+                      </div>
+                      <div class="courrier-meta-grid__label">
+                        Suivi / affectation
+                      </div>
+                      <div class="courrier-meta-grid__value">
+                        {{ currentAssignee || 'Non affecté' }}
+                      </div>
+                    </template>
                     <template v-else>
                       <div class="courrier-meta-grid__label">
                         Affecté à
@@ -1112,7 +1256,7 @@ async function archiveCorrespondence() {
                       </div>
                     </template>
                     <div class="courrier-meta-grid__label">
-                      {{ isSortant ? 'Document (projet / signé)' : 'Document GED' }}
+                      {{ isSortant || isInterne ? 'Document joint' : 'Document GED' }}
                     </div>
                     <div class="courrier-meta-grid__value">
                       <RouterLink
@@ -1121,7 +1265,7 @@ async function archiveCorrespondence() {
                       >
                         #{{ correspondence.document.id }}
                       </RouterLink>
-                      <span v-else>{{ isSortant ? 'Aucun document joint' : 'Aucun' }}</span>
+                      <span v-else>Aucun document joint</span>
                     </div>
                   </div>
                 </div>

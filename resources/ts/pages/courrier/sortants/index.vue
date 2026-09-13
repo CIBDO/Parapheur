@@ -4,6 +4,7 @@ import { useCorrespondence } from '@/composables/useCorrespondence'
 import {
   correspondenceStatusColors,
   formatCorrespondenceNumber,
+  formatCourrierDate,
   listItems,
   statusLabel,
 } from '@/utils/courrierUi'
@@ -84,6 +85,9 @@ const items = computed(() => listItems(correspondences.value))
           >
             {{ statusLabel(item.status, 'sortant') }}
           </VChip>
+        </template>
+        <template #item.correspondence_date="{ item }">
+          {{ formatCourrierDate(item.correspondence_date) }}
         </template>
       </VDataTable>
     </VCard>

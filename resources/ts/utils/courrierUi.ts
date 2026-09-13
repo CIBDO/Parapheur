@@ -103,6 +103,28 @@ export function formatCorrespondenceNumber(item: {
   return item.arrival_number || item.departure_number || `#${item.id}`
 }
 
+/** Affiche une date au format fr-FR (jj/mm/aaaa). */
+export function formatCourrierDate(date?: string | null) {
+  if (!date)
+    return '—'
+  const d = new Date(date)
+  if (Number.isNaN(d.getTime()))
+    return '—'
+
+  return d.toLocaleDateString('fr-FR')
+}
+
+/** Affiche date + heure au format fr-FR. */
+export function formatCourrierDateTime(date?: string | null) {
+  if (!date)
+    return '—'
+  const d = new Date(date)
+  if (Number.isNaN(d.getTime()))
+    return '—'
+
+  return d.toLocaleString('fr-FR')
+}
+
 export function statusLabel(status?: string | null, direction?: string | null) {
   if (!status)
     return '—'
@@ -153,6 +175,43 @@ export const transmissionSlipStatusLabels: Record<string, string> = {
   retourne: 'Retourné',
   cloture: 'Clôturé',
   annule: 'Annulé',
+}
+
+export const transmissionSlipStatusColors: Record<string, string> = {
+  brouillon: 'secondary',
+  genere: 'info',
+  en_modification: 'warning',
+  a_valider: 'warning',
+  valide: 'primary',
+  imprime: 'teal',
+  transmis: 'success',
+  recu: 'success',
+  retourne: 'orange',
+  cloture: 'default',
+  annule: 'error',
+}
+
+export const transmissionSlipNatureLabels: Record<string, string> = {
+  pour_traitement: 'Pour traitement',
+  pour_information: 'Pour information',
+  pour_avis: 'Pour avis',
+  pour_signature: 'Pour signature',
+  retour: 'Retour',
+  autre: 'Autre',
+}
+
+export function getTransmissionSlipStatusLabel(status?: string | null) {
+  return transmissionSlipStatusLabels[status || ''] || status || '—'
+}
+
+export function getTransmissionSlipStatusColor(status?: string | null) {
+  return transmissionSlipStatusColors[status || ''] || 'default'
+}
+
+export function getTransmissionSlipNatureLabel(nature?: string | null) {
+  if (!nature)
+    return '—'
+  return transmissionSlipNatureLabels[nature] || nature
 }
 
 export function detailRouteName(direction?: string | null) {
