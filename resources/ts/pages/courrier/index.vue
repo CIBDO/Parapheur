@@ -81,33 +81,12 @@ const activeFilterCount = computed(() => {
   return n
 })
 
-const cards = computed(() => {
-  const base = [
-    { title: 'Reçus aujourd\'hui', value: stats.value.received_today || 0, icon: 'tabler-inbox', color: 'info', route: 'courrier-entrants', hint: 'Arrivées du jour' },
-    { title: 'À qualifier', value: stats.value.to_qualify || 0, icon: 'tabler-tags', color: 'secondary', route: 'courrier-entrants', hint: 'À renseigner' },
-    { title: 'À affecter', value: stats.value.to_assign || 0, icon: 'tabler-user-plus', color: 'warning', route: 'courrier-a-affecter', hint: 'Sans destinataire' },
-    { title: 'Sans affectation', value: stats.value.unassigned || 0, icon: 'tabler-user-off', color: 'error', route: 'courrier-a-affecter', hint: 'À orienter' },
-    { title: 'En traitement', value: stats.value.in_processing || 0, icon: 'tabler-clock', color: 'primary', route: 'courrier-a-traiter', hint: 'En cours' },
-    { title: 'À expédier', value: stats.value.to_dispatch || 0, icon: 'tabler-send', color: 'success', route: 'courrier-sortants', hint: 'Départs prêts' },
-    { title: 'En retard', value: stats.value.overdue || 0, icon: 'tabler-alert-triangle', color: 'error', route: 'courrier-en-retard', hint: 'Échéance dépassée' },
-    { title: 'Mes en attente', value: stats.value.my_pending || 0, icon: 'tabler-mail-opened', color: 'info', route: 'courrier-a-traiter', hint: 'Mon portefeuille' },
-  ]
-
-  if (stats.value.slips_in_progress !== undefined) {
-    base.push({ title: 'Bordereaux en cours', value: stats.value.slips_in_progress, icon: 'tabler-clipboard-list', color: 'purple', route: 'courrier-bordereaux', hint: 'Transmissions' })
-  }
-  if (stats.value.circulation_sheets_open !== undefined) {
-    base.push({ title: 'Fiches ouvertes', value: stats.value.circulation_sheets_open, icon: 'tabler-file-invoice', color: 'teal', route: 'courrier-fiches', hint: 'Circulation' })
-  }
-  if (stats.value.reminders_due_today !== undefined) {
-    base.push({ title: 'Relances du jour', value: stats.value.reminders_due_today, icon: 'tabler-bell-ringing', color: 'orange', route: 'courrier-en-retard', hint: 'À traiter' })
-  }
-
-  return base
-})
-
-const highlightCards = computed(() => cards.value.slice(0, 4))
-const secondaryCards = computed(() => cards.value.slice(4))
+const cards = computed(() => [
+  { title: 'Reçus aujourd\'hui', value: stats.value.received_today || 0, icon: 'tabler-inbox', color: 'info', route: 'courrier-entrants', hint: 'Arrivées du jour' },
+  { title: 'À affecter', value: stats.value.to_assign || 0, icon: 'tabler-user-plus', color: 'warning', route: 'courrier-a-affecter', hint: 'Sans destinataire' },
+  { title: 'En traitement', value: stats.value.in_processing || 0, icon: 'tabler-clock', color: 'primary', route: 'courrier-a-traiter', hint: 'En cours' },
+  { title: 'En retard', value: stats.value.overdue || 0, icon: 'tabler-alert-triangle', color: 'error', route: 'courrier-en-retard', hint: 'Échéance dépassée' },
+])
 
 const tableItems = computed(() =>
   hasSearched.value ? searchResults.value : recentIncoming.value,
@@ -472,96 +451,56 @@ function openItem(item: any) {
       </VCol>
     </VRow>
 
-    <!-- KPI principaux -->
+    <!-- KPI -->
     <div
       v-if="loading"
       class="text-center py-8"
     >
       <VProgressCircular indeterminate />
     </div>
-    <template v-else>
-      <VRow
-        dense
-        class="mb-2"
+    <VRow
+      v-else
+      dense
+      class="mb-4"
+    >
+      <VCol
+        v-for="card in cards"
+        :key="card.title"
+        cols="12"
+        sm="6"
+        md="3"
       >
-        <VCol
-          v-for="card in highlightCards"
-          :key="card.title"
-          cols="12"
-          sm="6"
-          md="3"
+        <VCard
+          class="kpi-card cursor-pointer h-100"
+          @click="router.push({ name: card.route })"
         >
-          <VCard
-            class="kpi-card cursor-pointer h-100"
-            @click="router.push({ name: card.route })"
-          >
-            <VCardText class="d-flex align-center gap-4 pa-4">
-              <VAvatar
-                :color="card.color"
-                variant="tonal"
-                rounded
-                size="48"
-              >
-                <VIcon
-                  :icon="card.icon"
-                  size="26"
-                />
-              </VAvatar>
-              <div class="min-w-0">
-                <div class="text-h4 font-weight-semibold lh-1 mb-1">
-                  {{ card.value }}
-                </div>
-                <div class="text-body-2 font-weight-medium text-truncate">
-                  {{ card.title }}
-                </div>
-                <div class="text-caption text-medium-emphasis">
-                  {{ card.hint }}
-                </div>
+          <VCardText class="d-flex align-center gap-4 pa-4">
+            <VAvatar
+              :color="card.color"
+              variant="tonal"
+              rounded
+              size="48"
+            >
+              <VIcon
+                :icon="card.icon"
+                size="26"
+              />
+            </VAvatar>
+            <div class="min-w-0">
+              <div class="text-h4 font-weight-semibold lh-1 mb-1">
+                {{ card.value }}
               </div>
-            </VCardText>
-          </VCard>
-        </VCol>
-      </VRow>
-
-      <VRow
-        dense
-        class="mb-4"
-      >
-        <VCol
-          v-for="card in secondaryCards"
-          :key="card.title"
-          cols="6"
-          sm="4"
-          md="3"
-          lg="2"
-        >
-          <VCard
-            class="kpi-card-sm cursor-pointer h-100"
-            @click="router.push({ name: card.route })"
-          >
-            <VCardText class="pa-3">
-              <div class="d-flex align-center gap-2 mb-2">
-                <VAvatar
-                  :color="card.color"
-                  variant="tonal"
-                  size="28"
-                  rounded
-                >
-                  <VIcon
-                    :icon="card.icon"
-                    size="16"
-                  />
-                </VAvatar>
-                <span class="text-h6 font-weight-semibold">{{ card.value }}</span>
-              </div>
-              <div class="text-caption text-medium-emphasis text-truncate">
+              <div class="text-body-2 font-weight-medium text-truncate">
                 {{ card.title }}
               </div>
-            </VCardText>
-          </VCard>
-        </VCol>
-      </VRow>
-    </template>
+              <div class="text-caption text-medium-emphasis">
+                {{ card.hint }}
+              </div>
+            </div>
+          </VCardText>
+        </VCard>
+      </VCol>
+    </VRow>
 
     <!-- Liste -->
     <VCard>
@@ -699,13 +638,11 @@ function openItem(item: any) {
   min-inline-size: min(100%, 320px);
 }
 
-.kpi-card,
-.kpi-card-sm {
+.kpi-card {
   transition: box-shadow 0.18s ease, transform 0.18s ease;
 }
 
-.kpi-card:hover,
-.kpi-card-sm:hover {
+.kpi-card:hover {
   box-shadow: 0 6px 18px rgba(var(--v-theme-on-surface), 0.08);
   transform: translateY(-1px);
 }
