@@ -79,4 +79,14 @@ class NumberingService
     {
         return $this->nextNumber(NumberingSequenceCode::CirculationSheet, null, $structureId);
     }
+
+    public function generateDispatchSlipNumber(?int $structureId = null): string
+    {
+        return $this->nextNumber(NumberingSequenceCode::DispatchSlip, null, $structureId);
+    }
+
+    public function generateAcknowledgementNumber(?int $structureId = null): string
+    {
+        return $this->nextNumber(NumberingSequenceCode::Acknowledgement, null, $structureId);
+    }
 }

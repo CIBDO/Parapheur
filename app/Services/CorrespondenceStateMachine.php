@@ -59,6 +59,8 @@ class CorrespondenceStateMachine
             CorrespondenceStatus::AValider->value,
             CorrespondenceStatus::ASigner->value,
             CorrespondenceStatus::Valide->value,
+            CorrespondenceStatus::AExpedier->value,
+            CorrespondenceStatus::Expedie->value,
             CorrespondenceStatus::EnTraitement->value,
         ],
         CorrespondenceStatus::AViser->value => [

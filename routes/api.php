@@ -417,7 +417,11 @@ Route::middleware(['auth:sanctum', 'password.changed'])->group(function () {
             ->middleware('permission:mail.update|documents.create|admin.access');
         Route::post('/correspondences/{correspondence}/dispatch', [CorrespondenceController::class, 'dispatch'])
             ->middleware('permission:mail.dispatch|admin.access');
+        Route::post('/correspondences/{correspondence}/dispatches/{dispatch}/generate', [CorrespondenceController::class, 'generateDispatchSlip'])
+            ->middleware('permission:mail.dispatch|admin.access');
         Route::post('/correspondences/{correspondence}/acknowledge', [CorrespondenceController::class, 'acknowledge'])
+            ->middleware('permission:mail.update|admin.access');
+        Route::post('/correspondences/{correspondence}/acknowledgements/{acknowledgement}/generate', [CorrespondenceController::class, 'generateAcknowledgementDocument'])
             ->middleware('permission:mail.update|admin.access');
         Route::post('/correspondences/{correspondence}/parties', [CorrespondenceController::class, 'syncParties'])
             ->middleware('permission:mail.update|admin.access');

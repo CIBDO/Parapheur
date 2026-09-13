@@ -87,13 +87,30 @@ export const correspondenceMediumLabels: Record<string, string> = {
   hybride: 'Hybride',
 }
 
-export function formatCorrespondenceNumber(item: { arrival_number?: string | null; departure_number?: string | null; id: number }) {
+export function formatCorrespondenceNumber(item: {
+  arrival_number?: string | null
+  departure_number?: string | null
+  direction?: string | null
+  id: number
+  status?: string | null
+}) {
+  if (item.direction === 'sortant') {
+    if (item.departure_number)
+      return item.departure_number
+    return item.status === 'projet_reponse' ? `Projet #${item.id}` : `#${item.id}`
+  }
+
   return item.arrival_number || item.departure_number || `#${item.id}`
 }
 
-export function statusLabel(status?: string | null) {
+export function statusLabel(status?: string | null, direction?: string | null) {
   if (!status)
     return '—'
+  if (direction === 'sortant' && status === 'projet_reponse')
+    return 'Projet de départ'
+  if (direction === 'sortant' && status === 'enregistre')
+    return 'Enregistré au départ'
+
   return correspondenceStatusLabels[status] ?? status
 }
 
@@ -112,6 +129,7 @@ export const getCorrespondenceDirectionLabel = directionLabel
 
 export const documentTemplateKindLabels: Record<string, string> = {
   bordereau_transmission: 'Bordereau de transmission',
+  bordereau_envoi: 'Bordereau d\'envoi',
   fiche_circulation: 'Fiche de circulation',
   accuse_reception: 'Accusé de réception',
   lettre: 'Lettre',

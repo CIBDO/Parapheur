@@ -156,10 +156,12 @@ async function publishLatest(item: any) {
             v-model="form.kind"
             class="mb-3"
             :items="[
-              { value: 'bordereau_transmission', title: 'Bordereau' },
+              { value: 'bordereau_transmission', title: 'Bordereau de transmission' },
+              { value: 'bordereau_envoi', title: 'Bordereau d\'envoi' },
               { value: 'fiche_circulation', title: 'Fiche circulation' },
+              { value: 'accuse_reception', title: 'Accusé de réception' },
               { value: 'lettre', title: 'Lettre' },
-              { value: 'accuse_reception', title: 'Accusé' },
+              { value: 'note', title: 'Note' },
               { value: 'autre', title: 'Autre' },
             ]"
             label="Type"

@@ -4,10 +4,13 @@ namespace App\Http\Controllers\Api\Mail;
 
 use App\Http\Controllers\Controller;
 use App\Models\Correspondence;
+use App\Models\CorrespondenceAcknowledgement;
+use App\Models\CorrespondenceDispatch;
 use App\Services\CorrespondenceDispatchService;
 use App\Services\CorrespondenceReminderService;
 use App\Services\CorrespondenceReplyService;
 use App\Services\CorrespondenceService;
+use App\Services\MailOutputDocumentService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -18,6 +21,7 @@ class CorrespondenceController extends Controller
         private readonly CorrespondenceReplyService $replyService,
         private readonly CorrespondenceDispatchService $dispatchService,
         private readonly CorrespondenceReminderService $reminderService,
+        private readonly MailOutputDocumentService $outputDocumentService,
     ) {}
 
     public function index(Request $request): JsonResponse
@@ -222,10 +226,27 @@ class CorrespondenceController extends Controller
 
         $dispatch = $this->dispatchService->recordDispatch($correspondence, $request->user(), $validated);
 
+        if ($request->boolean('generate', true)) {
+            $dispatch = $this->outputDocumentService->generateDispatchSlip($dispatch, $request->user());
+        }
+
         return response()->json([
             'dispatch' => $dispatch,
             'correspondence' => $this->correspondenceService->serialize($correspondence->fresh()),
         ], 201);
+    }
+
+    public function generateDispatchSlip(Request $request, Correspondence $correspondence, CorrespondenceDispatch $dispatch): JsonResponse
+    {
+        $this->authorize('dispatch', $correspondence);
+        abort_unless((int) $dispatch->correspondence_id === (int) $correspondence->id, 404);
+
+        $dispatch = $this->outputDocumentService->generateDispatchSlip($dispatch, $request->user());
+
+        return response()->json([
+            'dispatch' => $dispatch,
+            'correspondence' => $this->correspondenceService->serialize($correspondence->fresh()),
+        ]);
     }
 
     public function acknowledge(Request $request, Correspondence $correspondence): JsonResponse
@@ -247,10 +268,27 @@ class CorrespondenceController extends Controller
             $request->file('proof')
         );
 
+        if ($request->boolean('generate', true)) {
+            $ack = $this->outputDocumentService->generateAcknowledgementDocument($ack, $request->user());
+        }
+
         return response()->json([
             'acknowledgement' => $ack,
             'correspondence' => $this->correspondenceService->serialize($correspondence->fresh()),
         ], 201);
+    }
+
+    public function generateAcknowledgementDocument(Request $request, Correspondence $correspondence, CorrespondenceAcknowledgement $acknowledgement): JsonResponse
+    {
+        $this->authorize('update', $correspondence);
+        abort_unless((int) $acknowledgement->correspondence_id === (int) $correspondence->id, 404);
+
+        $ack = $this->outputDocumentService->generateAcknowledgementDocument($acknowledgement, $request->user());
+
+        return response()->json([
+            'acknowledgement' => $ack,
+            'correspondence' => $this->correspondenceService->serialize($correspondence->fresh()),
+        ]);
     }
 
     public function syncParties(Request $request, Correspondence $correspondence): JsonResponse

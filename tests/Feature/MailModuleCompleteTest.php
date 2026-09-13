@@ -486,4 +486,81 @@ class MailModuleCompleteTest extends TestCase
             'name' => 'CIBDO',
         ]);
     }
+
+    public function test_it_can_generate_dispatch_slip_and_acknowledgement_documents(): void
+    {
+        $outgoing = app(CorrespondenceService::class)->createOutgoing($this->admin, [
+            'subject' => 'Sortant pour bordereau envoi',
+            'medium' => 'physique',
+            'structure_id' => $this->admin->structure_id,
+            'piece_count' => 2,
+        ]);
+
+        app(CorrespondenceService::class)->syncParties($outgoing, $this->admin, [
+            ['role' => 'from', 'name' => 'DGTCP'],
+            ['role' => 'to', 'name' => 'Ministère Test'],
+        ]);
+
+        if ($outgoing->status !== CorrespondenceStatus::AExpedier
+            && $outgoing->status !== CorrespondenceStatus::Expedie) {
+            $outgoing->status = CorrespondenceStatus::AExpedier;
+            $outgoing->save();
+        }
+
+        $dispatch = app(CorrespondenceDispatchService::class)->recordDispatch($outgoing, $this->admin, [
+            'method' => 'courrier',
+            'tracking_number' => 'TRK-1',
+            'dispatched_at' => now(),
+        ]);
+
+        $generated = app(\App\Services\MailOutputDocumentService::class)
+            ->generateDispatchSlip($dispatch, $this->admin);
+
+        $this->assertNotNull($generated->document_id);
+        $this->assertNotNull($generated->number);
+        $this->assertStringStartsWith('BE/', $generated->number);
+
+        $ack = app(CorrespondenceDispatchService::class)->recordAcknowledgement($outgoing->fresh(), $this->admin, [
+            'acknowledged_by_name' => 'Réceptionnaire Test',
+            'method' => 'signature',
+        ]);
+
+        $ackDoc = app(\App\Services\MailOutputDocumentService::class)
+            ->generateAcknowledgementDocument($ack, $this->admin);
+
+        $this->assertNotNull($ackDoc->document_id);
+        $this->assertStringStartsWith('AR/', $ackDoc->number);
+
+        // Régénération : ne doit pas planter sur documents.reference unique
+        $regen = app(\App\Services\MailOutputDocumentService::class)
+            ->generateDispatchSlip($generated->fresh(), $this->admin);
+
+        $this->assertSame($generated->document_id, $regen->document_id);
+        $this->assertSame($generated->number, $regen->number);
+    }
+
+    public function test_transmission_slip_generates_official_docx(): void
+    {
+        $this->actingAs($this->admin);
+
+        $slip = app(\App\Services\TransmissionSlipService::class)->create([
+            'from_structure_id' => $this->admin->structure_id,
+            'to_structure_id' => $this->admin->structure_id,
+            'nature' => 'Courriers divers',
+            'observations' => 'Test BT',
+        ], [
+            [
+                'correspondence_id' => $this->correspondence->id,
+                'reference' => $this->correspondence->arrival_number,
+                'object' => $this->correspondence->subject,
+                'piece_count' => 1,
+            ],
+        ]);
+
+        $generated = app(\App\Services\TransmissionSlipService::class)->generateDocument($slip);
+
+        $this->assertNotNull($generated->document_id);
+        $this->assertNotNull($generated->number);
+        $this->assertStringStartsWith('BT/', $generated->number);
+    }
 }

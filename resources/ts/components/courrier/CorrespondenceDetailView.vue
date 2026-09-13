@@ -49,7 +49,10 @@ const {
   printDocument, 
   createCirculationSheet, 
   generateCirculationSheetDocument,
+  generateDispatchSlip,
+  generateAcknowledgementDocument,
   dispatch,
+  registerCorrespondence,
   updateCorrespondence,
   fetchMeta,
 } = useCorrespondence()
@@ -64,6 +67,11 @@ const categories = ref<any[]>([])
 const creatingFiche = ref(false)
 const ficheMessage = ref('')
 const ficheError = ref('')
+const outputBusy = ref(false)
+const outputMessage = ref('')
+const outputError = ref('')
+const registeringDeparture = ref(false)
+const dispatching = ref(false)
 const documentDetail = ref<any>(null)
 const documentPreviewLoading = ref(false)
 const documentPreviewError = ref('')
@@ -86,7 +94,7 @@ const assignForm = ref({
 const complementForm = ref({ assignmentId: null as number | null, observation: '' })
 const reminderForm = ref({ reminder_date: '', note: '' })
 const printForm = ref({ reason: '', copies: 1, is_reprint: false })
-const dispatchForm = ref({ method: '', date: '', recipient: '', observations: '' })
+const dispatchForm = ref({ method: 'courrier', date: '', tracking_number: '', observations: '' })
 const signedFile = ref<File | null>(null)
 
 // Parties management
@@ -159,6 +167,49 @@ const primaryCirculationSheet = computed(() => {
 })
 
 const hasCirculationSheet = computed(() => !!primaryCirculationSheet.value)
+
+const latestDispatch = computed(() => {
+  const list = [...(props.correspondence.dispatches || [])]
+
+  return list.sort((a: any, b: any) => (b.id || 0) - (a.id || 0))[0] || null
+})
+
+const latestAcknowledgement = computed(() => {
+  const list = [...(props.correspondence.acknowledgements || [])]
+
+  return list.sort((a: any, b: any) => (b.id || 0) - (a.id || 0))[0] || null
+})
+
+const isSortant = computed(() => (props.direction || props.correspondence.direction) === 'sortant')
+
+const canRegisterDeparture = computed(() =>
+  isSortant.value && !props.correspondence.departure_number
+  && !['expedie', 'accuse_recu', 'classe', 'archive', 'annule'].includes(props.correspondence.status || ''),
+)
+
+const canDispatch = computed(() =>
+  isSortant.value
+  && !['expedie', 'accuse_recu', 'classe', 'archive', 'annule'].includes(props.correspondence.status || ''),
+)
+
+const alreadyDispatched = computed(() =>
+  isSortant.value && ['expedie', 'accuse_recu'].includes(props.correspondence.status || ''),
+)
+
+const sortantStep = computed(() => {
+  if (!isSortant.value)
+    return 0
+  if (alreadyDispatched.value || latestDispatch.value)
+    return 3
+  if (props.correspondence.departure_number)
+    return 2
+
+  return 1
+})
+
+const statusDisplayLabel = computed(() =>
+  getCorrespondenceStatusLabel(props.correspondence.status, props.direction || props.correspondence.direction),
+)
 
 const documentVersions = computed(() => documentDetail.value?.versions || [])
 const mainDocumentVersion = computed(() =>
@@ -474,14 +525,82 @@ async function handleUploadSigned() {
   }
 }
 
-async function handleDispatch() {
+async function handleRegisterDeparture() {
+  registeringDeparture.value = true
   try {
-    await dispatch(props.correspondence.id, dispatchForm.value)
-    showDispatchDialog.value = false
-    dispatchForm.value = { method: '', date: '', recipient: '', observations: '' }
+    await registerCorrespondence(props.correspondence.id)
     emit('refresh')
-  } catch (error: any) {
-    alert('Erreur : ' + (error.message || 'Impossible d\'expédier'))
+  }
+  catch (error: any) {
+    alert(error?.data?.message || error.message || 'Impossible d\'enregistrer au départ')
+  }
+  finally {
+    registeringDeparture.value = false
+  }
+}
+
+async function handleDispatch() {
+  if (!dispatchForm.value.method) {
+    alert('Choisissez un mode d\'expédition')
+
+    return
+  }
+  dispatching.value = true
+  try {
+    await dispatch(props.correspondence.id, {
+      method: dispatchForm.value.method,
+      dispatched_at: dispatchForm.value.date || undefined,
+      tracking_number: dispatchForm.value.tracking_number || undefined,
+      observations: dispatchForm.value.observations,
+      generate: true,
+    })
+    showDispatchDialog.value = false
+    dispatchForm.value = { method: 'courrier', date: '', tracking_number: '', observations: '' }
+    emit('refresh')
+  }
+  catch (error: any) {
+    alert(error?.data?.message || error.message || 'Impossible d\'expédier')
+  }
+  finally {
+    dispatching.value = false
+  }
+}
+
+async function handleGenerateDispatchSlip() {
+  if (!latestDispatch.value?.id)
+    return
+  outputBusy.value = true
+  outputError.value = ''
+  outputMessage.value = ''
+  try {
+    await generateDispatchSlip(props.correspondence.id, latestDispatch.value.id)
+    outputMessage.value = 'Bordereau d\'envoi généré.'
+    emit('refresh')
+  }
+  catch (error: any) {
+    outputError.value = error?.data?.error || error?.data?.message || error.message || 'Échec génération bordereau'
+  }
+  finally {
+    outputBusy.value = false
+  }
+}
+
+async function handleGenerateAcknowledgementDoc() {
+  if (!latestAcknowledgement.value?.id)
+    return
+  outputBusy.value = true
+  outputError.value = ''
+  outputMessage.value = ''
+  try {
+    await generateAcknowledgementDocument(props.correspondence.id, latestAcknowledgement.value.id)
+    outputMessage.value = 'Accusé de réception généré.'
+    emit('refresh')
+  }
+  catch (error: any) {
+    outputError.value = error?.data?.error || error?.data?.message || error.message || 'Échec génération accusé'
+  }
+  finally {
+    outputBusy.value = false
   }
 }
 
@@ -502,7 +621,7 @@ async function archiveCorrespondence() {
 <template>
   <div>
     <ParapheurPageHeader
-      :title="formatCorrespondenceNumber(correspondence)"
+      :title="formatCorrespondenceNumber({ ...correspondence, direction: direction || correspondence.direction })"
       :subtitle="correspondence.subject"
     >
       <template #actions>
@@ -523,13 +642,31 @@ async function archiveCorrespondence() {
           Affecter
         </VBtn>
         <VBtn
-          v-if="direction === 'sortant'"
+          v-if="canRegisterDeparture"
           variant="tonal"
+          color="primary"
+          prepend-icon="tabler-hash"
+          :loading="registeringDeparture"
+          @click="handleRegisterDeparture"
+        >
+          Enregistrer au départ
+        </VBtn>
+        <VBtn
+          v-if="canDispatch"
+          color="primary"
           prepend-icon="tabler-send"
           @click="showDispatchDialog = true"
         >
-          Expédier
+          {{ correspondence.departure_number ? 'Expédier' : 'Enregistrer & expédier' }}
         </VBtn>
+        <VChip
+          v-else-if="alreadyDispatched"
+          color="success"
+          variant="tonal"
+          prepend-icon="tabler-circle-check"
+        >
+          Déjà expédié
+        </VChip>
         <VBtn
           variant="tonal"
           prepend-icon="tabler-archive"
@@ -558,7 +695,7 @@ async function archiveCorrespondence() {
           Relances
         </VTab>
         <VTab value="fiche">
-          Fiche circulation
+          États de sortie
         </VTab>
         <VTab value="historique">
           Historique
@@ -586,7 +723,7 @@ async function archiveCorrespondence() {
                 :color="getCorrespondenceStatusColor(correspondence.status)"
                 variant="tonal"
               >
-                {{ getCorrespondenceStatusLabel(correspondence.status) }}
+                {{ statusDisplayLabel }}
               </VChip>
               <VChip
                 size="small"
@@ -621,6 +758,60 @@ async function archiveCorrespondence() {
               </VChip>
             </div>
 
+            <VAlert
+              v-if="isSortant"
+              type="info"
+              variant="tonal"
+              class="mb-5"
+            >
+              <div class="font-weight-medium mb-2">
+                Parcours du courrier sortant
+              </div>
+              <div class="d-flex flex-wrap ga-2 text-body-2">
+                <VChip
+                  size="small"
+                  :color="sortantStep >= 1 ? 'primary' : 'default'"
+                  :variant="sortantStep === 1 ? 'flat' : 'tonal'"
+                >
+                  1. Projet
+                </VChip>
+                <VIcon
+                  icon="tabler-chevron-right"
+                  size="18"
+                />
+                <VChip
+                  size="small"
+                  :color="sortantStep >= 2 ? 'primary' : 'default'"
+                  :variant="sortantStep === 2 ? 'flat' : 'tonal'"
+                >
+                  2. N° départ {{ correspondence.departure_number || '(à attribuer)' }}
+                </VChip>
+                <VIcon
+                  icon="tabler-chevron-right"
+                  size="18"
+                />
+                <VChip
+                  size="small"
+                  :color="sortantStep >= 3 ? 'success' : 'default'"
+                  :variant="sortantStep === 3 ? 'flat' : 'tonal'"
+                >
+                  3. Expédition
+                </VChip>
+              </div>
+              <div class="text-caption mt-2">
+                <template v-if="canRegisterDeparture">
+                  Ce projet n’a pas encore de N° DEP. Utilisez « Enregistrer au départ » ou « Enregistrer &amp; expédier ».
+                </template>
+                <template v-else-if="canDispatch">
+                  Numéro de départ attribué. Vous pouvez enregistrer l’expédition physique ou électronique.
+                </template>
+                <template v-else>
+                  Courrier expédié
+                  <span v-if="latestDispatch?.number"> — bordereau {{ latestDispatch.number }}</span>.
+                </template>
+              </div>
+            </VAlert>
+
             <VRow>
               <VCol
                 cols="12"
@@ -635,17 +826,19 @@ async function archiveCorrespondence() {
                     Identification
                   </div>
                   <div class="courrier-meta-grid">
+                    <template v-if="!isSortant">
+                      <div class="courrier-meta-grid__label">
+                        N° arrivée
+                      </div>
+                      <div class="courrier-meta-grid__value font-weight-medium">
+                        {{ correspondence.arrival_number || '—' }}
+                      </div>
+                    </template>
                     <div class="courrier-meta-grid__label">
-                      N° arrivée
+                      {{ isSortant ? 'N° départ (DEP)' : 'N° départ' }}
                     </div>
                     <div class="courrier-meta-grid__value font-weight-medium">
-                      {{ correspondence.arrival_number || '—' }}
-                    </div>
-                    <div class="courrier-meta-grid__label">
-                      N° départ
-                    </div>
-                    <div class="courrier-meta-grid__value font-weight-medium">
-                      {{ correspondence.departure_number || '—' }}
+                      {{ correspondence.departure_number || (isSortant ? 'Non attribué (projet)' : '—') }}
                     </div>
                     <div class="courrier-meta-grid__label">
                       Réf. externe
@@ -654,23 +847,36 @@ async function archiveCorrespondence() {
                       {{ correspondence.external_reference || '—' }}
                     </div>
                     <div class="courrier-meta-grid__label">
-                      Date courrier
+                      Date du courrier
                     </div>
                     <div class="courrier-meta-grid__value">
                       {{ formatDate(correspondence.correspondence_date) }}
                     </div>
+                    <template v-if="!isSortant">
+                      <div class="courrier-meta-grid__label">
+                        Réception
+                      </div>
+                      <div class="courrier-meta-grid__value">
+                        {{ formatDateTime(correspondence.received_at) }}
+                      </div>
+                    </template>
                     <div class="courrier-meta-grid__label">
-                      Réception
-                    </div>
-                    <div class="courrier-meta-grid__value">
-                      {{ formatDateTime(correspondence.received_at) }}
-                    </div>
-                    <div class="courrier-meta-grid__label">
-                      Enregistrement
+                      {{ isSortant ? 'Enregistrement au départ' : 'Enregistrement' }}
                     </div>
                     <div class="courrier-meta-grid__value">
                       {{ formatDateTime(correspondence.registered_at) }}
                     </div>
+                    <template v-if="isSortant && latestDispatch">
+                      <div class="courrier-meta-grid__label">
+                        Expédié le
+                      </div>
+                      <div class="courrier-meta-grid__value">
+                        {{ formatDateTime(latestDispatch.dispatched_at) }}
+                        <span v-if="latestDispatch.method">
+                          · {{ latestDispatch.method }}
+                        </span>
+                      </div>
+                    </template>
                     <div class="courrier-meta-grid__label">
                       Pièces
                     </div>
@@ -733,7 +939,7 @@ async function archiveCorrespondence() {
                   </div>
                   <div class="mb-3">
                     <div class="text-body-2 font-weight-medium mb-1">
-                      Expéditeur
+                      {{ isSortant ? 'Émetteur (nous)' : 'Expéditeur' }}
                     </div>
                     <div v-if="fromParty">
                       {{ partyDisplayName(fromParty) || '—' }}
@@ -753,7 +959,7 @@ async function archiveCorrespondence() {
                   </div>
                   <div>
                     <div class="text-body-2 font-weight-medium mb-1">
-                      Destinataire(s)
+                      {{ isSortant ? 'Destinataire externe' : 'Destinataire(s)' }}
                     </div>
                     <div v-if="toParties.length">
                       <div
@@ -785,7 +991,7 @@ async function archiveCorrespondence() {
                         icon="tabler-git-fork"
                         size="20"
                       />
-                      Traitement
+                      {{ isSortant ? 'Préparation / envoi' : 'Traitement' }}
                     </div>
                     <div class="d-flex ga-2">
                       <template v-if="!editingTraitement">
@@ -826,13 +1032,13 @@ async function archiveCorrespondence() {
                     <AppSelect
                       v-model="traitementForm.structure_id"
                       :items="structureItems"
-                      label="Structure"
+                      :label="isSortant ? 'Structure émettrice' : 'Structure'"
                       clearable
                     />
                     <AppSelect
                       v-model="traitementForm.channel_id"
                       :items="channelItems"
-                      label="Canal"
+                      :label="isSortant ? 'Canal d\'envoi' : 'Canal'"
                       clearable
                     />
                     <AppSelect
@@ -848,13 +1054,13 @@ async function archiveCorrespondence() {
                     class="courrier-meta-grid"
                   >
                     <div class="courrier-meta-grid__label">
-                      Structure
+                      {{ isSortant ? 'Structure émettrice' : 'Structure' }}
                     </div>
                     <div class="courrier-meta-grid__value">
                       {{ correspondence.structure?.name || '—' }}
                     </div>
                     <div class="courrier-meta-grid__label">
-                      Canal
+                      {{ isSortant ? 'Canal d\'envoi' : 'Canal' }}
                     </div>
                     <div class="courrier-meta-grid__value">
                       {{ correspondence.channel?.name || '—' }}
@@ -865,17 +1071,56 @@ async function archiveCorrespondence() {
                     <div class="courrier-meta-grid__value">
                       {{ correspondence.category?.name || '—' }}
                     </div>
+                    <template v-if="isSortant">
+                      <div class="courrier-meta-grid__label">
+                        N° départ
+                      </div>
+                      <div class="courrier-meta-grid__value">
+                        {{ correspondence.departure_number || 'Non attribué' }}
+                      </div>
+                      <div class="courrier-meta-grid__label">
+                        Expédition
+                      </div>
+                      <div class="courrier-meta-grid__value">
+                        <template v-if="latestDispatch">
+                          {{ latestDispatch.method || '—' }}
+                          <span v-if="latestDispatch.dispatched_at">
+                            · {{ formatDateTime(latestDispatch.dispatched_at) }}
+                          </span>
+                          <span v-if="latestDispatch.tracking_number">
+                            · Suivi {{ latestDispatch.tracking_number }}
+                          </span>
+                        </template>
+                        <template v-else>
+                          Pas encore expédié
+                        </template>
+                      </div>
+                      <div class="courrier-meta-grid__label">
+                        Rédacteur
+                      </div>
+                      <div class="courrier-meta-grid__value">
+                        {{ correspondence.owner_user?.name || correspondence.registered_by?.name || '—' }}
+                      </div>
+                    </template>
+                    <template v-else>
+                      <div class="courrier-meta-grid__label">
+                        Affecté à
+                      </div>
+                      <div class="courrier-meta-grid__value">
+                        {{ currentAssignee || 'Non affecté' }}
+                      </div>
+                    </template>
                     <div class="courrier-meta-grid__label">
-                      Affecté à
+                      {{ isSortant ? 'Document (projet / signé)' : 'Document GED' }}
                     </div>
                     <div class="courrier-meta-grid__value">
-                      {{ currentAssignee || 'Non affecté' }}
-                    </div>
-                    <div class="courrier-meta-grid__label">
-                      Document GED
-                    </div>
-                    <div class="courrier-meta-grid__value">
-                      {{ correspondence.document?.id ? `#${correspondence.document.id}` : 'Aucun' }}
+                      <RouterLink
+                        v-if="correspondence.document?.id"
+                        :to="{ name: 'ged-id', params: { id: correspondence.document.id } }"
+                      >
+                        #{{ correspondence.document.id }}
+                      </RouterLink>
+                      <span v-else>{{ isSortant ? 'Aucun document joint' : 'Aucun' }}</span>
                     </div>
                   </div>
                 </div>
@@ -1346,41 +1591,59 @@ async function archiveCorrespondence() {
           </VCardText>
         </VWindowItem>
 
-        <!-- Fiche circulation -->
+        <!-- États de sortie -->
         <VWindowItem value="fiche">
           <VCardText>
-            <div class="parapheur-form-section mb-0">
+            <div class="parapheur-form-section mb-6">
               <div class="parapheur-form-section__title">
                 <VIcon
-                  icon="tabler-file-invoice"
+                  icon="tabler-files"
                   size="20"
                 />
-                Fiche de circulation
+                États de sortie
               </div>
               <p class="text-body-2 text-medium-emphasis mb-4">
-                Une seule fiche numérotée (FC/…) par courrier, au modèle DGTCP (imputation et annotations).
+                Documents administratifs DGTCP : fiche de circulation, bordereau d’envoi, accusé de réception.
+                Le bordereau de transmission interne reste disponible dans
+                <RouterLink :to="{ name: 'courrier-bordereaux' }">
+                  Bordereaux
+                </RouterLink>.
               </p>
 
               <VAlert
-                v-if="ficheMessage"
+                v-if="ficheMessage || outputMessage"
                 type="success"
                 variant="tonal"
                 class="mb-4"
                 closable
-                @click:close="ficheMessage = ''"
+                @click:close="ficheMessage = ''; outputMessage = ''"
               >
-                {{ ficheMessage }}
+                {{ ficheMessage || outputMessage }}
               </VAlert>
               <VAlert
-                v-if="ficheError"
+                v-if="ficheError || outputError"
                 type="error"
                 variant="tonal"
                 class="mb-4"
                 closable
-                @click:close="ficheError = ''"
+                @click:close="ficheError = ''; outputError = ''"
               >
-                {{ ficheError }}
+                {{ ficheError || outputError }}
               </VAlert>
+            </div>
+
+            <!-- Fiche de circulation -->
+            <div class="parapheur-form-section mb-6">
+              <div class="parapheur-form-section__title mb-2">
+                <VIcon
+                  icon="tabler-file-invoice"
+                  size="20"
+                />
+                Fiche de circulation (FC)
+              </div>
+              <p class="text-body-2 text-medium-emphasis mb-4">
+                Une seule fiche numérotée par courrier (imputation et annotations).
+              </p>
 
               <div
                 v-if="primaryCirculationSheet"
@@ -1410,7 +1673,7 @@ async function archiveCorrespondence() {
                       variant="tonal"
                       :to="{ name: 'ged-id', params: { id: primaryCirculationSheet.document_id } }"
                     >
-                      Ouvrir le document
+                      Ouvrir
                     </VBtn>
                     <VBtn
                       size="small"
@@ -1419,7 +1682,7 @@ async function archiveCorrespondence() {
                       :loading="creatingFiche"
                       @click="handleGenerateExistingSheet(primaryCirculationSheet.id)"
                     >
-                      {{ primaryCirculationSheet.document_id ? 'Régénérer le document' : 'Générer le document' }}
+                      {{ primaryCirculationSheet.document_id ? 'Régénérer' : 'Générer' }}
                     </VBtn>
                   </div>
                 </div>
@@ -1451,12 +1714,131 @@ async function archiveCorrespondence() {
                 >
                   Créer la fiche seule
                 </VBtn>
-                <VBtn
-                  variant="text"
-                  :to="{ name: 'courrier-fiches' }"
-                >
-                  Voir toutes les fiches
-                </VBtn>
+              </div>
+            </div>
+
+            <!-- Bordereau d'envoi -->
+            <div class="parapheur-form-section mb-6">
+              <div class="parapheur-form-section__title mb-2">
+                <VIcon
+                  icon="tabler-send"
+                  size="20"
+                />
+                Bordereau d’envoi (BE)
+              </div>
+              <p class="text-body-2 text-medium-emphasis mb-4">
+                Preuve d’expédition externe. Généré automatiquement à l’expédition, ou régénérable ici.
+              </p>
+
+              <div
+                v-if="latestDispatch"
+                class="courrier-party-card mb-4"
+              >
+                <div class="d-flex flex-wrap justify-space-between align-center ga-3">
+                  <div>
+                    <div class="font-weight-medium">
+                      {{ latestDispatch.number || `Expédition #${latestDispatch.id}` }}
+                    </div>
+                    <div class="text-caption text-medium-emphasis mt-1">
+                      {{ latestDispatch.method || '—' }}
+                      <span v-if="latestDispatch.tracking_number"> · Suivi {{ latestDispatch.tracking_number }}</span>
+                    </div>
+                  </div>
+                  <div class="d-flex flex-wrap align-center ga-2">
+                    <VChip
+                      size="small"
+                      :color="latestDispatch.document_id ? 'success' : 'warning'"
+                      variant="tonal"
+                    >
+                      {{ latestDispatch.document_id ? `Document #${latestDispatch.document_id}` : 'Sans document' }}
+                    </VChip>
+                    <VBtn
+                      v-if="latestDispatch.document_id"
+                      size="small"
+                      variant="tonal"
+                      :to="{ name: 'ged-id', params: { id: latestDispatch.document_id } }"
+                    >
+                      Ouvrir
+                    </VBtn>
+                    <VBtn
+                      size="small"
+                      color="primary"
+                      variant="tonal"
+                      :loading="outputBusy"
+                      @click="handleGenerateDispatchSlip"
+                    >
+                      {{ latestDispatch.document_id ? 'Régénérer' : 'Générer' }}
+                    </VBtn>
+                  </div>
+                </div>
+              </div>
+              <div
+                v-else
+                class="parapheur-empty py-6"
+              >
+                Aucune expédition enregistrée — utilisez l’action « Expédier ».
+              </div>
+            </div>
+
+            <!-- Accusé de réception -->
+            <div class="parapheur-form-section mb-0">
+              <div class="parapheur-form-section__title mb-2">
+                <VIcon
+                  icon="tabler-mail-check"
+                  size="20"
+                />
+                Accusé de réception (AR)
+              </div>
+              <p class="text-body-2 text-medium-emphasis mb-4">
+                Formulaire d’accusé lié à l’enregistrement de réception.
+              </p>
+
+              <div
+                v-if="latestAcknowledgement"
+                class="courrier-party-card mb-4"
+              >
+                <div class="d-flex flex-wrap justify-space-between align-center ga-3">
+                  <div>
+                    <div class="font-weight-medium">
+                      {{ latestAcknowledgement.number || `AR #${latestAcknowledgement.id}` }}
+                    </div>
+                    <div class="text-caption text-medium-emphasis mt-1">
+                      {{ latestAcknowledgement.acknowledged_by_name || latestAcknowledgement.registered_by?.name || '—' }}
+                    </div>
+                  </div>
+                  <div class="d-flex flex-wrap align-center ga-2">
+                    <VChip
+                      size="small"
+                      :color="latestAcknowledgement.document_id ? 'success' : 'warning'"
+                      variant="tonal"
+                    >
+                      {{ latestAcknowledgement.document_id ? `Document #${latestAcknowledgement.document_id}` : 'Sans document' }}
+                    </VChip>
+                    <VBtn
+                      v-if="latestAcknowledgement.document_id"
+                      size="small"
+                      variant="tonal"
+                      :to="{ name: 'ged-id', params: { id: latestAcknowledgement.document_id } }"
+                    >
+                      Ouvrir
+                    </VBtn>
+                    <VBtn
+                      size="small"
+                      color="primary"
+                      variant="tonal"
+                      :loading="outputBusy"
+                      @click="handleGenerateAcknowledgementDoc"
+                    >
+                      {{ latestAcknowledgement.document_id ? 'Régénérer' : 'Générer' }}
+                    </VBtn>
+                  </div>
+                </div>
+              </div>
+              <div
+                v-else
+                class="parapheur-empty py-6"
+              >
+                Aucun accusé enregistré pour ce courrier.
               </div>
             </div>
           </VCardText>
@@ -1738,14 +2120,47 @@ async function archiveCorrespondence() {
     </VDialog>
 
     <!-- Dialog Expédition -->
-    <VDialog v-model="showDispatchDialog" max-width="600">
+    <VDialog
+      v-model="showDispatchDialog"
+      max-width="600"
+    >
       <VCard>
-        <VCardTitle>Expédier le courrier</VCardTitle>
+        <VCardTitle>
+          {{ correspondence.departure_number ? 'Enregistrer l\'expédition' : 'Enregistrer au départ et expédier' }}
+        </VCardTitle>
         <VCardText>
+          <VAlert
+            type="info"
+            variant="tonal"
+            class="mb-4"
+            density="compact"
+          >
+            <template v-if="correspondence.departure_number">
+              N° départ déjà attribué : <strong>{{ correspondence.departure_number }}</strong>.
+              Cette action passe le courrier en « Expédié » et génère le bordereau d’envoi (BE).
+            </template>
+            <template v-else>
+              Aucun N° DEP pour l’instant : l’expédition attribuera automatiquement le numéro de départ,
+              puis générera le bordereau d’envoi.
+            </template>
+          </VAlert>
+          <div
+            v-if="toParties.length || fallbackRecipientName"
+            class="mb-4 text-body-2"
+          >
+            <span class="text-medium-emphasis">Destinataire :</span>
+            {{ toParties.map(p => partyDisplayName(p)).filter(Boolean).join(', ') || fallbackRecipientName }}
+          </div>
           <VSelect
             v-model="dispatchForm.method"
-            :items="['poste', 'coursier', 'email', 'autre']"
-            label="Mode d'expédition"
+            :items="[
+              { value: 'courrier', title: 'Courrier postal' },
+              { value: 'coursier', title: 'Coursier' },
+              { value: 'email', title: 'Courriel' },
+              { value: 'fax', title: 'Fax' },
+              { value: 'plateforme', title: 'Plateforme' },
+            ]"
+            label="Mode d'expédition *"
             class="mb-4"
           />
           <VTextField
@@ -1755,8 +2170,8 @@ async function archiveCorrespondence() {
             class="mb-4"
           />
           <VTextField
-            v-model="dispatchForm.recipient"
-            label="Destinataire"
+            v-model="dispatchForm.tracking_number"
+            label="N° de suivi (optionnel)"
             class="mb-4"
           />
           <VTextarea
@@ -1767,11 +2182,18 @@ async function archiveCorrespondence() {
         </VCardText>
         <VCardActions>
           <VSpacer />
-          <VBtn variant="text" @click="showDispatchDialog = false">
+          <VBtn
+            variant="text"
+            @click="showDispatchDialog = false"
+          >
             Annuler
           </VBtn>
-          <VBtn color="primary" @click="handleDispatch">
-            Expédier
+          <VBtn
+            color="primary"
+            :loading="dispatching"
+            @click="handleDispatch"
+          >
+            Confirmer l'expédition
           </VBtn>
         </VCardActions>
       </VCard>

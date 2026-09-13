@@ -12,11 +12,13 @@ class CorrespondenceAcknowledgement extends Model
 
     protected $fillable = [
         'correspondence_id',
+        'number',
         'acknowledged_at',
         'acknowledged_by_name',
         'method',
         'observations',
         'registered_by',
+        'document_id',
     ];
 
     protected function casts(): array
@@ -29,6 +31,11 @@ class CorrespondenceAcknowledgement extends Model
     public function correspondence(): BelongsTo
     {
         return $this->belongsTo(Correspondence::class);
+    }
+
+    public function document(): BelongsTo
+    {
+        return $this->belongsTo(Document::class);
     }
 
     public function registeredBy(): BelongsTo

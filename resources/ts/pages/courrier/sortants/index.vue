@@ -32,7 +32,7 @@ const items = computed(() => listItems(correspondences.value))
   <div>
     <ParapheurPageHeader
       title="Courriers sortants"
-      subtitle="Registre de départ"
+      subtitle="Projets et registre de départ (DEP)"
     >
       <template #actions>
         <VBtn
@@ -63,7 +63,7 @@ const items = computed(() => listItems(correspondences.value))
       </VCardText>
       <VDataTable
         :headers="[
-          { title: 'N° départ', key: 'departure_number' },
+          { title: 'N° / projet', key: 'departure_number' },
           { title: 'Objet', key: 'subject' },
           { title: 'Statut', key: 'status' },
           { title: 'Date', key: 'correspondence_date' },
@@ -73,7 +73,7 @@ const items = computed(() => listItems(correspondences.value))
       >
         <template #item.departure_number="{ item }">
           <RouterLink :to="{ name: 'courrier-sortants-id', params: { id: item.id } }">
-            {{ formatCorrespondenceNumber(item) }}
+            {{ formatCorrespondenceNumber({ ...item, direction: 'sortant' }) }}
           </RouterLink>
         </template>
         <template #item.status="{ item }">
@@ -82,7 +82,7 @@ const items = computed(() => listItems(correspondences.value))
             :color="correspondenceStatusColors[item.status] || 'default'"
             variant="tonal"
           >
-            {{ statusLabel(item.status) }}
+            {{ statusLabel(item.status, 'sortant') }}
           </VChip>
         </template>
       </VDataTable>

@@ -110,20 +110,10 @@ class TransmissionSlipService
             }
 
             if (!$template) {
-                // Fallback: créer un document minimal si pas de template
+                $slip->loadMissing(['items.correspondence', 'fromStructure', 'toStructure', 'creator']);
                 $renderer = app(DocumentTemplateRenderer::class);
-                $blankPath = $renderer->createBlankDocx(
-                    'Bordereau de transmission ' . $slip->number,
-                    [
-                        'Numéro : ' . $slip->number,
-                        'Date : ' . now()->format('d/m/Y'),
-                        'De : ' . ($slip->fromStructure?->name ?? ''),
-                        'À : ' . ($slip->toStructure?->name ?? ''),
-                        'Nature : ' . ($slip->nature ?? ''),
-                        '',
-                        'Documents transmis :',
-                    ]
-                );
+                $variables = $this->buildVariables($slip);
+                $blankPath = $renderer->createTransmissionSlipDocx($variables);
 
                 $upload = new \Illuminate\Http\UploadedFile(
                     $blankPath,
@@ -133,12 +123,23 @@ class TransmissionSlipService
                     true
                 );
 
-                $document = app(DocumentService::class)->create(Auth::user(), [
-                    'origin' => \App\Enums\DocumentOrigin::Courrier->value,
-                    'object' => 'Bordereau de transmission ' . $slip->number,
-                    'title' => 'Bordereau ' . $slip->number,
-                    'reference' => $slip->number,
-                ], $upload);
+                $documentService = app(DocumentService::class);
+                if ($slip->document_id && ($existing = \App\Models\Document::query()->find($slip->document_id))) {
+                    $documentService->addVersion($existing, Auth::user(), $upload, 'Régénération bordereau');
+                    $document = $existing->fresh();
+                } elseif ($slip->number && ($existing = \App\Models\Document::query()->where('reference', $slip->number)->first())) {
+                    $documentService->addVersion($existing, Auth::user(), $upload, 'Régénération bordereau');
+                    $document = $existing->fresh();
+                } else {
+                    $document = $documentService->create(Auth::user(), [
+                        'origin' => \App\Enums\DocumentOrigin::Courrier->value,
+                        'object' => 'Bordereau de transmission ' . $slip->number,
+                        'title' => 'Bordereau ' . $slip->number,
+                        'reference' => $slip->number,
+                        'document_type_id' => \App\Models\DocumentType::query()->value('id'),
+                        'structure_id' => $slip->from_structure_id,
+                    ], $upload);
+                }
 
                 @unlink($blankPath);
 
@@ -150,20 +151,7 @@ class TransmissionSlipService
             }
 
             // Prepare variables
-            $variables = [
-                'numero' => $slip->number,
-                'date' => now()->format('d/m/Y'),
-                'expediteur' => $slip->fromStructure?->name ?? '',
-                'destinataire' => $slip->toStructure?->name ?? '',
-                'nature' => $slip->nature ?? '',
-                'observations' => $slip->observations ?? '',
-                'items' => $slip->items->map(fn($item) => [
-                    'reference' => $item->reference ?? $item->correspondence?->arrival_number ?? '',
-                    'objet' => $item->object ?? $item->correspondence?->subject ?? '',
-                    'pieces' => $item->piece_count ?? 1,
-                    'observations' => $item->observations ?? '',
-                ])->toArray(),
-            ];
+            $variables = $this->buildVariables($slip);
 
             $document = $this->templateService->generateDocument(
                 $template,
@@ -249,5 +237,35 @@ class TransmissionSlipService
 
             return $slip->fresh(['document']);
         });
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function buildVariables(TransmissionSlip $slip): array
+    {
+        $slip->loadMissing(['items.correspondence', 'fromStructure', 'toStructure', 'creator']);
+
+        $items = $slip->items->map(fn ($item) => [
+            'reference' => $item->reference
+                ?? $item->correspondence?->arrival_number
+                ?? $item->correspondence?->departure_number
+                ?? '',
+            'objet' => $item->object ?? $item->correspondence?->subject ?? '',
+            'pieces' => $item->piece_count ?? 1,
+            'observations' => $item->observations ?? '',
+        ])->values()->all();
+
+        return [
+            'saisi_par' => $slip->creator?->name ?? Auth::user()?->name ?? '',
+            'numero' => $slip->number,
+            'date' => now()->format('d/m/Y'),
+            'expediteur' => $slip->fromStructure?->name ?? '',
+            'destinataire' => $slip->toStructure?->name ?? '',
+            'nature' => $slip->nature ?? '',
+            'observations' => $slip->observations ?? '',
+            'total_pieces' => collect($items)->sum(fn ($item) => (int) ($item['pieces'] ?? 0)),
+            'items' => $items,
+        ];
     }
 }

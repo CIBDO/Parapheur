@@ -170,7 +170,42 @@ class DocumentTemplateRenderer
      */
     public function createCirculationSheetDocx(array $data): string
     {
-        $outputPath = storage_path('app/temp/'.uniqid('fiche_circ_', true).'.docx');
+        return $this->writeOfficialDocx('fiche_circ_', $this->buildCirculationSheetDocumentXml($data));
+    }
+
+    /**
+     * Bordereau de transmission interne (BT) — même charte que la fiche.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    public function createTransmissionSlipDocx(array $data): string
+    {
+        return $this->writeOfficialDocx('bordereau_bt_', $this->buildTransmissionSlipDocumentXml($data));
+    }
+
+    /**
+     * Bordereau d'envoi / d'expédition (BE).
+     *
+     * @param  array<string, mixed>  $data
+     */
+    public function createDispatchSlipDocx(array $data): string
+    {
+        return $this->writeOfficialDocx('bordereau_be_', $this->buildDispatchSlipDocumentXml($data));
+    }
+
+    /**
+     * Accusé de réception (AR).
+     *
+     * @param  array<string, mixed>  $data
+     */
+    public function createAcknowledgementDocx(array $data): string
+    {
+        return $this->writeOfficialDocx('accuse_ar_', $this->buildAcknowledgementDocumentXml($data));
+    }
+
+    private function writeOfficialDocx(string $prefix, string $documentXml): string
+    {
+        $outputPath = storage_path('app/temp/'.uniqid($prefix, true).'.docx');
         $outputDir = dirname($outputPath);
 
         if (! is_dir($outputDir)) {
@@ -179,7 +214,7 @@ class DocumentTemplateRenderer
 
         $zip = new ZipArchive();
         if ($zip->open($outputPath, ZipArchive::CREATE) !== true) {
-            throw new RuntimeException("Cannot create circulation sheet DOCX: {$outputPath}");
+            throw new RuntimeException("Cannot create official DOCX: {$outputPath}");
         }
 
         $zip->addFromString('[Content_Types].xml', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -211,7 +246,7 @@ class DocumentTemplateRenderer
   </w:style>
 </w:styles>');
 
-        $zip->addFromString('word/document.xml', $this->buildCirculationSheetDocumentXml($data));
+        $zip->addFromString('word/document.xml', $documentXml);
         $zip->close();
 
         return $outputPath;
@@ -271,14 +306,6 @@ class DocumentTemplateRenderer
             }
         }
 
-        $suite = trim((string) ($data['observations'] ?? ''));
-        if ($suite === '') {
-            $suite = trim((string) ($data['resume'] ?? ''));
-        }
-        if ($suite === '') {
-            $suite = '';
-        }
-
         return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
             xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
@@ -303,17 +330,218 @@ class DocumentTemplateRenderer
     '.$this->fcBorderedTable($affRows).'
     '.$this->fcSpacer(160).'
     '.$this->fcSignaturesTable().'
-    '.$this->fcSpacer(140).'
-    '.$this->fcSectionTitle('SUITE RÉSERVÉE').'
-    '.$this->fcSuiteBox($suite).'
-    '.$this->fcSpacer(100).'
-    '.$this->fcFooterLine($data).'
-    <w:sectPr>
-      <w:pgSz w:w="11906" w:h="16838"/>
-      <w:pgMar w:top="720" w:right="720" w:bottom="720" w:left="720" w:header="360" w:footer="360"/>
-    </w:sectPr>
+    '.$this->fcSectPr().'
   </w:body>
 </w:document>';
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    private function buildTransmissionSlipDocumentXml(array $data): string
+    {
+        $metaPairs = [
+            ['N° Bordereau', $data['numero'] ?? '', 'Date', $data['date'] ?? ''],
+            ['De (structure)', $data['expediteur'] ?? '', 'À (structure)', $data['destinataire'] ?? ''],
+            ['Nature', $data['nature'] ?? '', 'Pièces totales', (string) ($data['total_pieces'] ?? '0')],
+        ];
+
+        $metaXml = '';
+        foreach ($metaPairs as [$l1, $v1, $l2, $v2]) {
+            $metaXml .= '<w:tr>'
+                .$this->fcLabelCell($l1, 2100)
+                .$this->fcValueCell((string) $v1, 2900)
+                .$this->fcLabelCell($l2, 2100)
+                .$this->fcValueCell((string) $v2, 2900)
+                .'</w:tr>';
+        }
+
+        $items = is_array($data['items'] ?? null) ? $data['items'] : [];
+        $itemRows = '<w:tr>'
+            .$this->fcLabelCell('N°', 800)
+            .$this->fcLabelCell('Référence', 2400)
+            .$this->fcLabelCell('Objet', 4800)
+            .$this->fcLabelCell('Pièces', 1000)
+            .$this->fcLabelCell('Obs.', 1466)
+            .'</w:tr>';
+
+        if ($items === []) {
+            $itemRows .= '<w:tr>'.$this->fcValueCell('Aucun document listé.', 10466, false).'</w:tr>';
+        } else {
+            foreach ($items as $index => $item) {
+                $itemRows .= '<w:tr>'
+                    .$this->fcValueCell((string) ($index + 1), 800)
+                    .$this->fcValueCell((string) ($item['reference'] ?? ''), 2400)
+                    .$this->fcValueCell((string) ($item['objet'] ?? ''), 4800)
+                    .$this->fcValueCell((string) ($item['pieces'] ?? '1'), 1000)
+                    .$this->fcValueCell((string) ($item['observations'] ?? ''), 1466)
+                    .'</w:tr>';
+            }
+        }
+
+        $obs = trim((string) ($data['observations'] ?? ''));
+
+        return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+            xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <w:body>
+    '.$this->fcHeaderTable($data).'
+    '.$this->fcSpacer(80).'
+    '.$this->fcTitleBand('BORDEREAU DE TRANSMISSION', 'INTERNE', '0B6B3A').'
+    '.$this->fcSpacer(120).'
+    '.$this->fcSectionTitle('IDENTIFICATION').'
+    '.$this->fcBorderedTable($metaXml).'
+    '.$this->fcSpacer(120).'
+    '.$this->fcSectionTitle('DOCUMENTS TRANSMIS').'
+    '.$this->fcBorderedTable($itemRows).'
+    '.($obs !== '' ? $this->fcSpacer(120).$this->fcSectionTitle('OBSERVATIONS').$this->fcObjetBox($obs) : '').'
+    '.$this->fcSpacer(160).'
+    '.$this->fcDualSignatures('Le remettant', 'Le destinataire (accusé)').'
+    '.$this->fcSectPr().'
+  </w:body>
+</w:document>';
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    private function buildDispatchSlipDocumentXml(array $data): string
+    {
+        $metaPairs = [
+            ['N° Bordereau', $data['numero_bordereau'] ?? '', 'Date d\'envoi', $data['date_envoi'] ?? ''],
+            ['N° Départ', $data['numero_depart'] ?? '', 'Référence', $data['reference_externe'] ?? ''],
+            ['Canal / Mode', $data['mode_envoi'] ?? '', 'N° suivi', $data['numero_suivi'] ?? ''],
+            ['Expéditeur', $data['expediteur'] ?? '', 'Pièces', (string) ($data['nombre_pieces'] ?? '0')],
+        ];
+
+        $metaXml = '';
+        foreach ($metaPairs as [$l1, $v1, $l2, $v2]) {
+            $metaXml .= '<w:tr>'
+                .$this->fcLabelCell($l1, 2100)
+                .$this->fcValueCell((string) $v1, 2900)
+                .$this->fcLabelCell($l2, 2100)
+                .$this->fcValueCell((string) $v2, 2900)
+                .'</w:tr>';
+        }
+
+        $ampliations = trim((string) ($data['ampliations'] ?? ''));
+        $obs = trim((string) ($data['observations'] ?? ''));
+
+        return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+            xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <w:body>
+    '.$this->fcHeaderTable($data).'
+    '.$this->fcSpacer(80).'
+    '.$this->fcTitleBand('BORDEREAU D\'ENVOI', strtoupper((string) ($data['confidentialite_label'] ?? 'ORDINAIRE')), '0B6B3A').'
+    '.$this->fcSpacer(120).'
+    '.$this->fcSectionTitle('EXPÉDITION').'
+    '.$this->fcBorderedTable($metaXml).'
+    '.$this->fcSpacer(120).'
+    '.$this->fcSectionTitle('DESTINATAIRE(S)').'
+    '.$this->fcObjetBox((string) ($data['destinataires'] ?? '—')).'
+    '.$this->fcSpacer(120).'
+    '.$this->fcSectionTitle('OBJET').'
+    '.$this->fcObjetBox((string) ($data['objet'] ?? '')).'
+    '.($ampliations !== '' ? $this->fcSpacer(120).$this->fcSectionTitle('AMPLIATIONS / COPIES').$this->fcObjetBox($ampliations) : '').'
+    '.($obs !== '' ? $this->fcSpacer(120).$this->fcSectionTitle('OBSERVATIONS').$this->fcObjetBox($obs) : '').'
+    '.$this->fcSpacer(160).'
+    '.$this->fcDualSignatures('Le service expéditeur', 'Le destinataire (pour réception)').'
+    '.$this->fcSectPr().'
+  </w:body>
+</w:document>';
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    private function buildAcknowledgementDocumentXml(array $data): string
+    {
+        $metaPairs = [
+            ['N° Accusé', $data['numero_accuse'] ?? '', 'Date d\'accusé', $data['date_accuse'] ?? ''],
+            ['N° Enregistrement', $data['numero_enregistrement'] ?? '', 'Date courrier', $data['date_correspondance'] ?? ''],
+            ['Mode', $data['mode_accuse'] ?? '', 'Signataire', $data['signataire'] ?? ''],
+        ];
+
+        $metaXml = '';
+        foreach ($metaPairs as [$l1, $v1, $l2, $v2]) {
+            $metaXml .= '<w:tr>'
+                .$this->fcLabelCell($l1, 2100)
+                .$this->fcValueCell((string) $v1, 2900)
+                .$this->fcLabelCell($l2, 2100)
+                .$this->fcValueCell((string) $v2, 2900)
+                .'</w:tr>';
+        }
+
+        $obs = trim((string) ($data['observations'] ?? ''));
+
+        return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+            xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <w:body>
+    '.$this->fcHeaderTable($data).'
+    '.$this->fcSpacer(80).'
+    '.$this->fcTitleBand('ACCUSÉ DE RÉCEPTION', 'COURRIER', '0B6B3A').'
+    '.$this->fcSpacer(120).'
+    '.$this->fcSectionTitle('RÉFÉRENCES').'
+    '.$this->fcBorderedTable($metaXml).'
+    '.$this->fcSpacer(120).'
+    '.$this->fcSectionTitle('EXPÉDITEUR').'
+    '.$this->fcObjetBox((string) ($data['expediteur'] ?? '—')).'
+    '.$this->fcSpacer(120).'
+    '.$this->fcSectionTitle('OBJET DU COURRIER').'
+    '.$this->fcObjetBox((string) ($data['objet'] ?? '')).'
+    '.$this->fcSpacer(120).'
+    '.$this->fcSectionTitle('MENTION').'
+    '.$this->fcObjetBox("Le soussigné accuse réception du courrier ci-dessus référencé.").'
+    '.($obs !== '' ? $this->fcSpacer(120).$this->fcSectionTitle('OBSERVATIONS').$this->fcObjetBox($obs) : '').'
+    '.$this->fcSpacer(160).'
+    '.$this->fcDualSignatures('Pour la structure destinataire', 'Cachet / Signature').'
+    '.$this->fcSectPr().'
+  </w:body>
+</w:document>';
+    }
+
+    private function fcSectPr(): string
+    {
+        return '<w:sectPr>
+      <w:pgSz w:w="11906" w:h="16838"/>
+      <w:pgMar w:top="720" w:right="720" w:bottom="720" w:left="720" w:header="360" w:footer="360"/>
+    </w:sectPr>';
+    }
+
+    private function fcDualSignatures(string $leftRole, string $rightRole): string
+    {
+        $sig = fn (string $role) => $this->wParagraph($role, true, 'center', 18)
+            .$this->wParagraph('(Signature et cachet)', false, 'center', 14)
+            .$this->wParagraph(' ', false)
+            .$this->wParagraph(' ', false)
+            .$this->wParagraph(' ', false)
+            .$this->wParagraph(' ', false)
+            .$this->wParagraph('……………………………………', false, 'center', 16);
+
+        return '<w:tbl>
+          <w:tblPr>
+            <w:tblW w:w="10466" w:type="dxa"/>
+            '.$this->fcTblBorders('0B6B3A', 6).'
+          </w:tblPr>
+          <w:tr>
+            <w:tc>
+              <w:tcPr>
+                <w:tcW w:w="5233" w:type="dxa"/>
+                <w:tcMar><w:top w:w="80" w:type="dxa"/><w:bottom w:w="80" w:type="dxa"/></w:tcMar>
+              </w:tcPr>
+              '.$sig($leftRole).'
+            </w:tc>
+            <w:tc>
+              <w:tcPr>
+                <w:tcW w:w="5233" w:type="dxa"/>
+                <w:tcMar><w:top w:w="80" w:type="dxa"/><w:bottom w:w="80" w:type="dxa"/></w:tcMar>
+              </w:tcPr>
+              '.$sig($rightRole).'
+            </w:tc>
+          </w:tr>
+        </w:tbl>';
     }
 
     /**
@@ -429,36 +657,6 @@ class DocumentTemplateRenderer
         </w:tbl>';
     }
 
-    private function fcSuiteBox(string $text): string
-    {
-        $lines = $text !== ''
-            ? $this->wParagraph($text, false, 'left', 18)
-            : $this->wParagraph(' ', false)
-                .$this->wParagraph(' ', false)
-                .$this->wParagraph(' ', false)
-                .$this->wParagraph(' ', false);
-
-        return '<w:tbl>
-          <w:tblPr>
-            <w:tblW w:w="10466" w:type="dxa"/>
-            '.$this->fcTblBorders('666666', 6).'
-          </w:tblPr>
-          <w:tr>
-            <w:tc>
-              <w:tcPr>
-                <w:tcW w:w="10466" w:type="dxa"/>
-                <w:shd w:val="clear" w:color="auto" w:fill="F7F7F7"/>
-                <w:tcMar>
-                  <w:top w:w="80" w:type="dxa"/><w:left w:w="100" w:type="dxa"/>
-                  <w:bottom w:w="80" w:type="dxa"/><w:right w:w="100" w:type="dxa"/>
-                </w:tcMar>
-              </w:tcPr>
-              '.$lines.'
-            </w:tc>
-          </w:tr>
-        </w:tbl>';
-    }
-
     private function fcSignaturesTable(): string
     {
         $sig = fn (string $role) => $this->wParagraph($role, true, 'center', 18)
@@ -489,30 +687,6 @@ class DocumentTemplateRenderer
               </w:tcPr>
               '.$sig('Le Directeur Général Adjoint').'
             </w:tc>
-          </w:tr>
-        </w:tbl>';
-    }
-
-    /**
-     * @param  array<string, mixed>  $data
-     */
-    private function fcFooterLine(array $data): string
-    {
-        $left = 'E-Tresor DGTCP · Fiche '.((string) ($data['numero_fiche'] ?? ''));
-        $right = 'Générée le '.((string) ($data['genere_le'] ?? now()->format('d/m/Y H:i')));
-
-        return '<w:tbl>
-          <w:tblPr>
-            <w:tblW w:w="10466" w:type="dxa"/>
-            <w:tblBorders>
-              <w:top w:val="single" w:sz="6" w:color="0B6B3A"/>
-              <w:left w:val="nil"/><w:bottom w:val="nil"/><w:right w:val="nil"/>
-              <w:insideH w:val="nil"/><w:insideV w:val="nil"/>
-            </w:tblBorders>
-          </w:tblPr>
-          <w:tr>
-            <w:tc><w:tcPr><w:tcW w:w="6233" w:type="dxa"/></w:tcPr>'.$this->wParagraph($left, false, 'left', 14).'</w:tc>
-            <w:tc><w:tcPr><w:tcW w:w="4233" w:type="dxa"/></w:tcPr>'.$this->wParagraph($right, false, 'right', 14).'</w:tc>
           </w:tr>
         </w:tbl>';
     }

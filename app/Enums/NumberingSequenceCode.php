@@ -8,6 +8,8 @@ enum NumberingSequenceCode: string
     case Departure = 'DEP';
     case TransmissionSlip = 'BT';
     case CirculationSheet = 'FC';
+    case DispatchSlip = 'BE';
+    case Acknowledgement = 'AR';
 
     public function label(): string
     {
@@ -16,6 +18,8 @@ enum NumberingSequenceCode: string
             self::Departure => 'Départ',
             self::TransmissionSlip => 'Bordereau transmission',
             self::CirculationSheet => 'Fiche circulation',
+            self::DispatchSlip => 'Bordereau envoi',
+            self::Acknowledgement => 'Accusé de réception',
         };
     }
 

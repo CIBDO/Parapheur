@@ -29,10 +29,14 @@ export interface Correspondence {
   structure?: any
   channel?: any
   category?: any
+  registered_by?: any
+  owner_user?: any
   parties?: any[]
   assignments?: any[]
   events?: any[]
   circulation_sheets?: any[]
+  dispatches?: any[]
+  acknowledgements?: any[]
   links?: { outgoing: any[]; incoming: any[] }
   created_at: string
   updated_at: string
@@ -111,6 +115,13 @@ export function useCorrespondence() {
     return $api('/mail/registers/incoming', { method: 'POST', body: data })
   }
 
+  async function registerCorrespondence(id: number) {
+    return $api(`/mail/correspondences/${id}/register`, {
+      method: 'POST',
+      body: {},
+    })
+  }
+
   async function assign(id: number, assignments: any[]) {
     return $api(`/mail/correspondences/${id}/assignments`, {
       method: 'POST',
@@ -130,7 +141,31 @@ export function useCorrespondence() {
   }
 
   async function dispatch(id: number, data: Record<string, any>) {
-    return $api(`/mail/correspondences/${id}/dispatch`, { method: 'POST', body: data })
+    return $api(`/mail/correspondences/${id}/dispatch`, {
+      method: 'POST',
+      body: { generate: true, ...data },
+    })
+  }
+
+  async function generateDispatchSlip(correspondenceId: number, dispatchId: number) {
+    return $api(`/mail/correspondences/${correspondenceId}/dispatches/${dispatchId}/generate`, {
+      method: 'POST',
+      body: {},
+    })
+  }
+
+  async function acknowledge(id: number, data: Record<string, any>) {
+    return $api(`/mail/correspondences/${id}/acknowledge`, {
+      method: 'POST',
+      body: { generate: true, ...data },
+    })
+  }
+
+  async function generateAcknowledgementDocument(correspondenceId: number, acknowledgementId: number) {
+    return $api(`/mail/correspondences/${correspondenceId}/acknowledgements/${acknowledgementId}/generate`, {
+      method: 'POST',
+      body: {},
+    })
   }
 
   async function fetchDashboard() {
@@ -249,10 +284,14 @@ export function useCorrespondence() {
     createCorrespondence,
     updateCorrespondence,
     registerIncoming,
+    registerCorrespondence,
     assign,
     takeCharge,
     reply,
     dispatch,
+    acknowledge,
+    generateDispatchSlip,
+    generateAcknowledgementDocument,
     fetchDashboard,
     fetchDashboardDg,
     fetchDashboardDirection,

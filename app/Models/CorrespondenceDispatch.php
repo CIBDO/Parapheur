@@ -12,11 +12,13 @@ class CorrespondenceDispatch extends Model
 
     protected $fillable = [
         'correspondence_id',
+        'number',
         'dispatched_at',
         'method',
         'tracking_number',
         'dispatched_by',
         'observations',
+        'document_id',
     ];
 
     protected function casts(): array
@@ -29,6 +31,11 @@ class CorrespondenceDispatch extends Model
     public function correspondence(): BelongsTo
     {
         return $this->belongsTo(Correspondence::class);
+    }
+
+    public function document(): BelongsTo
+    {
+        return $this->belongsTo(Document::class);
     }
 
     public function dispatchedBy(): BelongsTo

@@ -2,8 +2,10 @@
 
 namespace App\Services;
 
+use App\Enums\CorrespondenceDirection;
 use App\Enums\CorrespondenceStatus;
 use App\Enums\DocumentAttachmentKind;
+use App\Enums\NumberingSequenceCode;
 use App\Models\Correspondence;
 use App\Models\CorrespondenceAcknowledgement;
 use App\Models\CorrespondenceDispatch;
@@ -23,6 +25,23 @@ class CorrespondenceDispatchService
     public function recordDispatch(Correspondence $correspondence, User $user, array $data): CorrespondenceDispatch
     {
         return DB::transaction(function () use ($correspondence, $user, $data) {
+            // Sortant : numéro de départ requis avant (ou lors de) l'expédition
+            if ($correspondence->direction === CorrespondenceDirection::Sortant
+                && ! $correspondence->departure_number) {
+                $number = app(NumberingService::class)->nextNumber(
+                    NumberingSequenceCode::Departure,
+                    structureId: $correspondence->structure_id
+                );
+                $correspondence->departure_number = $number;
+                $correspondence->is_registered = true;
+                $correspondence->registered_at = $correspondence->registered_at ?? now();
+                $correspondence->save();
+                $this->eventService->logEvent($correspondence, 'departure_number_assigned', $user, metadata: [
+                    'departure_number' => $number,
+                    'via' => 'dispatch',
+                ]);
+            }
+
             $dispatch = CorrespondenceDispatch::query()->create([
                 'correspondence_id' => $correspondence->id,
                 'dispatched_at' => $data['dispatched_at'] ?? now(),

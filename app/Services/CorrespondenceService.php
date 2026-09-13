@@ -311,6 +311,8 @@ class CorrespondenceService
             'assignments.toUser', 'assignments.toStructure', 'assignments.action',
             'events.user', 'outgoingLinks.targetCorrespondence', 'incomingLinks.sourceCorrespondence',
             'circulationSheets.document', 'circulationSheets.creator',
+            'dispatches.document', 'dispatches.dispatchedBy',
+            'acknowledgements.document', 'acknowledgements.registeredBy',
         ]);
 
         $parties = $correspondence->parties->map(fn ($party) => [
@@ -398,6 +400,28 @@ class CorrespondenceService
                 'document' => $sheet->document,
                 'created_by' => $sheet->creator?->only(['id', 'name']),
                 'created_at' => $sheet->created_at?->toIso8601String(),
+            ])->values(),
+            'dispatches' => $correspondence->dispatches->map(fn ($dispatch) => [
+                'id' => $dispatch->id,
+                'number' => $dispatch->number,
+                'method' => $dispatch->method,
+                'tracking_number' => $dispatch->tracking_number,
+                'dispatched_at' => $dispatch->dispatched_at?->toIso8601String(),
+                'observations' => $dispatch->observations,
+                'document_id' => $dispatch->document_id,
+                'document' => $dispatch->document,
+                'dispatched_by' => $dispatch->dispatchedBy?->only(['id', 'name']),
+            ])->values(),
+            'acknowledgements' => $correspondence->acknowledgements->map(fn ($ack) => [
+                'id' => $ack->id,
+                'number' => $ack->number,
+                'method' => $ack->method,
+                'acknowledged_by_name' => $ack->acknowledged_by_name,
+                'acknowledged_at' => $ack->acknowledged_at?->toIso8601String(),
+                'observations' => $ack->observations,
+                'document_id' => $ack->document_id,
+                'document' => $ack->document,
+                'registered_by' => $ack->registeredBy?->only(['id', 'name']),
             ])->values(),
             'links' => [
                 'outgoing' => $correspondence->outgoingLinks,

@@ -5,6 +5,7 @@ namespace App\Enums;
 enum DocumentTemplateKind: string
 {
     case BordereauTransmission = 'bordereau_transmission';
+    case BordereauEnvoi = 'bordereau_envoi';
     case FicheCirculation = 'fiche_circulation';
     case AccuseReception = 'accuse_reception';
     case Lettre = 'lettre';
@@ -16,6 +17,7 @@ enum DocumentTemplateKind: string
     {
         return match ($this) {
             self::BordereauTransmission => 'Bordereau de transmission',
+            self::BordereauEnvoi => 'Bordereau d\'envoi',
             self::FicheCirculation => 'Fiche de circulation',
             self::AccuseReception => 'Accusé de réception',
             self::Lettre => 'Lettre',

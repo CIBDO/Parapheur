@@ -138,15 +138,26 @@ class CirculationSheetService
                     true
                 );
 
-                $document = $this->documentService->create($user, [
-                    'origin' => 'courrier',
-                    'object' => 'Fiche circulation '.$sheet->number,
-                    'title' => 'Fiche de circulation — '.$sheet->number,
-                    'reference' => $sheet->number,
-                    'document_type_id' => \App\Models\DocumentType::query()->value('id'),
-                    'structure_id' => $correspondence->structure_id,
-                    'confidentiality' => $correspondence->confidentiality?->value,
-                ], $uploaded);
+                if ($sheet->document_id && ($existing = \App\Models\Document::query()->find($sheet->document_id))) {
+                    $this->documentService->addVersion($existing, $user, $uploaded, 'Régénération fiche de circulation');
+                    $existing->title = 'Fiche de circulation — '.$sheet->number;
+                    $existing->object = 'Fiche circulation '.$sheet->number;
+                    $existing->save();
+                    $document = $existing->fresh();
+                } elseif ($sheet->number && ($existing = \App\Models\Document::query()->where('reference', $sheet->number)->first())) {
+                    $this->documentService->addVersion($existing, $user, $uploaded, 'Régénération fiche de circulation');
+                    $document = $existing->fresh();
+                } else {
+                    $document = $this->documentService->create($user, [
+                        'origin' => 'courrier',
+                        'object' => 'Fiche circulation '.$sheet->number,
+                        'title' => 'Fiche de circulation — '.$sheet->number,
+                        'reference' => $sheet->number,
+                        'document_type_id' => \App\Models\DocumentType::query()->value('id'),
+                        'structure_id' => $correspondence->structure_id,
+                        'confidentiality' => $correspondence->confidentiality?->value,
+                    ], $uploaded);
+                }
 
                 @unlink($path);
             }
