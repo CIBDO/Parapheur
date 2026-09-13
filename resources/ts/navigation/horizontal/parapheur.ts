@@ -137,27 +137,6 @@ export default [
         subject: 'Ged',
       },
       {
-        title: 'Favoris',
-        icon: { icon: 'tabler-star' },
-        to: 'ged-favoris',
-        action: 'read',
-        subject: 'Ged',
-      },
-      {
-        title: 'Récents',
-        icon: { icon: 'tabler-history' },
-        to: 'ged-recents',
-        action: 'read',
-        subject: 'Ged',
-      },
-      {
-        title: 'Recherche',
-        icon: { icon: 'tabler-search' },
-        to: 'ged-recherche',
-        action: 'read',
-        subject: 'Ged',
-      },
-      {
         title: 'Plan de classement',
         icon: { icon: 'tabler-sitemap' },
         to: 'ged-classification',
@@ -169,13 +148,6 @@ export default [
         icon: { icon: 'tabler-archive' },
         to: 'ged-archives',
         action: 'read',
-        subject: 'Ged',
-      },
-      {
-        title: 'Nouveau',
-        icon: { icon: 'tabler-file-plus' },
-        to: 'ged-nouveau',
-        action: 'create',
         subject: 'Ged',
       },
       {
