@@ -7,6 +7,7 @@ use App\Enums\CorrespondenceStatus;
 use App\Enums\DocumentOrigin;
 use App\Enums\NumberingSequenceCode;
 use App\Models\Correspondence;
+use App\Models\Structure;
 use App\Models\User;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
@@ -30,6 +31,10 @@ class CorrespondenceService
     public function createIncoming(User $user, array $data, ?UploadedFile $scanFile = null): Correspondence
     {
         return DB::transaction(function () use ($user, $data, $scanFile) {
+            $documentData = is_array($data['document_data'] ?? null) ? $data['document_data'] : [];
+            [$data, $parties] = $this->extractPartiesInput($data);
+            $data['structure_id'] = $data['structure_id'] ?? $user->structure_id;
+
             $arrivalNumber = $this->numberingService->nextNumber(
                 NumberingSequenceCode::Arrival->value,
                 structureId: $data['structure_id'] ?? null
@@ -45,9 +50,11 @@ class CorrespondenceService
                 'is_registered' => true,
             ]);
 
+            $this->seedParties($correspondence, $user, $parties);
+
             // Attacher le scan si fourni
             if ($scanFile) {
-                $this->attachDocument($correspondence, $user, $scanFile, $data['document_data'] ?? []);
+                $this->attachDocument($correspondence, $user, $scanFile, $documentData);
             }
 
             $this->eventService->logEvent(
@@ -72,6 +79,9 @@ class CorrespondenceService
     public function createOutgoing(User $user, array $data): Correspondence
     {
         return DB::transaction(function () use ($user, $data) {
+            [$data, $parties] = $this->extractPartiesInput($data);
+            $data['structure_id'] = $data['structure_id'] ?? $user->structure_id;
+
             $correspondence = Correspondence::query()->create([
                 ...$data,
                 'direction' => CorrespondenceDirection::Sortant,
@@ -79,6 +89,8 @@ class CorrespondenceService
                 'registered_by' => $user->id,
                 'owner_user_id' => $user->id,
             ]);
+
+            $this->seedParties($correspondence, $user, $parties);
 
             $this->eventService->logEvent(
                 $correspondence,
@@ -101,6 +113,9 @@ class CorrespondenceService
     public function createInternal(User $user, array $data): Correspondence
     {
         return DB::transaction(function () use ($user, $data) {
+            [$data, $parties] = $this->extractPartiesInput($data);
+            $data['structure_id'] = $data['structure_id'] ?? $user->structure_id;
+
             $correspondence = Correspondence::query()->create([
                 ...$data,
                 'direction' => CorrespondenceDirection::Interne,
@@ -108,6 +123,8 @@ class CorrespondenceService
                 'registered_at' => now(),
                 'registered_by' => $user->id,
             ]);
+
+            $this->seedParties($correspondence, $user, $parties);
 
             $this->eventService->logEvent(
                 $correspondence,
@@ -133,7 +150,7 @@ class CorrespondenceService
             $fillable = [
                 'subject', 'summary', 'observations', 'external_reference',
                 'correspondence_date', 'due_date', 'medium', 'priority',
-                'confidentiality', 'channel_id', 'category_id', 'qualification_id',
+                'confidentiality', 'structure_id', 'channel_id', 'category_id', 'qualification_id',
                 'piece_count', 'keywords', 'requires_reply',
             ];
 
@@ -293,7 +310,47 @@ class CorrespondenceService
             'registeredBy', 'ownerUser', 'parties.correspondent',
             'assignments.toUser', 'assignments.toStructure', 'assignments.action',
             'events.user', 'outgoingLinks.targetCorrespondence', 'incomingLinks.sourceCorrespondence',
+            'circulationSheets.document', 'circulationSheets.creator',
         ]);
+
+        $parties = $correspondence->parties->map(fn ($party) => [
+            'id' => $party->id,
+            'role' => $party->role instanceof \BackedEnum ? $party->role->value : $party->role,
+            'name' => $party->name,
+            'function' => $party->function,
+            'organization' => $party->organization,
+            'correspondent_id' => $party->correspondent_id,
+            'correspondent' => $party->correspondent,
+            'display_order' => $party->display_order,
+        ])->values();
+
+        if ($correspondence->direction === CorrespondenceDirection::Entrant
+            && ! $parties->contains(fn ($party) => ($party['role'] ?? null) === 'to')) {
+            $parties->push([
+                'id' => null,
+                'role' => 'to',
+                'name' => $correspondence->structure?->name ?: 'DGTCP',
+                'function' => null,
+                'organization' => null,
+                'correspondent_id' => null,
+                'correspondent' => null,
+                'display_order' => $parties->count(),
+            ]);
+        }
+
+        if ($correspondence->direction === CorrespondenceDirection::Sortant
+            && ! $parties->contains(fn ($party) => ($party['role'] ?? null) === 'from')) {
+            $parties->push([
+                'id' => null,
+                'role' => 'from',
+                'name' => $correspondence->structure?->name ?: 'DGTCP',
+                'function' => null,
+                'organization' => null,
+                'correspondent_id' => null,
+                'correspondent' => null,
+                'display_order' => $parties->count(),
+            ]);
+        }
 
         return [
             'id' => $correspondence->id,
@@ -317,6 +374,10 @@ class CorrespondenceService
             'correspondence_date' => $correspondence->correspondence_date?->toDateString(),
             'registered_at' => $correspondence->registered_at?->toIso8601String(),
             'due_date' => $correspondence->due_date?->toDateString(),
+            'structure_id' => $correspondence->structure_id,
+            'channel_id' => $correspondence->channel_id,
+            'category_id' => $correspondence->category_id,
+            'qualification_id' => $correspondence->qualification_id,
             'created_at' => $correspondence->created_at->toIso8601String(),
             'updated_at' => $correspondence->updated_at->toIso8601String(),
             'document' => $correspondence->document,
@@ -326,9 +387,18 @@ class CorrespondenceService
             'qualification' => $correspondence->qualification,
             'registered_by' => $correspondence->registeredBy,
             'owner_user' => $correspondence->ownerUser,
-            'parties' => $correspondence->parties,
+            'parties' => $parties,
             'assignments' => $correspondence->assignments,
             'events' => $correspondence->events,
+            'circulation_sheets' => $correspondence->circulationSheets->map(fn ($sheet) => [
+                'id' => $sheet->id,
+                'number' => $sheet->number,
+                'status' => $sheet->status,
+                'document_id' => $sheet->document_id,
+                'document' => $sheet->document,
+                'created_by' => $sheet->creator?->only(['id', 'name']),
+                'created_at' => $sheet->created_at?->toIso8601String(),
+            ])->values(),
             'links' => [
                 'outgoing' => $correspondence->outgoingLinks,
                 'incoming' => $correspondence->incomingLinks,
@@ -344,21 +414,8 @@ class CorrespondenceService
     public function syncParties(Correspondence $correspondence, User $user, array $parties): void
     {
         DB::transaction(function () use ($correspondence, $user, $parties) {
-            // Supprimer toutes les parties existantes
             $correspondence->parties()->delete();
-
-            // Créer les nouvelles parties
-            $order = 0;
-            foreach ($parties as $partyData) {
-                $correspondence->parties()->create([
-                    'role' => $partyData['role'],
-                    'correspondent_id' => $partyData['correspondent_id'] ?? null,
-                    'name' => $partyData['name'] ?? null,
-                    'function' => $partyData['function'] ?? null,
-                    'organization' => $partyData['organization'] ?? null,
-                    'display_order' => $order++,
-                ]);
-            }
+            $this->attachParties($correspondence, $parties);
 
             // Log l'événement
             $this->eventService->logEvent(
@@ -373,5 +430,114 @@ class CorrespondenceService
                 'parties_count' => count($parties),
             ]);
         });
+    }
+
+    /**
+     * Inverse expéditeur / destinataire d'un courrier source (réponse).
+     */
+    public function copyInvertedParties(Correspondence $source, Correspondence $target, User $user): void
+    {
+        $source->load(['parties.correspondent']);
+
+        $inverted = [];
+        foreach ($source->parties as $party) {
+            $role = $party->role instanceof \BackedEnum ? $party->role->value : $party->role;
+            $inverted[] = [
+                'role' => match ($role) {
+                    'from' => 'to',
+                    'to' => 'from',
+                    default => $role,
+                },
+                'correspondent_id' => $party->correspondent_id,
+                'name' => $party->name ?? $party->correspondent?->name,
+                'function' => $party->function,
+                'organization' => $party->organization ?? $party->correspondent?->organization,
+            ];
+        }
+
+        $target->parties()->delete();
+        $this->seedParties($target, $user, $inverted);
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @return array{0: array<string, mixed>, 1: list<array<string, mixed>>}
+     */
+    private function extractPartiesInput(array $data): array
+    {
+        $parties = is_array($data['parties'] ?? null) ? array_values($data['parties']) : [];
+        $roles = collect($parties)->pluck('role');
+
+        $senderName = trim((string) ($data['sender_name'] ?? ''));
+        $recipientName = trim((string) ($data['recipient_name'] ?? ''));
+
+        if ($senderName !== '' && ! $roles->contains('from')) {
+            $parties[] = ['role' => 'from', 'name' => $senderName];
+        }
+        if ($recipientName !== '' && ! $roles->contains('to')) {
+            $parties[] = ['role' => 'to', 'name' => $recipientName];
+        }
+
+        unset($data['parties'], $data['sender_name'], $data['recipient_name'], $data['document_data']);
+
+        return [$data, $parties];
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $parties
+     */
+    private function seedParties(Correspondence $correspondence, User $user, array $parties): void
+    {
+        $roles = collect($parties)->pluck('role');
+        $institution = $this->institutionName($user, $correspondence->structure_id);
+
+        if ($correspondence->direction === CorrespondenceDirection::Entrant && ! $roles->contains('to')) {
+            $parties[] = ['role' => 'to', 'name' => $institution];
+        }
+
+        if ($correspondence->direction === CorrespondenceDirection::Sortant && ! $roles->contains('from')) {
+            $parties[] = ['role' => 'from', 'name' => $institution];
+        }
+
+        if ($parties === []) {
+            return;
+        }
+
+        $this->attachParties($correspondence, $parties);
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $parties
+     */
+    private function attachParties(Correspondence $correspondence, array $parties): void
+    {
+        $order = 0;
+        foreach ($parties as $partyData) {
+            if (empty($partyData['role'])) {
+                continue;
+            }
+
+            $correspondence->parties()->create([
+                'role' => $partyData['role'],
+                'correspondent_id' => $partyData['correspondent_id'] ?? null,
+                'name' => $partyData['name'] ?? null,
+                'function' => $partyData['function'] ?? null,
+                'organization' => $partyData['organization'] ?? null,
+                'display_order' => $order++,
+            ]);
+        }
+    }
+
+    private function institutionName(User $user, mixed $structureId = null): string
+    {
+        $id = $structureId ?? $user->structure_id;
+        if ($id) {
+            $name = Structure::query()->whereKey($id)->value('name');
+            if (is_string($name) && $name !== '') {
+                return $name;
+            }
+        }
+
+        return 'DGTCP';
     }
 }

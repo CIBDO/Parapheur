@@ -1,8 +1,12 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useCorrespondence } from '@/composables/useCorrespondence'
-import { correspondencePriorityLabels, correspondenceConfidentialityLabels, correspondenceMediumLabels } from '@/utils/courrierUi'
+import {
+  correspondencePriorityLabels,
+  correspondenceConfidentialityLabels,
+  correspondenceMediumLabels,
+} from '@/utils/courrierUi'
 import { $api } from '@/utils/api'
 
 definePage({
@@ -14,7 +18,9 @@ definePage({
 })
 
 const router = useRouter()
-const { createCorrespondence, loading } = useCorrespondence()
+const { createCorrespondence, fetchMeta, loading } = useCorrespondence()
+
+const userData = useCookie<Record<string, any> | null>('userData')
 
 const form = ref({
   direction: 'entrant',
@@ -29,17 +35,62 @@ const form = ref({
   piece_count: 1,
   requires_reply: false,
   sender_name: '',
+  recipient_name: '',
+  structure_id: null as number | null,
+  channel_id: null as number | null,
+  category_id: null as number | null,
 })
 
 const scanFile = ref<File | null>(null)
 const errorMsg = ref('')
+const structures = ref<any[]>([])
+const channels = ref<any[]>([])
+const categories = ref<any[]>([])
+
+const structureItems = computed(() =>
+  structures.value.map(s => ({ value: s.id, title: s.name || s.code })),
+)
+const channelItems = computed(() =>
+  channels.value.map(c => ({ value: c.id, title: c.name || c.code })),
+)
+const categoryItems = computed(() =>
+  categories.value.map(c => ({ value: c.id, title: c.name || c.code })),
+)
+
+onMounted(async () => {
+  form.value.structure_id = userData.value?.structure?.id
+    ?? userData.value?.structure_id
+    ?? null
+
+  try {
+    const [structs, meta] = await Promise.all([
+      $api('/meta/structures'),
+      fetchMeta(),
+    ])
+    structures.value = Array.isArray(structs) ? structs : []
+    channels.value = Array.isArray(meta.channels) ? meta.channels : (meta.channels?.data || [])
+    categories.value = Array.isArray(meta.categories) ? meta.categories : (meta.categories?.data || [])
+
+    if (!form.value.channel_id && channels.value.length) {
+      const byMedium = form.value.medium === 'electronique'
+        ? channels.value.find(c => String(c.code).toUpperCase() === 'EMAIL')
+        : channels.value.find(c => String(c.code).toUpperCase() === 'COURRIER')
+      form.value.channel_id = (byMedium || channels.value[0])?.id ?? null
+    }
+  }
+  catch {
+    structures.value = []
+    channels.value = []
+    categories.value = []
+  }
+})
 
 async function submit() {
   errorMsg.value = ''
   try {
     const body = new FormData()
     Object.entries(form.value).forEach(([key, value]) => {
-      if (value === null || value === undefined || key === 'sender_name')
+      if (value === null || value === undefined || value === '')
         return
 
       // Laravel `boolean` n'accepte pas les chaînes "true"/"false" (FormData)
@@ -56,14 +107,6 @@ async function submit() {
       body.append('scan_file', file)
 
     const created = await createCorrespondence(body)
-    if (form.value.sender_name && created?.id) {
-      await $api(`/mail/correspondences/${created.id}/parties`, {
-        method: 'POST',
-        body: {
-          parties: [{ role: 'from', name: form.value.sender_name }],
-        },
-      })
-    }
     router.push({ name: 'courrier-entrants-id', params: { id: created.id } })
   }
   catch (error: any) {
@@ -140,8 +183,51 @@ async function submit() {
               md="6"
             >
               <AppTextField
+                v-model="form.recipient_name"
+                label="Destinataire"
+                placeholder="DGTCP"
+              />
+            </VCol>
+            <VCol
+              cols="12"
+              md="6"
+            >
+              <AppTextField
                 v-model="form.external_reference"
                 label="Référence externe"
+              />
+            </VCol>
+            <VCol
+              cols="12"
+              md="6"
+            >
+              <AppSelect
+                v-model="form.structure_id"
+                :items="structureItems"
+                label="Structure de traitement *"
+                clearable
+              />
+            </VCol>
+            <VCol
+              cols="12"
+              md="4"
+            >
+              <AppSelect
+                v-model="form.channel_id"
+                :items="channelItems"
+                label="Canal"
+                clearable
+              />
+            </VCol>
+            <VCol
+              cols="12"
+              md="4"
+            >
+              <AppSelect
+                v-model="form.category_id"
+                :items="categoryItems"
+                label="Catégorie"
+                clearable
               />
             </VCol>
             <VCol

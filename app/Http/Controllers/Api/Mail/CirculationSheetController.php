@@ -8,6 +8,7 @@ use App\Models\Correspondence;
 use App\Services\CirculationSheetService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Throwable;
 
 class CirculationSheetController extends Controller
 {
@@ -25,14 +26,18 @@ class CirculationSheetController extends Controller
         $validated = $request->validate([
             'correspondence_id' => 'required|exists:correspondences,id',
             'template_version_id' => 'nullable|exists:document_template_versions,id',
+            'generate' => 'nullable|boolean',
         ]);
 
         $correspondence = Correspondence::query()->findOrFail($validated['correspondence_id']);
         $this->authorize('view', $correspondence);
 
-        $sheet = $this->service->create($correspondence, $request->user(), $validated);
-
-        return response()->json($sheet, 201);
+        return $this->respondWithSheet(
+            $correspondence,
+            $request->user(),
+            $validated,
+            (bool) ($validated['generate'] ?? false),
+        );
     }
 
     public function show(CirculationSheet $circulationSheet): JsonResponse
@@ -51,7 +56,7 @@ class CirculationSheetController extends Controller
                 'message' => 'Document généré avec succès',
                 'circulation_sheet' => $sheet,
             ]);
-        } catch (\InvalidArgumentException $e) {
+        } catch (Throwable $e) {
             return response()->json([
                 'message' => 'Erreur lors de la génération',
                 'error' => $e->getMessage(),
@@ -63,24 +68,58 @@ class CirculationSheetController extends Controller
     {
         $this->authorize('view', $correspondence);
 
+        if ($request->exists('generate') && ! is_bool($request->input('generate'))) {
+            $request->merge([
+                'generate' => filter_var($request->input('generate'), FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE),
+            ]);
+        }
+
         $validated = $request->validate([
             'generate' => 'nullable|boolean',
         ]);
 
-        $sheet = $this->service->create($correspondence, $request->user());
+        return $this->respondWithSheet(
+            $correspondence,
+            $request->user(),
+            [],
+            (bool) ($validated['generate'] ?? false),
+        );
+    }
 
-        if ($validated['generate'] ?? false) {
-            try {
-                $sheet = $this->service->generateDocument($sheet, $request->user());
-            } catch (\InvalidArgumentException $e) {
-                return response()->json([
-                    'message' => 'Fiche créée mais génération échouée',
-                    'error' => $e->getMessage(),
-                    'circulation_sheet' => $sheet,
-                ], 422);
+    private function respondWithSheet(
+        Correspondence $correspondence,
+        $user,
+        array $data,
+        bool $generate,
+    ): JsonResponse {
+        try {
+            $result = $this->service->findOrCreate($correspondence, $user, $data);
+            $sheet = $result['sheet'];
+            $created = $result['created'];
+
+            if ($generate) {
+                $sheet = $this->service->generateDocument($sheet, $user);
             }
-        }
 
-        return response()->json($sheet, 201);
+            $message = match (true) {
+                $created && $generate => 'Fiche créée et document généré',
+                $created => 'Fiche créée',
+                $generate => 'Fiche existante — document généré',
+                default => 'Fiche déjà existante pour ce courrier',
+            };
+
+            return response()->json([
+                'message' => $message,
+                'created' => $created,
+                'circulation_sheet' => $sheet,
+            ], $created ? 201 : 200);
+        } catch (Throwable $e) {
+            report($e);
+
+            return response()->json([
+                'message' => 'Impossible de créer la fiche de circulation',
+                'error' => $e->getMessage(),
+            ], 422);
+        }
     }
 }

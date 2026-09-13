@@ -151,6 +151,64 @@ class MailModuleCompleteTest extends TestCase
         $this->assertNull($sheet->document_id);
     }
 
+    public function test_it_can_generate_circulation_sheet_document(): void
+    {
+        app(CorrespondenceService::class)->syncParties($this->correspondence, $this->admin, [
+            ['role' => 'from', 'name' => 'MINISTERE DE L\'ECONOMIE', 'organization' => 'MEF'],
+            ['role' => 'to', 'name' => 'DGTCP'],
+        ]);
+
+        $service = app(CirculationSheetService::class);
+        $sheet = $service->create($this->correspondence->fresh(), $this->admin);
+        $generated = $service->generateDocument($sheet, $this->admin);
+
+        $this->assertNotNull($generated->document_id);
+        $this->assertDatabaseHas('documents', [
+            'id' => $generated->document_id,
+            'title' => 'Fiche de circulation — '.$sheet->number,
+        ]);
+    }
+
+    public function test_circulation_sheet_api_create_and_generate(): void
+    {
+        $this->actingAs($this->admin);
+
+        $response = $this->postJson(
+            "/api/mail/correspondences/{$this->correspondence->id}/circulation-sheet",
+            ['generate' => true]
+        );
+
+        $response->assertCreated()
+            ->assertJsonPath('circulation_sheet.number', fn ($n) => is_string($n) && str_starts_with($n, 'FC/'))
+            ->assertJsonPath('circulation_sheet.document_id', fn ($id) => ! empty($id));
+
+        $payload = $this->getJson("/api/mail/correspondences/{$this->correspondence->id}")
+            ->assertOk()
+            ->json();
+
+        $this->assertNotEmpty($payload['circulation_sheets']);
+    }
+
+    public function test_circulation_sheet_reuses_existing_for_same_correspondence(): void
+    {
+        $this->actingAs($this->admin);
+        $service = app(CirculationSheetService::class);
+
+        $first = $service->findOrCreate($this->correspondence, $this->admin);
+        $second = $service->findOrCreate($this->correspondence, $this->admin);
+
+        $this->assertTrue($first['created']);
+        $this->assertFalse($second['created']);
+        $this->assertSame($first['sheet']->id, $second['sheet']->id);
+        $this->assertEquals(1, $this->correspondence->circulationSheets()->count());
+
+        $this->postJson("/api/mail/correspondences/{$this->correspondence->id}/circulation-sheet", [
+            'generate' => false,
+        ])->assertOk()
+            ->assertJsonPath('created', false)
+            ->assertJsonPath('circulation_sheet.id', $first['sheet']->id);
+    }
+
     public function test_it_can_attach_signed_version(): void
     {
         $documentService = app(DocumentService::class);
@@ -317,5 +375,115 @@ class MailModuleCompleteTest extends TestCase
         $this->getJson("/api/mail/correspondences/{$this->correspondence->id}/reminders")
             ->assertOk()
             ->assertJsonCount(1);
+    }
+
+    public function test_store_incoming_persists_sender_and_recipient(): void
+    {
+        $response = $this->actingAs($this->admin)->postJson('/api/mail/correspondences', [
+            'direction' => 'entrant',
+            'subject' => 'Courrier CIBDO',
+            'medium' => 'physique',
+            'received_at' => now()->toIso8601String(),
+            'sender_name' => 'CIBDO',
+            'recipient_name' => 'DGTCP',
+        ]);
+
+        $response->assertCreated();
+        $id = $response->json('id');
+
+        $this->assertDatabaseHas('correspondence_parties', [
+            'correspondence_id' => $id,
+            'role' => 'from',
+            'name' => 'CIBDO',
+        ]);
+        $this->assertDatabaseHas('correspondence_parties', [
+            'correspondence_id' => $id,
+            'role' => 'to',
+            'name' => 'DGTCP',
+        ]);
+
+        $payload = $this->getJson("/api/mail/correspondences/{$id}")->assertOk()->json();
+        $roles = collect($payload['parties'])->pluck('role')->all();
+        $this->assertContains('from', $roles);
+        $this->assertContains('to', $roles);
+        $this->assertEquals('CIBDO', collect($payload['parties'])->firstWhere('role', 'from')['name']);
+        $this->assertEquals('DGTCP', collect($payload['parties'])->firstWhere('role', 'to')['name']);
+    }
+
+    public function test_store_incoming_defaults_recipient_to_structure(): void
+    {
+        $response = $this->actingAs($this->admin)->postJson('/api/mail/correspondences', [
+            'direction' => 'entrant',
+            'subject' => 'Sans destinataire saisi',
+            'medium' => 'physique',
+            'received_at' => now()->toIso8601String(),
+            'sender_name' => 'CIBDO',
+            'structure_id' => $this->admin->structure_id,
+        ]);
+
+        $response->assertCreated();
+        $id = $response->json('id');
+        $this->admin->loadMissing('structure');
+        $structureName = $this->admin->structure?->name ?: 'DGTCP';
+
+        $this->assertDatabaseHas('correspondence_parties', [
+            'correspondence_id' => $id,
+            'role' => 'to',
+            'name' => $structureName,
+        ]);
+    }
+
+    public function test_store_incoming_persists_treatment_fields(): void
+    {
+        $channel = \App\Models\CorrespondenceChannel::query()->where('code', 'COURRIER')->firstOrFail();
+        $category = \App\Models\CorrespondenceCategory::query()->where('code', 'ADMIN')->firstOrFail();
+
+        $response = $this->actingAs($this->admin)->postJson('/api/mail/correspondences', [
+            'direction' => 'entrant',
+            'subject' => 'Avec traitement',
+            'medium' => 'physique',
+            'received_at' => now()->toIso8601String(),
+            'structure_id' => $this->admin->structure_id,
+            'channel_id' => $channel->id,
+            'category_id' => $category->id,
+            'sender_name' => 'CIBDO',
+        ]);
+
+        $response->assertCreated()
+            ->assertJsonPath('structure.id', $this->admin->structure_id)
+            ->assertJsonPath('channel.id', $channel->id)
+            ->assertJsonPath('category.id', $category->id);
+
+        $id = $response->json('id');
+
+        $this->putJson("/api/mail/correspondences/{$id}", [
+            'channel_id' => null,
+            'category_id' => $category->id,
+            'structure_id' => $this->admin->structure_id,
+        ])->assertOk()
+            ->assertJsonPath('structure.id', $this->admin->structure_id)
+            ->assertJsonPath('category.id', $category->id);
+    }
+
+    public function test_prepare_reply_inverts_parties(): void
+    {
+        app(CorrespondenceService::class)->syncParties($this->correspondence, $this->admin, [
+            ['role' => 'from', 'name' => 'CIBDO'],
+            ['role' => 'to', 'name' => 'DGTCP'],
+        ]);
+
+        $reply = app(\App\Services\CorrespondenceReplyService::class)
+            ->prepareReply($this->correspondence, $this->admin);
+
+        $this->assertDatabaseHas('correspondence_parties', [
+            'correspondence_id' => $reply->id,
+            'role' => 'from',
+            'name' => 'DGTCP',
+        ]);
+        $this->assertDatabaseHas('correspondence_parties', [
+            'correspondence_id' => $reply->id,
+            'role' => 'to',
+            'name' => 'CIBDO',
+        ]);
     }
 }

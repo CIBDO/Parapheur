@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useCorrespondence } from '@/composables/useCorrespondence'
 import type { Correspondence } from '@/composables/useCorrespondence'
@@ -16,6 +16,9 @@ import {
   partyRoleLabel,
   partyRoleLabels,
   partyRoleColors,
+  partyRoleValue,
+  partyDisplayName,
+  partiesByRole,
   assignmentStatusLabel,
   assignmentStatusColors,
   detailRouteName,
@@ -45,13 +48,26 @@ const {
   attachSignedVersion, 
   printDocument, 
   createCirculationSheet, 
+  generateCirculationSheetDocument,
   dispatch,
+  updateCorrespondence,
+  fetchMeta,
 } = useCorrespondence()
 
 const activeTab = ref('synthese')
 const reminders = ref<any[]>([])
 const users = ref<any[]>([])
 const assigning = ref(false)
+const structures = ref<any[]>([])
+const channels = ref<any[]>([])
+const categories = ref<any[]>([])
+const creatingFiche = ref(false)
+const ficheMessage = ref('')
+const ficheError = ref('')
+const documentDetail = ref<any>(null)
+const documentPreviewLoading = ref(false)
+const documentPreviewError = ref('')
+const editorRemountKey = ref(0)
 
 // Dialogs
 const showAssignDialog = ref(false)
@@ -77,6 +93,25 @@ const signedFile = ref<File | null>(null)
 const editingParties = ref(false)
 const partiesForm = ref<any[]>([])
 
+// Traitement
+const editingTraitement = ref(false)
+const savingTraitement = ref(false)
+const traitementForm = ref({
+  structure_id: null as number | null,
+  channel_id: null as number | null,
+  category_id: null as number | null,
+})
+
+const structureItems = computed(() =>
+  structures.value.map(s => ({ value: s.id, title: s.name || s.code })),
+)
+const channelItems = computed(() =>
+  channels.value.map(c => ({ value: c.id, title: c.name || c.code })),
+)
+const categoryItems = computed(() =>
+  categories.value.map(c => ({ value: c.id, title: c.name || c.code })),
+)
+
 const myAssignments = computed(() => {
   return props.correspondence.assignments?.filter(a => a.status !== 'termine' && a.status !== 'refuse') || []
 })
@@ -87,12 +122,19 @@ const isOverdue = computed(() => {
 })
 
 const fromParty = computed(() =>
-  props.correspondence.parties?.find((p: any) => p.role === 'from') || null,
+  partiesByRole(props.correspondence.parties, 'from')[0] || null,
 )
 
 const toParties = computed(() =>
-  props.correspondence.parties?.filter((p: any) => p.role === 'to') || [],
+  partiesByRole(props.correspondence.parties, 'to'),
 )
+
+const fallbackRecipientName = computed(() => {
+  if (toParties.value.length)
+    return null
+  return props.correspondence.structure?.name
+    || (props.correspondence.direction === 'entrant' ? 'DGTCP' : null)
+})
 
 const currentAssignee = computed(() => {
   const a = props.correspondence.assignments?.find((item: any) =>
@@ -101,13 +143,95 @@ const currentAssignee = computed(() => {
   return a?.to_user?.name || a?.to_structure?.name || null
 })
 
+/** Une seule fiche métier par courrier (préférence : avec document, sinon la plus ancienne). */
+const primaryCirculationSheet = computed(() => {
+  const sheets = [...(props.correspondence.circulation_sheets || [])]
+  if (!sheets.length)
+    return null
+  sheets.sort((a: any, b: any) => {
+    const aDoc = a.document_id ? 0 : 1
+    const bDoc = b.document_id ? 0 : 1
+    if (aDoc !== bDoc)
+      return aDoc - bDoc
+    return (a.id || 0) - (b.id || 0)
+  })
+  return sheets[0]
+})
+
+const hasCirculationSheet = computed(() => !!primaryCirculationSheet.value)
+
+const documentVersions = computed(() => documentDetail.value?.versions || [])
+const mainDocumentVersion = computed(() =>
+  documentVersions.value.find((v: any) => v.is_main) || documentVersions.value[0] || null,
+)
+const documentStreamUrl = computed(() => {
+  const preview = mainDocumentVersion.value?.preview
+  if (preview?.mode === 'pdf_iframe' && preview.url)
+    return preview.url
+  const mime = (mainDocumentVersion.value?.mime_type || '').toLowerCase()
+  const name = (mainDocumentVersion.value?.original_name || '').toLowerCase()
+  if (mime.includes('pdf') || name.endsWith('.pdf') || mime.startsWith('image/'))
+    return mainDocumentVersion.value?.stream_url || null
+  return null
+})
+const isDocumentOnlyOffice = computed(() =>
+  mainDocumentVersion.value?.preview?.mode === 'onlyoffice_editor',
+)
+const isDocumentOfficeDownload = computed(() =>
+  mainDocumentVersion.value?.preview?.mode === 'office_download',
+)
+
+async function loadDocumentPreview() {
+  const documentId = props.correspondence.document?.id
+  if (!documentId) {
+    documentDetail.value = null
+    documentPreviewError.value = ''
+    return
+  }
+
+  documentPreviewLoading.value = true
+  documentPreviewError.value = ''
+  try {
+    documentDetail.value = await $api(`/parapheur/documents/${documentId}`)
+  }
+  catch (error: any) {
+    documentDetail.value = null
+    documentPreviewError.value = error?.data?.message || error?.message || 'Impossible de charger le document'
+  }
+  finally {
+    documentPreviewLoading.value = false
+  }
+}
+
+function reloadDocumentPreview() {
+  editorRemountKey.value += 1
+  loadDocumentPreview()
+}
+
+watch(
+  () => props.correspondence.document?.id,
+  () => { loadDocumentPreview() },
+  { immediate: true },
+)
+
 onMounted(async () => {
   await loadReminders()
   try {
-    users.value = await $api('/meta/users')
+    const [userList, structs, meta] = await Promise.all([
+      $api('/meta/users'),
+      $api('/meta/structures'),
+      fetchMeta(),
+    ])
+    users.value = Array.isArray(userList) ? userList : []
+    structures.value = Array.isArray(structs) ? structs : []
+    channels.value = Array.isArray(meta.channels) ? meta.channels : (meta.channels?.data || [])
+    categories.value = Array.isArray(meta.categories) ? meta.categories : (meta.categories?.data || [])
   }
   catch {
     users.value = []
+    structures.value = []
+    channels.value = []
+    categories.value = []
   }
 })
 
@@ -202,8 +326,42 @@ function startEditParties() {
   editingParties.value = true
 }
 
+function startEditTraitement() {
+  traitementForm.value = {
+    structure_id: props.correspondence.structure?.id
+      ?? (props.correspondence as any).structure_id
+      ?? null,
+    channel_id: props.correspondence.channel?.id
+      ?? (props.correspondence as any).channel_id
+      ?? null,
+    category_id: props.correspondence.category?.id
+      ?? (props.correspondence as any).category_id
+      ?? null,
+  }
+  editingTraitement.value = true
+}
+
+async function saveTraitement() {
+  savingTraitement.value = true
+  try {
+    await updateCorrespondence(props.correspondence.id, {
+      structure_id: traitementForm.value.structure_id,
+      channel_id: traitementForm.value.channel_id,
+      category_id: traitementForm.value.category_id,
+    })
+    editingTraitement.value = false
+    emit('refresh')
+  }
+  catch (error: any) {
+    alert('Erreur : ' + (error.message || 'Impossible de sauvegarder le traitement'))
+  }
+  finally {
+    savingTraitement.value = false
+  }
+}
+
 function addParty() {
-  partiesForm.value.push({ role: 'from', name: '', organization: '' })
+  partiesForm.value.push({ role: 'to', name: '', organization: '' })
 }
 
 function removeParty(index: number) {
@@ -259,11 +417,46 @@ async function handlePrint() {
 }
 
 async function handleCreateCirculationSheet(generate = false) {
+  creatingFiche.value = true
+  ficheMessage.value = ''
+  ficheError.value = ''
   try {
-    await createCirculationSheet(props.correspondence.id, { generate })
+    const result = await createCirculationSheet(props.correspondence.id, { generate })
+    const sheet = result?.circulation_sheet || result
+    ficheMessage.value = result?.message
+      || (generate
+        ? `Fiche ${sheet?.number || ''} prête (document généré).`
+        : `Fiche ${sheet?.number || ''} prête.`)
     emit('refresh')
-  } catch (error: any) {
-    alert('Erreur : ' + (error.message || 'Impossible de créer la fiche'))
+  }
+  catch (error: any) {
+    ficheError.value = error?.data?.error
+      || error?.data?.message
+      || error.message
+      || 'Impossible de créer la fiche'
+  }
+  finally {
+    creatingFiche.value = false
+  }
+}
+
+async function handleGenerateExistingSheet(sheetId: number) {
+  creatingFiche.value = true
+  ficheError.value = ''
+  ficheMessage.value = ''
+  try {
+    await generateCirculationSheetDocument(sheetId)
+    ficheMessage.value = 'Document de fiche généré.'
+    emit('refresh')
+  }
+  catch (error: any) {
+    ficheError.value = error?.data?.error
+      || error?.data?.message
+      || error.message
+      || 'Impossible de générer le document'
+  }
+  finally {
+    creatingFiche.value = false
   }
 }
 
@@ -543,7 +736,7 @@ async function archiveCorrespondence() {
                       Expéditeur
                     </div>
                     <div v-if="fromParty">
-                      {{ fromParty.name || fromParty.correspondent?.name || '—' }}
+                      {{ partyDisplayName(fromParty) || '—' }}
                       <div
                         v-if="fromParty.organization || fromParty.correspondent?.organization"
                         class="text-caption text-medium-emphasis"
@@ -568,8 +761,13 @@ async function archiveCorrespondence() {
                         :key="party.id || idx"
                         class="mb-1"
                       >
-                        {{ party.name || party.correspondent?.name || '—' }}
+                        {{ partyDisplayName(party) || '—' }}
                       </div>
+                    </div>
+                    <div
+                      v-else-if="fallbackRecipientName"
+                    >
+                      {{ fallbackRecipientName }}
                     </div>
                     <div
                       v-else
@@ -581,14 +779,74 @@ async function archiveCorrespondence() {
                 </div>
 
                 <div class="parapheur-form-section mb-0">
-                  <div class="parapheur-form-section__title">
-                    <VIcon
-                      icon="tabler-git-fork"
-                      size="20"
-                    />
-                    Traitement
+                  <div class="d-flex justify-space-between align-center mb-3">
+                    <div class="parapheur-form-section__title mb-0">
+                      <VIcon
+                        icon="tabler-git-fork"
+                        size="20"
+                      />
+                      Traitement
+                    </div>
+                    <div class="d-flex ga-2">
+                      <template v-if="!editingTraitement">
+                        <VBtn
+                          size="small"
+                          variant="tonal"
+                          prepend-icon="tabler-edit"
+                          @click="startEditTraitement"
+                        >
+                          Modifier
+                        </VBtn>
+                      </template>
+                      <template v-else>
+                        <VBtn
+                          size="small"
+                          variant="text"
+                          @click="editingTraitement = false"
+                        >
+                          Annuler
+                        </VBtn>
+                        <VBtn
+                          size="small"
+                          color="primary"
+                          variant="tonal"
+                          :loading="savingTraitement"
+                          @click="saveTraitement"
+                        >
+                          Enregistrer
+                        </VBtn>
+                      </template>
+                    </div>
                   </div>
-                  <div class="courrier-meta-grid">
+
+                  <div
+                    v-if="editingTraitement"
+                    class="d-flex flex-column ga-3"
+                  >
+                    <AppSelect
+                      v-model="traitementForm.structure_id"
+                      :items="structureItems"
+                      label="Structure"
+                      clearable
+                    />
+                    <AppSelect
+                      v-model="traitementForm.channel_id"
+                      :items="channelItems"
+                      label="Canal"
+                      clearable
+                    />
+                    <AppSelect
+                      v-model="traitementForm.category_id"
+                      :items="categoryItems"
+                      label="Catégorie"
+                      clearable
+                    />
+                  </div>
+
+                  <div
+                    v-else
+                    class="courrier-meta-grid"
+                  >
                     <div class="courrier-meta-grid__label">
                       Structure
                     </div>
@@ -681,7 +939,7 @@ async function archiveCorrespondence() {
                   <div class="d-flex align-start justify-space-between ga-3">
                     <div>
                       <div class="font-weight-medium">
-                        {{ party.name || party.correspondent?.name || '—' }}
+                        {{ partyDisplayName(party) || '—' }}
                       </div>
                       <div
                         v-if="party.organization || party.correspondent?.organization || party.function"
@@ -692,10 +950,10 @@ async function archiveCorrespondence() {
                     </div>
                     <VChip
                       size="small"
-                      :color="partyRoleColors[party.role] || 'secondary'"
+                      :color="partyRoleColors[partyRoleValue(party)] || 'secondary'"
                       variant="tonal"
                     >
-                      {{ partyRoleLabel(party.role) }}
+                      {{ partyRoleLabel(partyRoleValue(party)) }}
                     </VChip>
                   </div>
                 </div>
@@ -817,8 +1075,107 @@ async function archiveCorrespondence() {
                 <div class="courrier-meta-grid__value">
                   {{ correspondence.document.reference || correspondence.document.dossier_number || '—' }}
                 </div>
+                <div
+                  v-if="mainDocumentVersion"
+                  class="courrier-meta-grid__label"
+                >
+                  Fichier
+                </div>
+                <div
+                  v-if="mainDocumentVersion"
+                  class="courrier-meta-grid__value"
+                >
+                  {{ mainDocumentVersion.original_name || '—' }}
+                  <span
+                    v-if="mainDocumentVersion.mime_type"
+                    class="text-caption text-medium-emphasis"
+                  >
+                    · {{ mainDocumentVersion.mime_type }}
+                  </span>
+                </div>
               </div>
-              <OnlyOfficeEditor :document-id="correspondence.document.id" />
+
+              <VProgressLinear
+                v-if="documentPreviewLoading"
+                indeterminate
+                class="mb-4"
+              />
+              <VAlert
+                v-if="documentPreviewError"
+                type="warning"
+                variant="tonal"
+                class="mb-4"
+              >
+                {{ documentPreviewError }}
+                <template #append>
+                  <VBtn
+                    size="small"
+                    variant="text"
+                    @click="reloadDocumentPreview"
+                  >
+                    Réessayer
+                  </VBtn>
+                </template>
+              </VAlert>
+
+              <div
+                v-if="mainDocumentVersion"
+                class="d-flex flex-wrap justify-space-between align-center ga-3 mb-3"
+              >
+                <div class="text-body-2 text-medium-emphasis">
+                  Aperçu
+                </div>
+                <div class="d-flex flex-wrap ga-2">
+                  <VBtn
+                    v-if="mainDocumentVersion.download_url"
+                    size="small"
+                    variant="tonal"
+                    prepend-icon="tabler-download"
+                    :href="mainDocumentVersion.download_url"
+                    target="_blank"
+                  >
+                    Télécharger
+                  </VBtn>
+                  <VBtn
+                    size="small"
+                    variant="tonal"
+                    prepend-icon="tabler-refresh"
+                    :loading="documentPreviewLoading"
+                    @click="reloadDocumentPreview"
+                  >
+                    Recharger
+                  </VBtn>
+                </div>
+              </div>
+
+              <iframe
+                v-if="documentStreamUrl"
+                class="w-100 border rounded"
+                style="border: 0; min-block-size: 640px; background: #f5f5f5;"
+                :src="documentStreamUrl"
+                title="Aperçu du document"
+              />
+              <OnlyOfficeEditor
+                v-else-if="isDocumentOnlyOffice && correspondence.document?.id"
+                :key="`oo-mail-${correspondence.document.id}-${editorRemountKey}`"
+                :document-id="correspondence.document.id"
+                @reload="reloadDocumentPreview"
+              />
+              <VAlert
+                v-else-if="isDocumentOfficeDownload"
+                type="info"
+                variant="tonal"
+              >
+                Document Office : prévisualisation navigateur indisponible.
+                Téléchargez le fichier pour le consulter, ou activez ONLYOFFICE pour l’édition en ligne.
+              </VAlert>
+              <VAlert
+                v-else-if="mainDocumentVersion && !documentPreviewLoading"
+                type="info"
+                variant="tonal"
+              >
+                Aperçu iframe indisponible pour ce format. Utilisez le téléchargement.
+              </VAlert>
             </div>
             <div
               v-else
@@ -1001,23 +1358,98 @@ async function archiveCorrespondence() {
                 Fiche de circulation
               </div>
               <p class="text-body-2 text-medium-emphasis mb-4">
-                Générez une fiche numérotée (FC/…) liée à ce courrier, avec ou sans document DOCX.
+                Une seule fiche numérotée (FC/…) par courrier, au modèle DGTCP (imputation et annotations).
               </p>
+
+              <VAlert
+                v-if="ficheMessage"
+                type="success"
+                variant="tonal"
+                class="mb-4"
+                closable
+                @click:close="ficheMessage = ''"
+              >
+                {{ ficheMessage }}
+              </VAlert>
+              <VAlert
+                v-if="ficheError"
+                type="error"
+                variant="tonal"
+                class="mb-4"
+                closable
+                @click:close="ficheError = ''"
+              >
+                {{ ficheError }}
+              </VAlert>
+
+              <div
+                v-if="primaryCirculationSheet"
+                class="courrier-party-card mb-4"
+              >
+                <div class="d-flex flex-wrap justify-space-between align-center ga-3">
+                  <div>
+                    <div class="font-weight-medium">
+                      {{ primaryCirculationSheet.number || `Fiche #${primaryCirculationSheet.id}` }}
+                    </div>
+                    <div class="text-caption text-medium-emphasis mt-1">
+                      {{ primaryCirculationSheet.created_at ? new Date(primaryCirculationSheet.created_at).toLocaleString('fr-FR') : '' }}
+                      <span v-if="primaryCirculationSheet.created_by?.name"> · {{ primaryCirculationSheet.created_by.name }}</span>
+                    </div>
+                  </div>
+                  <div class="d-flex flex-wrap align-center ga-2">
+                    <VChip
+                      size="small"
+                      :color="primaryCirculationSheet.document_id ? 'success' : 'warning'"
+                      variant="tonal"
+                    >
+                      {{ primaryCirculationSheet.document_id ? `Document #${primaryCirculationSheet.document_id}` : 'Sans document' }}
+                    </VChip>
+                    <VBtn
+                      v-if="primaryCirculationSheet.document_id"
+                      size="small"
+                      variant="tonal"
+                      :to="{ name: 'ged-id', params: { id: primaryCirculationSheet.document_id } }"
+                    >
+                      Ouvrir le document
+                    </VBtn>
+                    <VBtn
+                      size="small"
+                      color="primary"
+                      variant="tonal"
+                      :loading="creatingFiche"
+                      @click="handleGenerateExistingSheet(primaryCirculationSheet.id)"
+                    >
+                      {{ primaryCirculationSheet.document_id ? 'Régénérer le document' : 'Générer le document' }}
+                    </VBtn>
+                  </div>
+                </div>
+              </div>
+              <div
+                v-else
+                class="parapheur-empty py-6 mb-4"
+              >
+                Aucune fiche pour ce courrier
+              </div>
+
               <div class="d-flex flex-wrap ga-2">
                 <VBtn
-                  variant="tonal"
-                  prepend-icon="tabler-plus"
-                  @click="handleCreateCirculationSheet(false)"
-                >
-                  Créer la fiche
-                </VBtn>
-                <VBtn
+                  v-if="!hasCirculationSheet"
                   color="primary"
                   variant="tonal"
                   prepend-icon="tabler-file-export"
+                  :loading="creatingFiche"
                   @click="handleCreateCirculationSheet(true)"
                 >
-                  Créer et générer le document
+                  Créer et générer la fiche
+                </VBtn>
+                <VBtn
+                  v-if="!hasCirculationSheet"
+                  variant="tonal"
+                  prepend-icon="tabler-plus"
+                  :loading="creatingFiche"
+                  @click="handleCreateCirculationSheet(false)"
+                >
+                  Créer la fiche seule
                 </VBtn>
                 <VBtn
                   variant="text"

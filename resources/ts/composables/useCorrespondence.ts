@@ -22,6 +22,9 @@ export interface Correspondence {
   correspondence_date: string | null
   registered_at: string | null
   due_date: string | null
+  structure_id?: number | null
+  channel_id?: number | null
+  category_id?: number | null
   document?: any
   structure?: any
   channel?: any
@@ -29,6 +32,7 @@ export interface Correspondence {
   parties?: any[]
   assignments?: any[]
   events?: any[]
+  circulation_sheets?: any[]
   links?: { outgoing: any[]; incoming: any[] }
   created_at: string
   updated_at: string
@@ -92,6 +96,15 @@ export function useCorrespondence() {
     finally {
       loading.value = false
     }
+  }
+
+  async function updateCorrespondence(id: number, data: Record<string, any>) {
+    const response = await $api(`/mail/correspondences/${id}`, {
+      method: 'PUT',
+      body: data,
+    })
+    correspondence.value = response
+    return response
   }
 
   async function registerIncoming(data: FormData | Record<string, any>) {
@@ -180,6 +193,13 @@ export function useCorrespondence() {
     })
   }
 
+  async function generateCirculationSheetDocument(sheetId: number) {
+    return $api(`/mail/circulation-sheets/${sheetId}/generate`, {
+      method: 'POST',
+      body: {},
+    })
+  }
+
   async function fetchDashboardDg() {
     return $api('/mail/dashboard/dg')
   }
@@ -227,6 +247,7 @@ export function useCorrespondence() {
     fetchCorrespondences,
     fetchCorrespondence,
     createCorrespondence,
+    updateCorrespondence,
     registerIncoming,
     assign,
     takeCharge,
@@ -243,6 +264,7 @@ export function useCorrespondence() {
     attachSignedVersion,
     printDocument,
     createCirculationSheet,
+    generateCirculationSheetDocument,
     adminList,
     adminStore,
     adminUpdate,

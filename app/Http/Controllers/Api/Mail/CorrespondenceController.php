@@ -90,11 +90,18 @@ class CorrespondenceController extends Controller
             'scan_file' => 'nullable|file|max:20480',
             'document_data' => 'nullable|array',
             'parties' => 'nullable|array',
+            'parties.*.role' => 'required_with:parties|in:from,to,cc,ampliation,info',
+            'parties.*.name' => 'nullable|string|max:200',
+            'parties.*.organization' => 'nullable|string|max:200',
+            'parties.*.correspondent_id' => 'nullable|exists:correspondents,id',
+            'parties.*.function' => 'nullable|string|max:200',
+            'sender_name' => 'nullable|string|max:200',
+            'recipient_name' => 'nullable|string|max:200',
         ]);
 
         $direction = $validated['direction'];
         $scanFile = $request->file('scan_file');
-        unset($validated['direction'], $validated['scan_file'], $validated['document_data'], $validated['parties']);
+        unset($validated['direction'], $validated['scan_file'], $validated['document_data']);
 
         $correspondence = match ($direction) {
             'entrant' => $this->correspondenceService->createIncoming($request->user(), $validated, $scanFile),
@@ -128,6 +135,7 @@ class CorrespondenceController extends Controller
             'medium' => 'sometimes|in:physique,electronique,hybride',
             'priority' => 'nullable|string',
             'confidentiality' => 'nullable|string',
+            'structure_id' => 'nullable|exists:structures,id',
             'channel_id' => 'nullable|exists:correspondence_channels,id',
             'category_id' => 'nullable|exists:correspondence_categories,id',
             'qualification_id' => 'nullable|exists:correspondence_qualifications,id',

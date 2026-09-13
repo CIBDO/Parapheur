@@ -44,6 +44,14 @@ class MailRegisterController extends Controller
             'requires_reply' => 'nullable|boolean',
             'scan_file' => 'nullable|file|max:20480',
             'document_data' => 'nullable|array',
+            'parties' => 'nullable|array',
+            'parties.*.role' => 'required_with:parties|in:from,to,cc,ampliation,info',
+            'parties.*.name' => 'nullable|string|max:200',
+            'parties.*.organization' => 'nullable|string|max:200',
+            'parties.*.correspondent_id' => 'nullable|exists:correspondents,id',
+            'parties.*.function' => 'nullable|string|max:200',
+            'sender_name' => 'nullable|string|max:200',
+            'recipient_name' => 'nullable|string|max:200',
         ]);
 
         $scanFile = $request->file('scan_file');
@@ -72,6 +80,11 @@ class MailRegisterController extends Controller
             'category_id' => 'nullable|exists:correspondence_categories,id',
             'keywords' => 'nullable|array',
             'requires_reply' => 'nullable|boolean',
+            'parties' => 'nullable|array',
+            'parties.*.role' => 'required_with:parties|in:from,to,cc,ampliation,info',
+            'parties.*.name' => 'nullable|string|max:200',
+            'sender_name' => 'nullable|string|max:200',
+            'recipient_name' => 'nullable|string|max:200',
         ]);
 
         $correspondence = $this->correspondenceService->createOutgoing($request->user(), $validated);
@@ -96,6 +109,11 @@ class MailRegisterController extends Controller
             'channel_id' => 'nullable|exists:correspondence_channels,id',
             'category_id' => 'nullable|exists:correspondence_categories,id',
             'keywords' => 'nullable|array',
+            'parties' => 'nullable|array',
+            'parties.*.role' => 'required_with:parties|in:from,to,cc,ampliation,info',
+            'parties.*.name' => 'nullable|string|max:200',
+            'sender_name' => 'nullable|string|max:200',
+            'recipient_name' => 'nullable|string|max:200',
         ]);
 
         $correspondence = $this->correspondenceService->createInternal($request->user(), $validated);

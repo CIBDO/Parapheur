@@ -69,6 +69,8 @@ class CorrespondenceReplyService
                 'reply_id' => $reply->id,
             ]);
 
+            $this->correspondenceService->copyInvertedParties($original, $reply, $user);
+
             // Notifier l'enregistreur du courrier original
             if ($original->registeredBy && $original->registeredBy->id !== $user->id) {
                 $original->registeredBy->notify(new \App\Notifications\MailCorrespondenceNotification(

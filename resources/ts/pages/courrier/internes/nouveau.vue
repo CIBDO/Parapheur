@@ -25,6 +25,8 @@ const form = ref({
   confidentiality: 'normal',
   correspondence_date: new Date().toISOString().split('T')[0],
   received_at: new Date().toISOString().slice(0, 16),
+  sender_name: '',
+  recipient_name: '',
 })
 
 async function submit() {
@@ -62,6 +64,24 @@ async function submit() {
                 v-model="form.subject"
                 label="Objet *"
                 required
+              />
+            </VCol>
+            <VCol
+              cols="12"
+              md="6"
+            >
+              <AppTextField
+                v-model="form.sender_name"
+                label="Expéditeur"
+              />
+            </VCol>
+            <VCol
+              cols="12"
+              md="6"
+            >
+              <AppTextField
+                v-model="form.recipient_name"
+                label="Destinataire"
               />
             </VCol>
             <VCol

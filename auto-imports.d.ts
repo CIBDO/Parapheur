@@ -173,9 +173,12 @@ declare global {
   const originOptions: typeof import('./resources/ts/utils/gedUi')['originOptions']
   const paginationMeta: typeof import('./resources/ts/utils/paginationMeta')['paginationMeta']
   const participationTypeLabels: typeof import('./resources/ts/utils/meetingsUi')['participationTypeLabels']
+  const partiesByRole: typeof import('./resources/ts/utils/courrierUi')['partiesByRole']
+  const partyDisplayName: typeof import('./resources/ts/utils/courrierUi')['partyDisplayName']
   const partyRoleColors: typeof import('./resources/ts/utils/courrierUi')['partyRoleColors']
   const partyRoleLabel: typeof import('./resources/ts/utils/courrierUi')['partyRoleLabel']
   const partyRoleLabels: typeof import('./resources/ts/utils/courrierUi')['partyRoleLabels']
+  const partyRoleValue: typeof import('./resources/ts/utils/courrierUi')['partyRoleValue']
   const passwordValidator: typeof import('./resources/ts/@core/utils/validators')['passwordValidator']
   const pausableWatch: typeof import('@vueuse/core')['pausableWatch']
   const prefixWithPlus: typeof import('./resources/ts/@core/utils/formatters')['prefixWithPlus']
@@ -611,9 +614,12 @@ declare module 'vue' {
     readonly originOptions: UnwrapRef<typeof import('./resources/ts/utils/gedUi')['originOptions']>
     readonly paginationMeta: UnwrapRef<typeof import('./resources/ts/utils/paginationMeta')['paginationMeta']>
     readonly participationTypeLabels: UnwrapRef<typeof import('./resources/ts/utils/meetingsUi')['participationTypeLabels']>
+    readonly partiesByRole: UnwrapRef<typeof import('./resources/ts/utils/courrierUi')['partiesByRole']>
+    readonly partyDisplayName: UnwrapRef<typeof import('./resources/ts/utils/courrierUi')['partyDisplayName']>
     readonly partyRoleColors: UnwrapRef<typeof import('./resources/ts/utils/courrierUi')['partyRoleColors']>
     readonly partyRoleLabel: UnwrapRef<typeof import('./resources/ts/utils/courrierUi')['partyRoleLabel']>
     readonly partyRoleLabels: UnwrapRef<typeof import('./resources/ts/utils/courrierUi')['partyRoleLabels']>
+    readonly partyRoleValue: UnwrapRef<typeof import('./resources/ts/utils/courrierUi')['partyRoleValue']>
     readonly passwordValidator: UnwrapRef<typeof import('./resources/ts/@core/utils/validators')['passwordValidator']>
     readonly pausableWatch: UnwrapRef<typeof import('@vueuse/core')['pausableWatch']>
     readonly prefixWithPlus: UnwrapRef<typeof import('./resources/ts/@core/utils/formatters')['prefixWithPlus']>

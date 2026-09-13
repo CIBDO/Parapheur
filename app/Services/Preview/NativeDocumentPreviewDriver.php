@@ -18,13 +18,15 @@ class NativeDocumentPreviewDriver implements DocumentPreviewDriver
         $name = strtolower((string) $version->original_name);
 
         $isPdf = str_contains($mime, 'pdf') || str_ends_with($name, '.pdf');
+        $isImage = str_starts_with($mime, 'image/')
+            || (bool) preg_match('/\.(jpe?g|png|gif|webp|bmp)$/', $name);
         $isOffice = str_contains($mime, 'word')
             || str_contains($mime, 'excel')
             || str_contains($mime, 'powerpoint')
             || str_contains($mime, 'officedocument')
             || (bool) preg_match('/\.(docx?|xlsx?|pptx?)$/', $name);
 
-        if ($isPdf) {
+        if ($isPdf || $isImage) {
             return [
                 'mode' => 'pdf_iframe',
                 'url' => $streamUrl,

@@ -197,6 +197,20 @@ export function partyRoleLabel(role?: string | null) {
   return partyRoleLabels[role || ''] || role || '—'
 }
 
+export function partyRoleValue(party: { role?: string | { value?: string } | null } | null | undefined): string {
+  if (!party?.role)
+    return ''
+  return typeof party.role === 'string' ? party.role : (party.role.value || '')
+}
+
+export function partyDisplayName(party: any): string {
+  return party?.name || party?.correspondent?.name || ''
+}
+
+export function partiesByRole(parties: any[] | undefined, role: string) {
+  return (parties || []).filter(party => partyRoleValue(party) === role)
+}
+
 export function assignmentStatusLabel(status?: string | null) {
   return assignmentStatusLabels[status || ''] || status || '—'
 }
