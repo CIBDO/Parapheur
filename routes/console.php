@@ -27,3 +27,13 @@ Schedule::command('parapheur:remind-mail')
     ->dailyAt('08:15')
     ->withoutOverlapping()
     ->appendOutputTo(storage_path('logs/mail-reminders.log'));
+
+Schedule::command('parapheur:check-ticket-sla')
+    ->everyFiveMinutes()
+    ->withoutOverlapping()
+    ->appendOutputTo(storage_path('logs/ticket-sla.log'));
+
+Schedule::command('parapheur:auto-close-tickets')
+    ->dailyAt('07:30')
+    ->withoutOverlapping()
+    ->appendOutputTo(storage_path('logs/ticket-auto-close.log'));

@@ -89,4 +89,14 @@ class NumberingService
     {
         return $this->nextNumber(NumberingSequenceCode::Acknowledgement, null, $structureId);
     }
+
+    public function generateTicketNumber(?int $structureId = null): string
+    {
+        return $this->nextNumber(NumberingSequenceCode::Ticket, null, $structureId);
+    }
+
+    public function generateProblemNumber(?int $structureId = null): string
+    {
+        return $this->nextNumber(NumberingSequenceCode::Problem, null, $structureId);
+    }
 }

@@ -30,6 +30,8 @@ export type Subjects =
   | 'Library'
   | 'Courrier'
   | 'CourrierAdmin'
+  | 'Ticketing'
+  | 'TicketingAdmin'
   | 'DocumentTemplate'
   | 'Post'
   | 'Comment'

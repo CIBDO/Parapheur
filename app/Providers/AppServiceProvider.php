@@ -9,6 +9,7 @@ use App\Models\Appointment;
 use App\Models\Correspondence;
 use App\Models\Document;
 use App\Models\DocumentTemplate;
+use App\Models\Ticket;
 use App\Models\TransmissionSlip;
 use App\Models\User;
 use App\Models\Workspace;
@@ -16,6 +17,7 @@ use App\Policies\AppointmentPolicy;
 use App\Policies\CorrespondencePolicy;
 use App\Policies\DocumentPolicy;
 use App\Policies\DocumentTemplatePolicy;
+use App\Policies\TicketPolicy;
 use App\Policies\TransmissionSlipPolicy;
 use App\Policies\WorkspacePolicy;
 use App\Services\Identity\LdapIdentityProvider;
@@ -65,6 +67,7 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(Correspondence::class, CorrespondencePolicy::class);
         Gate::policy(TransmissionSlip::class, TransmissionSlipPolicy::class);
         Gate::policy(DocumentTemplate::class, DocumentTemplatePolicy::class);
+        Gate::policy(Ticket::class, TicketPolicy::class);
 
         if (config('onlyoffice.enabled')) {
             try {

@@ -119,6 +119,35 @@ class DatabaseSeeder extends Seeder
             'document_template.update',
             'document_template.delete',
             'document_template.publish',
+            'ticket.view',
+            'ticket.create',
+            'ticket.update',
+            'ticket.assign',
+            'ticket.reassign',
+            'ticket.take_charge',
+            'ticket.comment',
+            'ticket.internal_note',
+            'ticket.escalate',
+            'ticket.resolve',
+            'ticket.close',
+            'ticket.reopen',
+            'ticket.cancel',
+            'ticket.view_all',
+            'ticket.view_team',
+            'ticket.view_reports',
+            'ticket.manage_sla',
+            'ticket.manage_catalog',
+            'ticket.manage_categories',
+            'ticket.admin',
+            'ticket.audit.view',
+            'problem.view',
+            'problem.create',
+            'problem.update',
+            'problem.close',
+            'knowledge.view',
+            'knowledge.create',
+            'knowledge.review',
+            'knowledge.publish',
         ];
 
         foreach ($permissions as $permission) {
@@ -154,6 +183,23 @@ class DatabaseSeeder extends Seeder
             'document_template.create', 'document_template.update', 'document_template.delete', 'document_template.publish',
         ]);
 
+        $ticketBasic = [
+            'ticket.view', 'ticket.create', 'ticket.comment', 'ticket.close', 'ticket.reopen',
+        ];
+        $ticketAgent = array_merge($ticketBasic, [
+            'ticket.update', 'ticket.take_charge', 'ticket.internal_note', 'ticket.resolve',
+            'ticket.view_team', 'knowledge.view',
+        ]);
+        $ticketLead = array_merge($ticketAgent, [
+            'ticket.assign', 'ticket.reassign', 'ticket.escalate', 'ticket.cancel',
+            'ticket.view_reports', 'problem.view', 'problem.create', 'problem.update',
+        ]);
+        $ticketAdmin = array_merge($ticketLead, [
+            'ticket.view_all', 'ticket.admin', 'ticket.manage_sla', 'ticket.manage_catalog',
+            'ticket.manage_categories', 'ticket.audit.view',
+            'problem.close', 'knowledge.create', 'knowledge.review', 'knowledge.publish',
+        ]);
+
         $appointmentManage = [
             'appointments.view',
             'appointments.create',
@@ -184,57 +230,66 @@ class DatabaseSeeder extends Seeder
                 $gedManage,
                 $workspaceManage,
                 $appointmentManage,
-                $mailAdmin
+                $mailAdmin,
+                $ticketAdmin
             ),
             'DGA' => array_merge(
                 ['documents.create', 'documents.act', 'documents.vise', 'documents.validate', 'dashboard.dg', 'instructions.manage', 'meetings.manage', 'reporting.view'],
                 $gedManage,
                 $workspaceManage,
                 ['appointments.view', 'appointments.create', 'appointments.view_calendar', 'appointments.validate', 'appointments.manage_notes'],
-                $mailManage
+                $mailManage,
+                $ticketLead
             ),
             'Conseiller' => array_merge(
                 ['documents.create', 'documents.act', 'reporting.view', 'meetings.view', 'appointments.view', 'appointments.create', 'appointments.view_calendar'],
                 $gedBasic,
                 $workspaceBasic,
-                $mailBasic
+                $mailBasic,
+                $ticketBasic
             ),
             'Secrétariat DG' => array_merge(
                 ['documents.create', 'documents.act', 'meetings.manage', 'meetings.view', 'meetings.create', 'meetings.take_official_notes', 'meetings.generate_minutes', 'reporting.view'],
                 $gedManage,
                 $workspaceManage,
                 $appointmentManage,
-                $mailAdmin
+                $mailAdmin,
+                $ticketLead
             ),
             'Directeur' => array_merge(
                 ['documents.create', 'documents.act', 'documents.vise', 'documents.validate', 'dashboard.direction', 'reporting.view', 'meetings.manage', 'meetings.view', 'appointments.view', 'appointments.create', 'appointments.view_calendar'],
                 $gedManage,
                 $workspaceBasic,
-                $mailManage
+                $mailManage,
+                $ticketLead
             ),
             'Chef de division' => array_merge(
                 ['documents.create', 'documents.act', 'meetings.view', 'appointments.view', 'appointments.create'],
                 $gedBasic,
                 $workspaceBasic,
-                $mailBasic
+                $mailBasic,
+                $ticketAgent
             ),
             'Chef de section' => array_merge(
                 ['documents.create', 'documents.act', 'meetings.view', 'appointments.view', 'appointments.create'],
                 $gedBasic,
                 $workspaceBasic,
-                $mailBasic
+                $mailBasic,
+                $ticketAgent
             ),
             'Agent' => array_merge(
                 ['documents.create', 'documents.act', 'meetings.view', 'appointments.view', 'appointments.create'],
                 $gedBasic,
                 $workspaceBasic,
-                $mailBasic
+                $mailBasic,
+                $ticketAgent
             ),
             'Lecteur' => array_merge(
                 ['meetings.view', 'appointments.view', 'appointments.view_calendar'],
                 ['ged.view', 'ged.search', 'ged.download'],
                 ['workspace.access', 'library.access'],
-                ['mail.view']
+                ['mail.view'],
+                ['ticket.view', 'knowledge.view']
             ),
         ];
 
@@ -412,6 +467,7 @@ class DatabaseSeeder extends Seeder
         $this->seedMailReferentials();
         $this->call(MeetingSeeder::class);
         $this->call(AppointmentSeeder::class);
+        $this->call(TicketingSeeder::class);
     }
 
     private function seedDemoDocuments(): void

@@ -26,6 +26,24 @@ use App\Http\Controllers\Api\Workspace\WorkspaceFolderController;
 use App\Http\Controllers\Api\Workspace\WorkspaceMemberController;
 use App\Http\Controllers\Api\Workspace\WorkspaceQuotaAdminController;
 use App\Http\Controllers\Api\Workspace\WorkspaceShareController;
+use App\Http\Controllers\Api\Ticketing\ApplicationController;
+use App\Http\Controllers\Api\Ticketing\AssetController;
+use App\Http\Controllers\Api\Ticketing\KnowledgeController;
+use App\Http\Controllers\Api\Ticketing\KnownErrorController;
+use App\Http\Controllers\Api\Ticketing\ProblemController;
+use App\Http\Controllers\Api\Ticketing\ServiceCatalogController;
+use App\Http\Controllers\Api\Ticketing\TicketActionController;
+use App\Http\Controllers\Api\Ticketing\TicketAttachmentController;
+use App\Http\Controllers\Api\Ticketing\TicketCommentController;
+use App\Http\Controllers\Api\Ticketing\TicketController;
+use App\Http\Controllers\Api\Ticketing\TicketNotificationPreferenceController;
+use App\Http\Controllers\Api\Ticketing\TicketRelationController;
+use App\Http\Controllers\Api\Ticketing\TicketWorklogController;
+use App\Http\Controllers\Api\Ticketing\TicketingAdminController;
+use App\Http\Controllers\Api\Ticketing\TicketingAiController;
+use App\Http\Controllers\Api\Ticketing\TicketingDashboardController;
+use App\Http\Controllers\Api\Ticketing\TicketingMetaController;
+use App\Http\Controllers\Api\Ticketing\TicketingReportController;
 use App\Http\Controllers\Api\UnifiedSearchController;
 use App\Http\Controllers\Api\AppointmentController;
 use App\Http\Controllers\Api\AppointmentTypeController;
@@ -550,6 +568,182 @@ Route::middleware(['auth:sanctum', 'password.changed'])->group(function () {
 
         // Recherche
         Route::get('/search', [CorrespondenceController::class, 'search']);
+    });
+
+    // ——— Module Ticketing / Centre de services ———
+    Route::middleware('permission:ticket.view|admin.access')->prefix('ticketing')->group(function () {
+        Route::get('/meta', [TicketingMetaController::class, 'index']);
+
+        Route::get('/notification-preferences', [TicketNotificationPreferenceController::class, 'show']);
+        Route::put('/notification-preferences', [TicketNotificationPreferenceController::class, 'update']);
+
+        Route::get('/dashboard/requester', [TicketingDashboardController::class, 'requester']);
+        Route::get('/dashboard/agent', [TicketingDashboardController::class, 'agent']);
+        Route::get('/dashboard/team', [TicketingDashboardController::class, 'team']);
+        Route::get('/dashboard/management', [TicketingDashboardController::class, 'management']);
+
+        Route::get('/service-catalog', [ServiceCatalogController::class, 'index']);
+        Route::get('/service-catalog/{serviceItem}', [ServiceCatalogController::class, 'show']);
+        Route::get('/service-catalog/{serviceItem}/form', [ServiceCatalogController::class, 'form']);
+
+        Route::get('/tickets', [TicketController::class, 'index']);
+        Route::get('/tickets/search', [TicketController::class, 'search']);
+        Route::get('/tickets/kanban', [TicketController::class, 'kanban']);
+        Route::post('/tickets/duplicate-check', [TicketController::class, 'duplicateCheck'])
+            ->middleware('permission:ticket.create|admin.access');
+        Route::post('/tickets', [TicketController::class, 'store'])
+            ->middleware('permission:ticket.create|admin.access');
+        Route::get('/tickets/{ticket}', [TicketController::class, 'show']);
+        Route::put('/tickets/{ticket}', [TicketController::class, 'update'])
+            ->middleware('permission:ticket.update|admin.access');
+        Route::get('/tickets/{ticket}/timeline', [TicketController::class, 'timeline']);
+
+        Route::post('/tickets/{ticket}/assign', [TicketActionController::class, 'assign'])
+            ->middleware('permission:ticket.assign|admin.access');
+        Route::post('/tickets/{ticket}/take-charge', [TicketActionController::class, 'takeCharge'])
+            ->middleware('permission:ticket.take_charge|admin.access');
+        Route::post('/tickets/{ticket}/escalate', [TicketActionController::class, 'escalate'])
+            ->middleware('permission:ticket.escalate|admin.access');
+        Route::post('/tickets/{ticket}/resolve', [TicketActionController::class, 'resolve'])
+            ->middleware('permission:ticket.resolve|admin.access');
+        Route::post('/tickets/{ticket}/reopen', [TicketActionController::class, 'reopen'])
+            ->middleware('permission:ticket.reopen|admin.access');
+        Route::post('/tickets/{ticket}/close', [TicketActionController::class, 'close'])
+            ->middleware('permission:ticket.close|admin.access');
+        Route::post('/tickets/{ticket}/cancel', [TicketActionController::class, 'cancel'])
+            ->middleware('permission:ticket.cancel|admin.access');
+        Route::post('/tickets/{ticket}/wait', [TicketActionController::class, 'wait'])
+            ->middleware('permission:ticket.update|admin.access');
+        Route::patch('/tickets/{ticket}/status', [TicketActionController::class, 'changeStatus'])
+            ->middleware('permission:ticket.update|admin.access');
+        Route::post('/tickets/{ticket}/satisfaction', [TicketActionController::class, 'satisfaction'])
+            ->middleware('permission:ticket.view|admin.access');
+
+        Route::get('/tickets/{ticket}/comments', [TicketCommentController::class, 'index']);
+        Route::post('/tickets/{ticket}/comments', [TicketCommentController::class, 'store'])
+            ->middleware('permission:ticket.comment|ticket.internal_note|admin.access');
+
+        Route::post('/tickets/{ticket}/attachments', [TicketAttachmentController::class, 'store'])
+            ->middleware('permission:ticket.create|ticket.update|admin.access');
+        Route::get('/tickets/{ticket}/attachments/{attachment}/download', [TicketAttachmentController::class, 'download']);
+        Route::delete('/tickets/{ticket}/attachments/{attachment}', [TicketAttachmentController::class, 'destroy'])
+            ->middleware('permission:ticket.update|admin.access');
+
+        Route::get('/tickets/{ticket}/worklogs', [TicketWorklogController::class, 'index']);
+        Route::post('/tickets/{ticket}/worklogs', [TicketWorklogController::class, 'store'])
+            ->middleware('permission:ticket.update|admin.access');
+
+        Route::get('/tickets/{ticket}/relations', [TicketRelationController::class, 'index']);
+        Route::post('/tickets/{ticket}/relations', [TicketRelationController::class, 'store'])
+            ->middleware('permission:ticket.update|admin.access');
+        Route::delete('/tickets/{ticket}/relations/{relation}', [TicketRelationController::class, 'destroy'])
+            ->middleware('permission:ticket.update|admin.access');
+
+        Route::get('/reports/volume', [TicketingReportController::class, 'volume'])
+            ->middleware('permission:ticket.view_reports|admin.access');
+        Route::get('/reports/sla', [TicketingReportController::class, 'sla'])
+            ->middleware('permission:ticket.view_reports|admin.access');
+        Route::get('/reports/satisfaction', [TicketingReportController::class, 'satisfaction'])
+            ->middleware('permission:ticket.view_reports|admin.access');
+        Route::get('/reports/by-category', [TicketingReportController::class, 'byCategory'])
+            ->middleware('permission:ticket.view_reports|admin.access');
+
+        Route::middleware('permission:problem.view|admin.access')->group(function () {
+            Route::get('/problems', [ProblemController::class, 'index']);
+            Route::post('/problems', [ProblemController::class, 'store'])
+                ->middleware('permission:problem.create|admin.access');
+            Route::get('/problems/{problem}', [ProblemController::class, 'show']);
+            Route::put('/problems/{problem}', [ProblemController::class, 'update'])
+                ->middleware('permission:problem.update|admin.access');
+            Route::post('/problems/{problem}/tickets', [ProblemController::class, 'linkTicket'])
+                ->middleware('permission:problem.update|admin.access');
+            Route::delete('/problems/{problem}/tickets/{ticket}', [ProblemController::class, 'unlinkTicket'])
+                ->middleware('permission:problem.update|admin.access');
+            Route::post('/problems/{problem}/known-errors', [KnownErrorController::class, 'storeForProblem'])
+                ->middleware('permission:problem.update|admin.access');
+        });
+
+        Route::get('/known-errors', [KnownErrorController::class, 'index']);
+        Route::post('/known-errors', [KnownErrorController::class, 'store'])
+            ->middleware('permission:problem.create|problem.update|admin.access');
+        Route::get('/known-errors/{knownError}', [KnownErrorController::class, 'show']);
+        Route::put('/known-errors/{knownError}', [KnownErrorController::class, 'update'])
+            ->middleware('permission:problem.update|admin.access');
+        Route::delete('/known-errors/{knownError}', [KnownErrorController::class, 'destroy'])
+            ->middleware('permission:problem.update|admin.access');
+
+        Route::middleware('permission:knowledge.view|admin.access')->group(function () {
+            Route::get('/knowledge', [KnowledgeController::class, 'index']);
+            Route::post('/knowledge', [KnowledgeController::class, 'store'])
+                ->middleware('permission:knowledge.create|admin.access');
+            Route::get('/knowledge/{article}', [KnowledgeController::class, 'show']);
+            Route::put('/knowledge/{article}', [KnowledgeController::class, 'update'])
+                ->middleware('permission:knowledge.create|knowledge.review|admin.access');
+            Route::post('/knowledge/{article}/publish', [KnowledgeController::class, 'publish'])
+                ->middleware('permission:knowledge.publish|admin.access');
+            Route::post('/knowledge/{article}/tickets', [KnowledgeController::class, 'linkTicket'])
+                ->middleware('permission:knowledge.create|admin.access');
+        });
+
+        Route::get('/applications', [ApplicationController::class, 'index']);
+        Route::post('/applications', [ApplicationController::class, 'store'])
+            ->middleware('permission:ticket.admin|admin.access');
+        Route::get('/applications/{application}', [ApplicationController::class, 'show']);
+        Route::put('/applications/{application}', [ApplicationController::class, 'update'])
+            ->middleware('permission:ticket.admin|admin.access');
+
+        Route::get('/assets', [AssetController::class, 'index']);
+        Route::post('/assets', [AssetController::class, 'store'])
+            ->middleware('permission:ticket.admin|admin.access');
+        Route::get('/assets/{asset}', [AssetController::class, 'show']);
+        Route::put('/assets/{asset}', [AssetController::class, 'update'])
+            ->middleware('permission:ticket.admin|admin.access');
+
+        Route::post('/ai/suggest', [TicketingAiController::class, 'suggest'])
+            ->middleware('permission:ticket.create|ticket.update|admin.access');
+
+        Route::middleware('permission:ticket.admin|admin.access')->prefix('admin')->group(function () {
+            Route::get('/types', [TicketingAdminController::class, 'typesIndex']);
+            Route::post('/types', [TicketingAdminController::class, 'typesStore']);
+            Route::put('/types/{type}', [TicketingAdminController::class, 'typesUpdate']);
+
+            Route::get('/categories', [TicketingAdminController::class, 'categoriesIndex']);
+            Route::post('/categories', [TicketingAdminController::class, 'categoriesStore']);
+            Route::put('/categories/{category}', [TicketingAdminController::class, 'categoriesUpdate']);
+
+            Route::get('/channels', [TicketingAdminController::class, 'channelsIndex']);
+            Route::post('/channels', [TicketingAdminController::class, 'channelsStore']);
+            Route::put('/channels/{channel}', [TicketingAdminController::class, 'channelsUpdate']);
+
+            Route::get('/teams', [TicketingAdminController::class, 'teamsIndex']);
+            Route::post('/teams', [TicketingAdminController::class, 'teamsStore']);
+            Route::put('/teams/{team}', [TicketingAdminController::class, 'teamsUpdate']);
+            Route::post('/teams/{team}/members', [TicketingAdminController::class, 'teamMembersStore']);
+            Route::delete('/teams/{team}/members/{member}', [TicketingAdminController::class, 'teamMembersDestroy']);
+
+            Route::get('/catalogs', [TicketingAdminController::class, 'catalogsIndex']);
+            Route::post('/catalogs', [TicketingAdminController::class, 'catalogsStore']);
+            Route::put('/catalogs/{catalog}', [TicketingAdminController::class, 'catalogsUpdate']);
+            Route::post('/catalogs/{catalog}/items', [TicketingAdminController::class, 'itemsStore']);
+            Route::put('/items/{item}', [TicketingAdminController::class, 'itemsUpdate']);
+            Route::post('/items/{item}/fields', [TicketingAdminController::class, 'fieldsStore']);
+            Route::put('/fields/{field}', [TicketingAdminController::class, 'fieldsUpdate']);
+
+            Route::get('/sla-policies', [TicketingAdminController::class, 'slaPoliciesIndex']);
+            Route::post('/sla-policies', [TicketingAdminController::class, 'slaPoliciesStore']);
+            Route::put('/sla-policies/{policy}', [TicketingAdminController::class, 'slaPoliciesUpdate']);
+
+            Route::get('/sla-calendars', [TicketingAdminController::class, 'slaCalendarsIndex']);
+            Route::post('/sla-calendars', [TicketingAdminController::class, 'slaCalendarsStore']);
+            Route::put('/sla-calendars/{calendar}', [TicketingAdminController::class, 'slaCalendarsUpdate']);
+            Route::post('/sla-calendars/{calendar}/exceptions', [TicketingAdminController::class, 'slaCalendarExceptionsStore']);
+
+            Route::get('/priority-matrix', [TicketingAdminController::class, 'priorityMatrixIndex']);
+            Route::post('/priority-matrix', [TicketingAdminController::class, 'priorityMatrixStore']);
+
+            Route::get('/settings', [TicketingAdminController::class, 'settingsIndex']);
+            Route::put('/settings', [TicketingAdminController::class, 'settingsUpdate']);
+        });
     });
 });
 // Callback ONLYOFFICE Document Server (JWT, hors Sanctum)

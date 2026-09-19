@@ -175,7 +175,13 @@ class UserController extends Controller
             $rules['password'] = ['nullable', 'string', Password::defaults()];
         }
 
-        return $request->validate($rules);
+        return $request->validate($rules, [
+            'email.unique' => 'Cette adresse e-mail est déjà utilisée par un autre compte.',
+            'email.required' => 'L’adresse e-mail est obligatoire.',
+            'email.email' => 'L’adresse e-mail n’est pas valide.',
+            'role.required' => 'Le rôle est obligatoire.',
+            'role.exists' => 'Le rôle sélectionné est invalide.',
+        ]);
     }
 
     private function resolveName(array $data, ?User $user = null): string

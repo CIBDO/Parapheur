@@ -235,6 +235,23 @@ class User extends Authenticatable
             $rules[] = ['action' => 'manage', 'subject' => 'DocumentTemplate'];
         }
 
+        if ($this->can('ticket.view') || $this->can('ticket.view_all') || $this->can('ticket.view_team')) {
+            $rules[] = ['action' => 'read', 'subject' => 'Ticketing'];
+        }
+
+        if ($this->can('ticket.create')) {
+            $rules[] = ['action' => 'create', 'subject' => 'Ticketing'];
+        }
+
+        if ($this->can('ticket.update') || $this->can('ticket.assign') || $this->can('ticket.take_charge') || $this->can('ticket.resolve')) {
+            $rules[] = ['action' => 'update', 'subject' => 'Ticketing'];
+            $rules[] = ['action' => 'manage', 'subject' => 'Ticketing'];
+        }
+
+        if ($this->can('ticket.admin') || $this->can('ticket.manage_catalog') || $this->can('ticket.manage_sla')) {
+            $rules[] = ['action' => 'manage', 'subject' => 'TicketingAdmin'];
+        }
+
         return $rules;
     }
 }

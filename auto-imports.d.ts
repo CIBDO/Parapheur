@@ -95,6 +95,9 @@ declare global {
   const formatDateFr: typeof import('./resources/ts/utils/parapheurUi')['formatDateFr']
   const formatDateTimeFr: typeof import('./resources/ts/utils/parapheurUi')['formatDateTimeFr']
   const formatDateToMonthShort: typeof import('./resources/ts/@core/utils/formatters')['formatDateToMonthShort']
+  const formatTicketDate: typeof import('./resources/ts/utils/ticketingUi')['formatTicketDate']
+  const formatTicketDateTime: typeof import('./resources/ts/utils/ticketingUi')['formatTicketDateTime']
+  const formatTicketNumber: typeof import('./resources/ts/utils/ticketingUi')['formatTicketNumber']
   const getActivePinia: typeof import('pinia')['getActivePinia']
   const getAssignmentActionLabel: typeof import('./resources/ts/utils/courrierUi')['getAssignmentActionLabel']
   const getChannelLabel: typeof import('./resources/ts/utils/courrierUi')['getChannelLabel']
@@ -137,7 +140,7 @@ declare global {
   const labelOf: typeof import('./resources/ts/utils/parapheurUi')['labelOf']
   const lengthValidator: typeof import('./resources/ts/@core/utils/validators')['lengthValidator']
   const linkRelationLabels: typeof import('./resources/ts/utils/gedUi')['linkRelationLabels']
-  const listItems: typeof import('./resources/ts/utils/courrierUi')['listItems']
+  const listItems: typeof import('./resources/ts/utils/ticketingUi')['listItems']
   const logicAnd: typeof import('@vueuse/math')['logicAnd']
   const logicNot: typeof import('@vueuse/math')['logicNot']
   const logicOr: typeof import('@vueuse/math')['logicOr']
@@ -217,6 +220,7 @@ declare global {
   const shallowReactive: typeof import('vue')['shallowReactive']
   const shallowReadonly: typeof import('vue')['shallowReadonly']
   const shallowRef: typeof import('vue')['shallowRef']
+  const slaBadge: typeof import('./resources/ts/utils/ticketingUi')['slaBadge']
   const statusColor: typeof import('./resources/ts/utils/parapheurUi')['statusColor']
   const statusLabel: typeof import('./resources/ts/utils/courrierUi')['statusLabel']
   const statusLabels: typeof import('./resources/ts/utils/parapheurUi')['statusLabels']
@@ -229,6 +233,15 @@ declare global {
   const templateRef: typeof import('@vueuse/core')['templateRef']
   const throttledRef: typeof import('@vueuse/core')['throttledRef']
   const throttledWatch: typeof import('@vueuse/core')['throttledWatch']
+  const ticketKanbanColumnOrder: typeof import('./resources/ts/utils/ticketingUi')['ticketKanbanColumnOrder']
+  const ticketPriorityColor: typeof import('./resources/ts/utils/ticketingUi')['ticketPriorityColor']
+  const ticketPriorityColors: typeof import('./resources/ts/utils/ticketingUi')['ticketPriorityColors']
+  const ticketPriorityLabel: typeof import('./resources/ts/utils/ticketingUi')['ticketPriorityLabel']
+  const ticketPriorityLabels: typeof import('./resources/ts/utils/ticketingUi')['ticketPriorityLabels']
+  const ticketStatusColor: typeof import('./resources/ts/utils/ticketingUi')['ticketStatusColor']
+  const ticketStatusColors: typeof import('./resources/ts/utils/ticketingUi')['ticketStatusColors']
+  const ticketStatusLabel: typeof import('./resources/ts/utils/ticketingUi')['ticketStatusLabel']
+  const ticketStatusLabels: typeof import('./resources/ts/utils/ticketingUi')['ticketStatusLabels']
   const toRaw: typeof import('vue')['toRaw']
   const toReactive: typeof import('@vueuse/core')['toReactive']
   const toRef: typeof import('vue')['toRef']
@@ -409,6 +422,7 @@ declare global {
   const useThrottle: typeof import('@vueuse/core')['useThrottle']
   const useThrottleFn: typeof import('@vueuse/core')['useThrottleFn']
   const useThrottledRefHistory: typeof import('@vueuse/core')['useThrottledRefHistory']
+  const useTicketing: typeof import('./resources/ts/composables/useTicketing')['useTicketing']
   const useTimeAgo: typeof import('@vueuse/core')['useTimeAgo']
   const useTimeout: typeof import('@vueuse/core')['useTimeout']
   const useTimeoutFn: typeof import('@vueuse/core')['useTimeoutFn']
@@ -529,7 +543,6 @@ declare module 'vue' {
     readonly defineComponent: UnwrapRef<typeof import('vue')['defineComponent']>
     readonly definePage: UnwrapRef<typeof import('unplugin-vue-router/runtime')['definePage']>
     readonly defineStore: UnwrapRef<typeof import('pinia')['defineStore']>
-    readonly detailRouteName: UnwrapRef<typeof import('./resources/ts/utils/courrierUi')['detailRouteName']>
     readonly directionLabel: UnwrapRef<typeof import('./resources/ts/utils/courrierUi')['directionLabel']>
     readonly documentKindLabels: UnwrapRef<typeof import('./resources/ts/utils/meetingsUi')['documentKindLabels']>
     readonly documentTemplateKindLabels: UnwrapRef<typeof import('./resources/ts/utils/courrierUi')['documentTemplateKindLabels']>
@@ -550,6 +563,9 @@ declare module 'vue' {
     readonly formatDateFr: UnwrapRef<typeof import('./resources/ts/utils/parapheurUi')['formatDateFr']>
     readonly formatDateTimeFr: UnwrapRef<typeof import('./resources/ts/utils/parapheurUi')['formatDateTimeFr']>
     readonly formatDateToMonthShort: UnwrapRef<typeof import('./resources/ts/@core/utils/formatters')['formatDateToMonthShort']>
+    readonly formatTicketDate: UnwrapRef<typeof import('./resources/ts/utils/ticketingUi')['formatTicketDate']>
+    readonly formatTicketDateTime: UnwrapRef<typeof import('./resources/ts/utils/ticketingUi')['formatTicketDateTime']>
+    readonly formatTicketNumber: UnwrapRef<typeof import('./resources/ts/utils/ticketingUi')['formatTicketNumber']>
     readonly getActivePinia: UnwrapRef<typeof import('pinia')['getActivePinia']>
     readonly getCorrespondenceConfidentialityLabel: UnwrapRef<typeof import('./resources/ts/utils/courrierUi')['getCorrespondenceConfidentialityLabel']>
     readonly getCorrespondenceDirectionLabel: UnwrapRef<typeof import('./resources/ts/utils/courrierUi')['getCorrespondenceDirectionLabel']>
@@ -586,6 +602,7 @@ declare module 'vue' {
     readonly lengthValidator: UnwrapRef<typeof import('./resources/ts/@core/utils/validators')['lengthValidator']>
     readonly linkRelationLabels: UnwrapRef<typeof import('./resources/ts/utils/gedUi')['linkRelationLabels']>
     readonly listItems: UnwrapRef<typeof import('./resources/ts/utils/courrierUi')['listItems']>
+    readonly listItems: UnwrapRef<typeof import('./resources/ts/utils/ticketingUi')['listItems']>
     readonly logicAnd: UnwrapRef<typeof import('@vueuse/math')['logicAnd']>
     readonly logicNot: UnwrapRef<typeof import('@vueuse/math')['logicNot']>
     readonly logicOr: UnwrapRef<typeof import('@vueuse/math')['logicOr']>
@@ -665,6 +682,7 @@ declare module 'vue' {
     readonly shallowReactive: UnwrapRef<typeof import('vue')['shallowReactive']>
     readonly shallowReadonly: UnwrapRef<typeof import('vue')['shallowReadonly']>
     readonly shallowRef: UnwrapRef<typeof import('vue')['shallowRef']>
+    readonly slaBadge: UnwrapRef<typeof import('./resources/ts/utils/ticketingUi')['slaBadge']>
     readonly statusColor: UnwrapRef<typeof import('./resources/ts/utils/parapheurUi')['statusColor']>
     readonly statusLabel: UnwrapRef<typeof import('./resources/ts/utils/courrierUi')['statusLabel']>
     readonly statusLabels: UnwrapRef<typeof import('./resources/ts/utils/parapheurUi')['statusLabels']>
@@ -676,6 +694,15 @@ declare module 'vue' {
     readonly templateRef: UnwrapRef<typeof import('@vueuse/core')['templateRef']>
     readonly throttledRef: UnwrapRef<typeof import('@vueuse/core')['throttledRef']>
     readonly throttledWatch: UnwrapRef<typeof import('@vueuse/core')['throttledWatch']>
+    readonly ticketKanbanColumnOrder: UnwrapRef<typeof import('./resources/ts/utils/ticketingUi')['ticketKanbanColumnOrder']>
+    readonly ticketPriorityColor: UnwrapRef<typeof import('./resources/ts/utils/ticketingUi')['ticketPriorityColor']>
+    readonly ticketPriorityColors: UnwrapRef<typeof import('./resources/ts/utils/ticketingUi')['ticketPriorityColors']>
+    readonly ticketPriorityLabel: UnwrapRef<typeof import('./resources/ts/utils/ticketingUi')['ticketPriorityLabel']>
+    readonly ticketPriorityLabels: UnwrapRef<typeof import('./resources/ts/utils/ticketingUi')['ticketPriorityLabels']>
+    readonly ticketStatusColor: UnwrapRef<typeof import('./resources/ts/utils/ticketingUi')['ticketStatusColor']>
+    readonly ticketStatusColors: UnwrapRef<typeof import('./resources/ts/utils/ticketingUi')['ticketStatusColors']>
+    readonly ticketStatusLabel: UnwrapRef<typeof import('./resources/ts/utils/ticketingUi')['ticketStatusLabel']>
+    readonly ticketStatusLabels: UnwrapRef<typeof import('./resources/ts/utils/ticketingUi')['ticketStatusLabels']>
     readonly toRaw: UnwrapRef<typeof import('vue')['toRaw']>
     readonly toReactive: UnwrapRef<typeof import('@vueuse/core')['toReactive']>
     readonly toRef: UnwrapRef<typeof import('vue')['toRef']>
@@ -856,6 +883,7 @@ declare module 'vue' {
     readonly useThrottle: UnwrapRef<typeof import('@vueuse/core')['useThrottle']>
     readonly useThrottleFn: UnwrapRef<typeof import('@vueuse/core')['useThrottleFn']>
     readonly useThrottledRefHistory: UnwrapRef<typeof import('@vueuse/core')['useThrottledRefHistory']>
+    readonly useTicketing: UnwrapRef<typeof import('./resources/ts/composables/useTicketing')['useTicketing']>
     readonly useTimeAgo: UnwrapRef<typeof import('@vueuse/core')['useTimeAgo']>
     readonly useTimeout: UnwrapRef<typeof import('@vueuse/core')['useTimeout']>
     readonly useTimeoutFn: UnwrapRef<typeof import('@vueuse/core')['useTimeoutFn']>

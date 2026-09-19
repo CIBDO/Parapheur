@@ -10,6 +10,8 @@ enum NumberingSequenceCode: string
     case CirculationSheet = 'FC';
     case DispatchSlip = 'BE';
     case Acknowledgement = 'AR';
+    case Ticket = 'TCK';
+    case Problem = 'PRB';
 
     public function label(): string
     {
@@ -20,6 +22,8 @@ enum NumberingSequenceCode: string
             self::CirculationSheet => 'Fiche circulation',
             self::DispatchSlip => 'Bordereau envoi',
             self::Acknowledgement => 'Accusé de réception',
+            self::Ticket => 'Ticket',
+            self::Problem => 'Problème',
         };
     }
 
