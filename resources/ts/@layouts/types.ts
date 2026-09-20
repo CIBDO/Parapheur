@@ -114,6 +114,7 @@ export type Notification = {
   time: string;
   color?: string;
   isSeen: boolean;
+  domain?: string;
 } & (
   | { img: string; text?: never; icon?: never }
   | { img?: never; text: string; icon?: never }

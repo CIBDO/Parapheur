@@ -21,7 +21,8 @@ const load = async () => {
       subtitle: item.subtitle,
       time: item.time,
       isSeen: item.isSeen,
-      color: item.isSeen ? undefined : 'primary',
+      color: item.color || (item.isSeen ? undefined : 'primary'),
+      domain: item.domain || undefined,
       url: item.url,
     }))
     unreadCount.value = Number(res.unread_count ?? notifications.value.filter(n => !n.isSeen).length)
@@ -56,8 +57,10 @@ const markRead = async (notificationIds: Array<number | string>) => {
   }
   catch {}
   notifications.value.forEach(item => {
-    if (notificationIds.includes(item.id))
+    if (notificationIds.includes(item.id)) {
       item.isSeen = true
+      item.color = undefined
+    }
   })
   unreadCount.value = Math.max(0, unreadCount.value - unreadIds.length)
 }
@@ -76,8 +79,10 @@ const markUnRead = async (notificationIds: Array<number | string>) => {
   }
   catch {}
   notifications.value.forEach(item => {
-    if (notificationIds.includes(item.id))
+    if (notificationIds.includes(item.id)) {
       item.isSeen = false
+      item.color = item.color || 'primary'
+    }
   })
   unreadCount.value += newlyUnread.length
 }

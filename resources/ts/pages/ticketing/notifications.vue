@@ -18,19 +18,25 @@ const form = ref({
 })
 
 const eventOptions = [
-  { value: 'created', title: 'Nouveau ticket' },
+  { value: 'created', title: 'Enregistrement de demande' },
   { value: 'assigned', title: 'Affectation' },
+  { value: 'transferred', title: 'Transfert' },
   { value: 'taken_charge', title: 'Prise en charge' },
-  { value: 'comment_agent', title: 'Commentaire agent' },
-  { value: 'comment_requester', title: 'Commentaire demandeur' },
-  { value: 'waiting_requester', title: 'En attente demandeur' },
+  { value: 'comment_agent', title: 'Réponse du Centre de services' },
+  { value: 'comment_requester', title: 'Message du demandeur' },
+  { value: 'waiting_requester', title: 'Attente de votre réponse' },
   { value: 'escalated', title: 'Escalade' },
-  { value: 'sla_warning', title: 'Alerte SLA' },
-  { value: 'sla_breach', title: 'Dépassement SLA' },
-  { value: 'resolved', title: 'Résolution' },
+  { value: 'sla_warning', title: 'Alerte délai de service (SLA)' },
+  { value: 'sla_breach', title: 'Dépassement de délai (SLA)' },
+  { value: 'ola_warning', title: 'Alerte engagement interne (OLA)' },
+  { value: 'ola_breach', title: 'Dépassement d’engagement (OLA)' },
+  { value: 'resolved', title: 'Solution proposée' },
+  { value: 'solution_accepted', title: 'Solution acceptée' },
   { value: 'reopened', title: 'Réouverture' },
   { value: 'closed', title: 'Clôture' },
   { value: 'priority_changed', title: 'Changement de priorité' },
+  { value: 'approval_accepted', title: 'Approbation accordée' },
+  { value: 'approval_refused', title: 'Approbation refusée' },
 ]
 
 onMounted(async () => {
@@ -73,8 +79,8 @@ async function save() {
 <template>
   <div>
     <ParapheurPageHeader
-      title="Notifications ticketing"
-      subtitle="Canaux et événements à recevoir"
+      title="Préférences de notification"
+      subtitle="Choisissez les canaux et les événements du Centre de services que vous souhaitez recevoir"
     />
 
     <VAlert

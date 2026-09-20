@@ -65,25 +65,31 @@ const toggleReadUnread = (isSeen: boolean, Id: number | string) => {
 
     <VMenu
       activator="parent"
-      width="380px"
+      width="420px"
       :location="props.location"
       offset="12px"
       :close-on-content-click="false"
     >
-      <VCard class="d-flex flex-column">
+      <VCard class="notification-panel d-flex flex-column">
         <VCardItem class="notification-section">
-          <VCardTitle class="text-h6">
-            Notifications
-          </VCardTitle>
+          <div>
+            <VCardTitle class="text-h6 mb-0">
+              Notifications
+            </VCardTitle>
+            <p class="text-caption text-medium-emphasis mb-0 mt-1">
+              Bureau Numérique · DGTCP
+            </p>
+          </div>
 
           <template #append>
             <VChip
               v-show="totalUnseenNotifications > 0"
               size="small"
               color="primary"
-              class="me-2"
+              variant="tonal"
+              class="me-1"
             >
-              {{ totalUnseenNotifications }} nouvelle{{ totalUnseenNotifications > 1 ? 's' : '' }}
+              {{ totalUnseenNotifications }} non lue{{ totalUnseenNotifications > 1 ? 's' : '' }}
             </VChip>
             <IconBtn
               v-show="props.notifications.length"
@@ -110,7 +116,7 @@ const toggleReadUnread = (isSeen: boolean, Id: number | string) => {
 
         <PerfectScrollbar
           :options="{ wheelPropagation: false }"
-          style="max-block-size: 23.75rem"
+          style="max-block-size: 26rem"
         >
           <VList class="notification-list rounded-0 py-0">
             <template
@@ -120,14 +126,16 @@ const toggleReadUnread = (isSeen: boolean, Id: number | string) => {
               <VDivider v-if="index > 0" />
               <VListItem
                 link
-                lines="one"
-                min-height="66px"
-                class="list-item-hover-class"
+                lines="three"
+                min-height="78px"
+                class="list-item-hover-class notification-item"
+                :class="{ 'notification-item--unread': !notification.isSeen }"
                 @click="$emit('click:notification', notification)"
               >
-                <div class="d-flex align-start gap-3">
+                <div class="d-flex align-start gap-3 w-100">
                   <VAvatar
-                    :color="notification.color && !notification.img ? notification.color : undefined"
+                    size="40"
+                    :color="notification.color || 'secondary'"
                     :variant="notification.img ? undefined : 'tonal'"
                   >
                     <span v-if="notification.text">{{ avatarText(notification.text) }}</span>
@@ -138,73 +146,88 @@ const toggleReadUnread = (isSeen: boolean, Id: number | string) => {
                     <VIcon
                       v-if="notification.icon"
                       :icon="notification.icon"
+                      size="22"
                     />
                   </VAvatar>
 
-                  <div>
-                    <p class="text-sm font-weight-medium mb-1">
+                  <div class="notification-body flex-grow-1 min-w-0">
+                    <div class="d-flex align-center gap-2 mb-1 flex-wrap">
+                      <span
+                        v-if="notification.domain"
+                        class="notification-domain text-caption"
+                      >
+                        {{ notification.domain }}
+                      </span>
+                      <span class="text-caption text-disabled">{{ notification.time }}</span>
+                    </div>
+                    <p class="text-sm font-weight-medium mb-1 text-high-emphasis">
                       {{ notification.title }}
                     </p>
-                    <p
-                      class="text-body-2 mb-2"
-                      style="letter-spacing: 0.4px !important; line-height: 18px"
-                    >
+                    <p class="text-body-2 text-medium-emphasis mb-0 notification-subtitle">
                       {{ notification.subtitle }}
                     </p>
-                    <p
-                      class="text-sm text-disabled mb-0"
-                      style="letter-spacing: 0.4px !important; line-height: 18px"
-                    >
-                      {{ notification.time }}
-                    </p>
                   </div>
-                  <VSpacer />
 
-                  <div class="d-flex flex-column align-end">
+                  <div class="d-flex flex-column align-end flex-shrink-0">
                     <VIcon
                       size="10"
                       icon="tabler-circle-filled"
-                      :color="!notification.isSeen ? 'primary' : '#a8aaae'"
+                      :color="!notification.isSeen ? (notification.color || 'primary') : '#a8aaae'"
                       :class="`${notification.isSeen ? 'visible-in-hover' : ''}`"
                       class="mb-2"
                       @click.stop="toggleReadUnread(notification.isSeen, notification.id)"
                     />
 
                     <VIcon
-                      size="20"
+                      size="18"
                       icon="tabler-x"
-                      class="visible-in-hover"
-                      @click="$emit('remove', notification.id)"
+                      class="visible-in-hover text-disabled"
+                      @click.stop="$emit('remove', notification.id)"
                     />
                   </div>
                 </div>
               </VListItem>
             </template>
 
-            <VListItem
+            <div
               v-show="!props.notifications.length"
-              class="text-center text-medium-emphasis"
-              style="block-size: 56px"
+              class="notification-empty text-center pa-8"
             >
-              <VListItemTitle>Aucune notification</VListItemTitle>
-            </VListItem>
+              <VAvatar
+                size="48"
+                color="secondary"
+                variant="tonal"
+                class="mb-3"
+              >
+                <VIcon
+                  icon="tabler-bell-off"
+                  size="26"
+                />
+              </VAvatar>
+              <p class="text-body-1 font-weight-medium mb-1">
+                Aucune notification
+              </p>
+              <p class="text-caption text-medium-emphasis mb-0">
+                Les alertes du Bureau Numérique apparaîtront ici.
+              </p>
+            </div>
           </VList>
         </PerfectScrollbar>
 
-        <VDivider />
+        <VDivider v-if="props.notifications.length && isAllMarkRead" />
 
         <VCardText
-          v-show="props.notifications.length"
-          class="pa-4"
+          v-show="props.notifications.length && isAllMarkRead"
+          class="pa-3"
         >
           <VBtn
             block
             size="small"
             variant="tonal"
             color="primary"
-            :to="{ name: 'parapheur' }"
+            @click="markAllReadOrUnread"
           >
-            Voir mon parapheur
+            Tout marquer comme lu
           </VBtn>
         </VCardText>
       </VCard>
@@ -213,9 +236,47 @@ const toggleReadUnread = (isSeen: boolean, Id: number | string) => {
 </template>
 
 <style lang="scss">
+.notification-panel {
+  overflow: hidden;
+}
+
 .notification-section {
-  padding-block: 0.75rem;
+  padding-block: 0.875rem;
   padding-inline: 1rem;
+}
+
+.notification-domain {
+  color: rgb(var(--v-theme-primary));
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.notification-subtitle {
+  display: -webkit-box;
+  letter-spacing: 0.2px;
+  line-height: 1.35;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.notification-item {
+  position: relative;
+
+  &--unread {
+    background: rgba(var(--v-theme-primary), 0.04);
+
+    &::before {
+      background: rgb(var(--v-theme-primary));
+      block-size: 100%;
+      content: '';
+      inline-size: 3px;
+      inset-block-start: 0;
+      inset-inline-start: 0;
+      position: absolute;
+    }
+  }
 }
 
 .list-item-hover-class {
@@ -234,6 +295,7 @@ const toggleReadUnread = (isSeen: boolean, Id: number | string) => {
   .v-list-item {
     border-radius: 0 !important;
     margin: 0 !important;
+    padding-block: 0.75rem !important;
 
     .v-list-item__append {
       .v-list-item__spacer {

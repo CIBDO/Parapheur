@@ -242,7 +242,7 @@ class SlaService
                     $ticket,
                     'sla_warning',
                     null,
-                    sprintf('SLA proche du dépassement (%d%%).', $percent),
+                    sprintf('(%d%%).', $percent),
                     ['percent' => $percent]
                 );
                 $warnings++;

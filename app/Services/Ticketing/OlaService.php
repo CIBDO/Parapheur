@@ -105,7 +105,7 @@ class OlaService
 
             if ($percent >= $warningPercent) {
                 $ola->update(['warning_sent_at' => $now]);
-                $this->notifications->notify($ticket, 'ola_warning', null, sprintf('OLA proche du dépassement (%d%%).', $percent));
+                $this->notifications->notify($ticket, 'ola_warning', null, sprintf('(%d%%).', $percent));
                 $warnings++;
             }
         }

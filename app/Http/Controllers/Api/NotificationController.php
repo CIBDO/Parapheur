@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Support\NotificationPresentation;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -15,16 +16,24 @@ class NotificationController extends Controller
             ->latest()
             ->limit(50)
             ->get()
-            ->map(fn ($notification) => [
-                'id' => $notification->id,
-                'title' => $notification->data['title'] ?? 'Notification',
-                'subtitle' => $notification->data['message'] ?? '',
-                'time' => optional($notification->created_at)->diffForHumans(),
-                'isSeen' => $notification->read_at !== null,
-                'url' => $notification->data['url'] ?? null,
-                'icon' => 'tabler-file-text',
-                'created_at' => $notification->created_at,
-            ]);
+            ->map(function ($notification) {
+                $data = is_array($notification->data) ? $notification->data : [];
+                $isSeen = $notification->read_at !== null;
+
+                return [
+                    'id' => $notification->id,
+                    'title' => $data['title'] ?? 'Notification',
+                    'subtitle' => $data['message'] ?? '',
+                    'time' => optional($notification->created_at)->diffForHumans(),
+                    'isSeen' => $isSeen,
+                    'url' => $data['url'] ?? null,
+                    'icon' => NotificationPresentation::icon($data),
+                    'color' => NotificationPresentation::color($data, $isSeen),
+                    'domain' => NotificationPresentation::domainLabel($data),
+                    'event' => $data['event'] ?? null,
+                    'created_at' => $notification->created_at,
+                ];
+            });
 
         return response()->json([
             'data' => $notifications,

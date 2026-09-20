@@ -2,6 +2,7 @@
 
 namespace App\Notifications;
 
+use App\Support\NotificationPresentation;
 use Illuminate\Bus\Queueable;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
@@ -27,13 +28,13 @@ class UserAccountCreatedNotification extends Notification
 
         return (new MailMessage)
             ->subject("[{$appName}] Vos identifiants de connexion")
-            ->greeting('Bonjour '.$notifiable->name.',')
-            ->line('Un compte a été créé pour vous sur le parapheur électronique DGTCP.')
+            ->greeting(NotificationPresentation::greeting((string) ($notifiable->name ?? '')))
+            ->line('Un compte a été créé pour vous sur le Bureau Numérique de la Direction Générale du Trésor et de la Comptabilité Publique (DGTCP).')
             ->line('Voici vos informations de connexion :')
             ->line('**Adresse e-mail :** '.$notifiable->email)
             ->line('**Mot de passe temporaire :** '.$this->plainPassword)
             ->action('Se connecter', $loginUrl)
-            ->line('Pour des raisons de sécurité, vous devrez obligatoirement changer ce mot de passe à votre première connexion.')
-            ->line('Ceci est un message automatique — merci de ne pas y répondre.');
+            ->line('Pour des raisons de sécurité, vous devrez obligatoirement modifier ce mot de passe lors de votre première connexion.')
+            ->line(NotificationPresentation::FOOTER);
     }
 }
