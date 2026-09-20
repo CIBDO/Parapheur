@@ -94,7 +94,7 @@ const quickActions = [
   { title: 'Nouvel incident', icon: 'tabler-alert-triangle', color: 'primary', route: 'ticketing-nouveau' },
   { title: 'Nouvelle demande', icon: 'tabler-file-plus', color: 'success', route: 'ticketing-demande' },
   { title: 'Catalogue', icon: 'tabler-category', color: 'info', route: 'ticketing-catalogue' },
-  { title: 'Kanban', icon: 'tabler-layout-kanban', color: 'warning', route: 'ticketing-kanban' },
+  { title: 'Recherche', icon: 'tabler-search', color: 'warning', route: 'ticketing-recherche' },
 ]
 
 const tableItems = computed(() =>

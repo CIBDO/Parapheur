@@ -199,6 +199,20 @@ export function useTicketing() {
     })
   }
 
+  async function downloadAttachment(ticketId: number, attachmentId: number, filename?: string) {
+    const blob = await $api(`/ticketing/tickets/${ticketId}/attachments/${attachmentId}/download`, {
+      responseType: 'blob',
+    }) as Blob
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename || 'piece-jointe'
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    URL.revokeObjectURL(url)
+  }
+
   async function fetchWorklogs(id: number) {
     return $api(`/ticketing/tickets/${id}/worklogs`)
   }
@@ -267,6 +281,7 @@ export function useTicketing() {
     fetchComments,
     fetchTimeline,
     uploadAttachment,
+    downloadAttachment,
     fetchWorklogs,
     addWorklog,
     submitSatisfaction,

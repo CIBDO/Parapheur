@@ -234,6 +234,7 @@ declare global {
   const templateRef: typeof import('@vueuse/core')['templateRef']
   const throttledRef: typeof import('@vueuse/core')['throttledRef']
   const throttledWatch: typeof import('@vueuse/core')['throttledWatch']
+  const ticketActorRoleLabel: typeof import('./resources/ts/utils/ticketingUi')['ticketActorRoleLabel']
   const ticketKanbanColumnOrder: typeof import('./resources/ts/utils/ticketingUi')['ticketKanbanColumnOrder']
   const ticketPriorityColor: typeof import('./resources/ts/utils/ticketingUi')['ticketPriorityColor']
   const ticketPriorityColors: typeof import('./resources/ts/utils/ticketingUi')['ticketPriorityColors']
@@ -696,6 +697,7 @@ declare module 'vue' {
     readonly templateRef: UnwrapRef<typeof import('@vueuse/core')['templateRef']>
     readonly throttledRef: UnwrapRef<typeof import('@vueuse/core')['throttledRef']>
     readonly throttledWatch: UnwrapRef<typeof import('@vueuse/core')['throttledWatch']>
+    readonly ticketActorRoleLabel: UnwrapRef<typeof import('./resources/ts/utils/ticketingUi')['ticketActorRoleLabel']>
     readonly ticketKanbanColumnOrder: UnwrapRef<typeof import('./resources/ts/utils/ticketingUi')['ticketKanbanColumnOrder']>
     readonly ticketPriorityColor: UnwrapRef<typeof import('./resources/ts/utils/ticketingUi')['ticketPriorityColor']>
     readonly ticketPriorityColors: UnwrapRef<typeof import('./resources/ts/utils/ticketingUi')['ticketPriorityColors']>

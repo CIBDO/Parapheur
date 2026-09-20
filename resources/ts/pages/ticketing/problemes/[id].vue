@@ -6,7 +6,7 @@ import { formatTicketDateTime, formatTicketNumber, listItems } from '@/utils/tic
 import { useTicketing } from '@/composables/useTicketing'
 
 definePage({
-  meta: { layout: 'default', action: 'read', subject: 'Ticketing' },
+  meta: { layout: 'default', action: 'read', subject: 'Ticketing', navActiveLink: 'ticketing' },
 })
 
 const route = useRoute()

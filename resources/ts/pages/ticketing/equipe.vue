@@ -14,7 +14,7 @@ import {
 } from '@/utils/ticketingUi'
 
 definePage({
-  meta: { layout: 'default', action: 'read', subject: 'Ticketing' },
+  meta: { layout: 'default', action: 'read', subject: 'Ticketing', navActiveLink: 'ticketing' },
 })
 
 const router = useRouter()

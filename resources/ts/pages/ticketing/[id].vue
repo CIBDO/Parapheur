@@ -9,6 +9,7 @@ import {
   listItems,
   slaBadge,
   teamAgentSelectItems,
+  ticketActorRoleLabel,
   ticketPriorityColor,
   ticketPriorityLabel,
   ticketStatusColor,
@@ -20,6 +21,7 @@ definePage({
     layout: 'default',
     action: 'read',
     subject: 'Ticketing',
+    navActiveLink: 'ticketing',
   },
 })
 
@@ -41,6 +43,7 @@ const {
   fetchComments,
   fetchTimeline,
   uploadAttachment,
+  downloadAttachment,
   fetchWorklogs,
   addWorklog,
   submitSatisfaction,
@@ -594,6 +597,19 @@ async function doUpload() {
   })
 }
 
+async function doDownloadAttachment(att: any) {
+  try {
+    await downloadAttachment(
+      id.value,
+      att.id,
+      att.original_name || att.name || 'piece-jointe',
+    )
+  }
+  catch (e: any) {
+    errorMsg.value = e?.data?.message || e.message || 'Téléchargement impossible'
+  }
+}
+
 async function postWorklog() {
   await runAction(async () => {
     await addWorklog(id.value, { minutes: worklogForm.value.minutes, note: worklogForm.value.note || undefined })
@@ -1093,7 +1109,7 @@ function timelineLabel(event: any) {
                       size="small"
                       class="me-2"
                     >
-                      {{ a.role }}
+                      {{ ticketActorRoleLabel(a.role) }}
                     </VChip>
                     {{ a.user?.name || a.user_id }}
                   </div>
@@ -1231,8 +1247,25 @@ function timelineLabel(event: any) {
                       v-for="att in ticket.attachments"
                       :key="att.id"
                     >
-                      <VListItemTitle>{{ att.original_name || att.name }}</VListItemTitle>
+                      <VListItemTitle>
+                        <a
+                          href="#"
+                          class="text-primary text-decoration-none"
+                          @click.prevent="doDownloadAttachment(att)"
+                        >{{ att.original_name || att.name }}</a>
+                      </VListItemTitle>
                       <VListItemSubtitle>{{ formatTicketDateTime(att.created_at) }}</VListItemSubtitle>
+                      <template #append>
+                        <VBtn
+                          icon
+                          variant="text"
+                          size="small"
+                          title="Télécharger"
+                          @click="doDownloadAttachment(att)"
+                        >
+                          <VIcon icon="tabler-download" />
+                        </VBtn>
+                      </template>
                     </VListItem>
                   </VList>
                   <div

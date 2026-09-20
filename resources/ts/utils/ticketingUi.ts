@@ -150,6 +150,22 @@ export function listItems<T = any>(payload: any): T[] {
   return []
 }
 
+/** Libellés FR pour les rôles d’acteurs ticket. */
+export function ticketActorRoleLabel(role: string | null | undefined): string {
+  const map: Record<string, string> = {
+    requester: 'Demandeur',
+    assignee: 'Assigné',
+    observer: 'Observateur',
+    approver: 'Approbateur',
+    writer: 'Rédacteur',
+    supplier: 'Fournisseur',
+  }
+  if (!role)
+    return '—'
+
+  return map[role] || map[String(role).toLowerCase()] || String(role)
+}
+
 /**
  * Agents d’une équipe pour les selects (évite d’afficher tous les users → 422).
  * Compare les ids en Number pour éviter les mismatches string/number du VSelect.

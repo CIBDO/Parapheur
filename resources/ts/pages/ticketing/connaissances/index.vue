@@ -5,7 +5,7 @@ import { $api } from '@/utils/api'
 import { formatTicketDateTime, listItems } from '@/utils/ticketingUi'
 
 definePage({
-  meta: { layout: 'default', action: 'read', subject: 'Ticketing' },
+  meta: { layout: 'default', action: 'read', subject: 'Ticketing', navActiveLink: 'ticketing' },
 })
 
 const router = useRouter()
