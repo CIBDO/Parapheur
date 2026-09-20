@@ -25,11 +25,11 @@ const errors = ref<Record<string, string | undefined>>({
 const refVForm = ref<VForm>()
 
 const credentials = ref({
-  email: 'dg@dgtcp.local',
-  password: 'password',
+  email: '',
+  password: '',
 })
 
-const rememberMe = ref(true)
+const rememberMe = ref(false)
 
 const logoSrc = typeof logoDgtcp === 'string'
   ? logoDgtcp
