@@ -30,6 +30,7 @@ const overrideForm = ref({
   note: '',
 })
 const users = ref<any[]>([])
+const structures = ref<any[]>([])
 const message = ref('')
 const errorMsg = ref('')
 
@@ -52,17 +53,36 @@ const allowedExtStr = computed({
   },
 })
 
+const overrideQuotaGo = computed({
+  get: () => Number(((overrideForm.value.quota_bytes || 0) / (1024 ** 3)).toFixed(2)),
+  set: (v: number) => { overrideForm.value.quota_bytes = Math.round(Number(v) * (1024 ** 3)) },
+})
+
+const scopeLabel = (o: any) => {
+  if (o.scope_type === 'user') {
+    const u = users.value.find((x: any) => x.id === o.scope_id)
+    return u ? `Utilisateur · ${u.name}` : `Utilisateur #${o.scope_id}`
+  }
+  if (o.scope_type === 'structure') {
+    const s = structures.value.find((x: any) => x.id === o.scope_id)
+    return s ? `Structure · ${s.name}` : `Structure #${o.scope_id}`
+  }
+  return `Espace #${o.scope_id}`
+}
+
 async function load() {
   loading.value = true
   try {
-    const [p, o, u] = await Promise.all([
+    const [p, o, u, s] = await Promise.all([
       $api('/workspace/admin/storage-policy'),
       $api('/workspace/admin/quota-overrides'),
       $api('/meta/users'),
+      $api('/meta/structures'),
     ])
     policy.value = { ...policy.value, ...(p.data || p) }
     overrides.value = o.data || o.items || o || []
     users.value = u.data || u || []
+    structures.value = s.data || s || []
   }
   finally {
     loading.value = false
@@ -203,6 +223,8 @@ onMounted(load)
               label="Rétention corbeille (jours)"
               type="number"
               min="1"
+              hint="Purge automatique quotidienne des éléments plus anciens"
+              persistent-hint
             />
           </VCol>
           <VCol
@@ -219,6 +241,8 @@ onMounted(load)
             <VTextField
               v-model="allowedExtStr"
               label="Extensions autorisées (séparées par des virgules)"
+              hint="Appliquées aux uploads Mon espace (ex. pdf, docx, xlsx)"
+              persistent-hint
             />
           </VCol>
         </VRow>
@@ -249,7 +273,8 @@ onMounted(load)
               v-model="overrideForm.scope_type"
               :items="[
                 { title: 'Utilisateur', value: 'user' },
-                { title: 'Workspace', value: 'workspace' },
+                { title: 'Espace de travail', value: 'workspace' },
+                { title: 'Structure', value: 'structure' },
               ]"
               label="Portée"
             />
@@ -264,10 +289,16 @@ onMounted(load)
               :items="users.map((u: any) => ({ title: u.name || u.email, value: u.id }))"
               label="Utilisateur"
             />
+            <VSelect
+              v-else-if="overrideForm.scope_type === 'structure'"
+              v-model="overrideForm.scope_id"
+              :items="structures.map((s: any) => ({ title: s.name, value: s.id }))"
+              label="Structure"
+            />
             <VTextField
               v-else
               v-model.number="overrideForm.scope_id"
-              label="ID workspace"
+              label="ID espace de travail"
               type="number"
             />
           </VCol>
@@ -276,9 +307,11 @@ onMounted(load)
             md="3"
           >
             <VTextField
-              v-model.number="overrideForm.quota_bytes"
-              label="Quota (octets)"
+              v-model.number="overrideQuotaGo"
+              label="Quota (Go)"
               type="number"
+              min="0.1"
+              step="0.5"
               :hint="formatBytes(overrideForm.quota_bytes)"
               persistent-hint
             />
@@ -313,8 +346,8 @@ onMounted(load)
               v-for="o in overrides"
               :key="o.id"
             >
-              <td>{{ o.scope_type }}</td>
-              <td>{{ o.scope_id }}</td>
+              <td>{{ scopeLabel(o) }}</td>
+              <td>{{ o.scope_type }} #{{ o.scope_id }}</td>
               <td>{{ formatBytes(o.quota_bytes) }}</td>
               <td>{{ o.note || '—' }}</td>
               <td>

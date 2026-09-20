@@ -32,6 +32,7 @@ final class NotificationPresentation
         $url = (string) ($data['url'] ?? '');
 
         return match (true) {
+            str_contains($url, '/espace/collaboratifs') || isset($data['workspace_id']) => 'tabler-users-group',
             str_contains($url, '/ticketing') || isset($data['ticket_id']) => match ($event) {
                 'created' => 'tabler-ticket',
                 'assigned', 'transferred' => 'tabler-user-check',
@@ -114,6 +115,7 @@ final class NotificationPresentation
         $url = (string) ($data['url'] ?? '');
 
         return match (true) {
+            str_contains($url, '/espace/collaboratifs') || isset($data['workspace_id']) => 'Espace collaboratif',
             str_contains($url, '/ticketing') || isset($data['ticket_id']) => 'Centre de services',
             str_contains($url, '/courrier') || isset($data['correspondence_id']) => 'Courrier',
             str_contains($url, '/parapheur/reunions') || isset($data['meeting_id']) => 'Réunions',

@@ -25,6 +25,35 @@ const {
   loading, folderId, breadcrumb, folders, documents, currentFolder, viewMode, load, openFolder,
 } = useWorkspaceExplorer(workspaceId)
 
+const collabWorkspace = ref<any>(null)
+const isCollaborative = computed(() => !!overrideWorkspaceId.value)
+
+const pageTitle = computed(() => {
+  if (isCollaborative.value && collabWorkspace.value?.name)
+    return `Dossiers — ${collabWorkspace.value.name}`
+  return 'Mes dossiers'
+})
+
+const pageSubtitle = computed(() => {
+  if (isCollaborative.value)
+    return 'Espace collaboratif — importez et organisez les fichiers de l’équipe'
+  return 'Naviguez, importez et organisez vos documents — y compris vos modèles personnels'
+})
+
+async function loadCollabMeta() {
+  if (!overrideWorkspaceId.value) {
+    collabWorkspace.value = null
+    return
+  }
+  try {
+    const show = await $api(`/workspace/${overrideWorkspaceId.value}`)
+    collabWorkspace.value = show.workspace || show
+  }
+  catch {
+    collabWorkspace.value = null
+  }
+}
+
 const createFolderDialog = ref(false)
 const newFolderName = ref('')
 const uploadInput = ref<HTMLInputElement | null>(null)
@@ -68,6 +97,7 @@ const emptySubtitle = computed(() => {
 
 onMounted(async () => {
   await loadHome()
+  await loadCollabMeta()
   if (route.query.folder)
     folderId.value = Number(route.query.folder)
   await load()
@@ -77,6 +107,8 @@ watch(workspaceId, async (id) => {
   if (id)
     await load()
 })
+
+watch(overrideWorkspaceId, loadCollabMeta)
 
 watch(folderId, (id) => {
   const query: Record<string, string> = {}
@@ -329,11 +361,18 @@ function folderSubtitle(folder: any) {
 <template>
   <div>
     <ParapheurPageHeader
-      title="Mes dossiers"
-      subtitle="Naviguez, importez et organisez vos documents — y compris vos modèles personnels"
+      :title="pageTitle"
+      :subtitle="pageSubtitle"
       icon="tabler-folder"
     >
       <template #actions>
+        <VBtn
+          v-if="isCollaborative"
+          variant="tonal"
+          :to="{ name: 'espace-collaboratifs-id', params: { id: overrideWorkspaceId } }"
+        >
+          Retour à l’espace
+        </VBtn>
         <VBtn
           color="primary"
           prepend-icon="tabler-folder-plus"
@@ -376,6 +415,17 @@ function folderSubtitle(folder: any) {
       @click:close="errorMsg = ''"
     >
       {{ errorMsg }}
+    </VAlert>
+
+    <VAlert
+      v-if="isCollaborative && collabWorkspace"
+      type="info"
+      variant="tonal"
+      class="mb-4"
+      density="comfortable"
+    >
+      Vous naviguez dans l’espace collaboratif <strong>{{ collabWorkspace.name }}</strong>.
+      Les fichiers importés ici sont visibles par les membres selon leurs droits.
     </VAlert>
 
     <VAlert

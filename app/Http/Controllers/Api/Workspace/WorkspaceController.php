@@ -45,7 +45,9 @@ class WorkspaceController extends Controller
     {
         $this->authorize('viewAny', Workspace::class);
 
-        return response()->json($this->workspaces->listCollaboratifs($request->user()));
+        return response()->json([
+            'data' => $this->workspaces->listCollaboratifs($request->user())->values(),
+        ]);
     }
 
     public function sharedWithMe(Request $request): JsonResponse
@@ -54,35 +56,48 @@ class WorkspaceController extends Controller
 
         $filter = $request->query('filter', 'all');
         $items = $this->shares->sharedWithMe($request->user())->map(function ($share) {
+            $sharedBy = $share->sharedBy;
+            $ability = $share->ability?->value ?? (string) $share->ability;
+
             if ($share->document_id) {
                 return [
                     'id' => $share->id,
                     'kind' => 'document',
+                    'document_id' => $share->document_id,
                     'title' => $share->document?->title ?? $share->document?->object,
                     'object' => $share->document?->object,
                     'created_at' => $share->created_at,
                     'shared_at' => $share->created_at,
-                    'ability' => $share->ability,
+                    'ability' => $ability,
+                    'shared_by' => $sharedBy ? ['id' => $sharedBy->id, 'name' => $sharedBy->name] : null,
+                    'url' => '/espace/documents/'.$share->document_id,
                 ];
             }
             if ($share->folder_id) {
                 return [
                     'id' => $share->id,
                     'kind' => 'folder',
+                    'folder_id' => $share->folder_id,
+                    'workspace_id' => $share->workspace_id,
                     'name' => $share->folder?->name,
                     'created_at' => $share->created_at,
                     'shared_at' => $share->created_at,
-                    'ability' => $share->ability,
+                    'ability' => $ability,
+                    'shared_by' => $sharedBy ? ['id' => $sharedBy->id, 'name' => $sharedBy->name] : null,
+                    'url' => '/espace/dossiers?workspace='.$share->workspace_id.'&folder='.$share->folder_id,
                 ];
             }
 
             return [
                 'id' => $share->id,
                 'kind' => 'workspace',
+                'workspace_id' => $share->workspace_id,
                 'name' => $share->workspace?->name,
-                'type' => $share->workspace?->type,
+                'type' => $share->workspace?->type?->value ?? (string) $share->workspace?->type,
                 'created_at' => $share->created_at,
-                'ability' => $share->ability,
+                'ability' => $ability,
+                'shared_by' => $sharedBy ? ['id' => $sharedBy->id, 'name' => $sharedBy->name] : null,
+                'url' => '/espace/collaboratifs/'.$share->workspace_id,
             ];
         });
 
@@ -142,7 +157,31 @@ class WorkspaceController extends Controller
     {
         $this->authorize('view', $workspace);
 
-        return response()->json($this->workspaces->show($workspace, $request->user()));
+        return response()->json($this->workspaces->showPayload($workspace, $request->user()));
+    }
+
+    public function update(Request $request, Workspace $workspace): JsonResponse
+    {
+        $this->authorize('update', $workspace);
+
+        $data = $request->validate([
+            'name' => ['sometimes', 'string', 'max:255'],
+            'description' => ['nullable', 'string'],
+            'type' => ['nullable', Rule::in([
+                WorkspaceType::Shared->value,
+                WorkspaceType::Team->value,
+                WorkspaceType::Project->value,
+            ])],
+            'visibility' => ['nullable', Rule::in(array_column(WorkspaceVisibility::cases(), 'value'))],
+        ]);
+
+        try {
+            $updated = $this->workspaces->update($workspace, $request->user(), $data);
+        } catch (InvalidArgumentException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+
+        return response()->json($this->workspaces->showPayload($updated, $request->user()));
     }
 
     public function store(Request $request): JsonResponse
@@ -227,7 +266,7 @@ class WorkspaceController extends Controller
             ->where('workspace_id', $workspace->id)
             ->get();
 
-        $docIds = WorkspaceDocumentLink::query()
+        $docIds = WorkspaceDocumentLink::onlyTrashed()
             ->where('workspace_id', $workspace->id)
             ->pluck('document_id');
 

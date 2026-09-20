@@ -151,6 +151,87 @@ class WorkspaceModuleTest extends TestCase
             ->assertJsonPath('warn_threshold_percent', 75);
     }
 
+    public function test_upload_rejects_extension_outside_policy(): void
+    {
+        $agent = User::query()->where('email', 'agent.dsi@dgtcp.local')->firstOrFail();
+        $type = DocumentType::query()->firstOrFail();
+
+        WorkspaceStoragePolicy::query()->first()?->update([
+            'allowed_extensions' => ['pdf', 'docx'],
+            'denied_extensions' => [],
+            'max_upload_bytes' => 10 * 1024 * 1024,
+            'block_on_exceed' => false,
+        ]);
+
+        $home = $this->actingAs($agent, 'sanctum')->getJson('/api/workspace/home')->assertOk();
+        $wsId = $home->json('workspace.id');
+
+        $this->actingAs($agent, 'sanctum')
+            ->withHeader('Accept', 'application/json')
+            ->post("/api/workspace/{$wsId}/documents", [
+                'object' => 'Exe interdit',
+                'document_type_id' => $type->id,
+                'main_file' => UploadedFile::fake()->create('malware.exe', 10, 'application/x-msdownload'),
+            ])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['main_file']);
+
+        $this->actingAs($agent, 'sanctum')
+            ->withHeader('Accept', 'application/json')
+            ->post("/api/workspace/{$wsId}/documents", [
+                'object' => 'Pdf ok',
+                'document_type_id' => $type->id,
+                'main_file' => UploadedFile::fake()->create('ok.pdf', 10, 'application/pdf'),
+            ])
+            ->assertCreated();
+    }
+
+    public function test_purge_workspace_trash_respects_retention(): void
+    {
+        $agent = User::query()->where('email', 'agent.dsi@dgtcp.local')->firstOrFail();
+        $type = DocumentType::query()->firstOrFail();
+
+        WorkspaceStoragePolicy::query()->first()?->update([
+            'trash_retention_days' => 7,
+            'allowed_extensions' => ['pdf'],
+            'max_upload_bytes' => 10 * 1024 * 1024,
+            'block_on_exceed' => false,
+        ]);
+
+        $home = $this->actingAs($agent, 'sanctum')->getJson('/api/workspace/home')->assertOk();
+        $wsId = $home->json('workspace.id');
+
+        $created = $this->actingAs($agent, 'sanctum')
+            ->post("/api/workspace/{$wsId}/documents", [
+                'object' => 'À purger',
+                'document_type_id' => $type->id,
+                'main_file' => UploadedFile::fake()->create('purge.pdf', 10, 'application/pdf'),
+            ])
+            ->assertCreated();
+
+        $docId = (int) $created->json('id');
+
+        $this->actingAs($agent, 'sanctum')
+            ->deleteJson("/api/workspace/{$wsId}/documents/{$docId}")
+            ->assertOk();
+
+        $this->assertSoftDeleted('documents', ['id' => $docId]);
+        $this->assertSoftDeleted('workspace_document_links', ['document_id' => $docId]);
+
+        // Encore dans la fenêtre de rétention → rien à purger
+        $this->artisan('parapheur:purge-workspace-trash')->assertSuccessful();
+        $this->assertSoftDeleted('documents', ['id' => $docId]);
+
+        \App\Models\Document::withTrashed()->whereKey($docId)->update(['deleted_at' => now()->subDays(10)]);
+        \App\Models\WorkspaceDocumentLink::withTrashed()
+            ->where('document_id', $docId)
+            ->update(['deleted_at' => now()->subDays(10)]);
+
+        $this->artisan('parapheur:purge-workspace-trash')->assertSuccessful();
+        $this->assertDatabaseMissing('documents', ['id' => $docId]);
+        $this->assertDatabaseMissing('workspace_document_links', ['document_id' => $docId]);
+    }
+
     public function test_library_reference_create(): void
     {
         $agent = User::query()->where('email', 'agent.dsi@dgtcp.local')->firstOrFail();

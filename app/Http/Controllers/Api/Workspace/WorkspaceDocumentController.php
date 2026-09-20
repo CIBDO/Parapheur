@@ -9,7 +9,7 @@ use App\Models\WorkspaceDocumentLink;
 use App\Services\DocumentBridgeService;
 use App\Services\WorkspaceAccessService;
 use App\Services\WorkspaceDocumentService;
-use App\Support\AllowedDocumentUploads;
+use App\Services\WorkspaceQuotaService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use InvalidArgumentException;
@@ -20,6 +20,7 @@ class WorkspaceDocumentController extends Controller
         private readonly WorkspaceDocumentService $documents,
         private readonly WorkspaceAccessService $access,
         private readonly DocumentBridgeService $bridge,
+        private readonly WorkspaceQuotaService $quotas,
     ) {}
 
     public function index(Request $request, Workspace $workspace): JsonResponse
@@ -89,7 +90,7 @@ class WorkspaceDocumentController extends Controller
             'document_type_id' => ['nullable', 'exists:document_types,id'],
             'folder_id' => ['nullable', 'exists:workspace_folders,id'],
             'confidentiality' => ['nullable', 'string'],
-            'main_file' => AllowedDocumentUploads::fileRules(true),
+            'main_file' => $this->quotas->fileValidationRules(true),
             'tags' => ['nullable'],
         ]);
 

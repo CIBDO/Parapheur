@@ -18,14 +18,19 @@ class CorrespondenceAccessService
             return true;
         }
 
-        // Permission générale
-        if (! $user->can('mail.view')) {
+        // Permission générale (consultation limitée ou vue globale)
+        if (! $user->can('mail.view') && ! $user->can('mail.view_all')) {
             return false;
         }
 
-        // Vérifier la confidentialité
+        // Vérifier la confidentialité (même avec view_all)
         if (! $this->canAccessConfidentiality($user, $correspondence)) {
             return false;
+        }
+
+        // Vue globale bureau courrier
+        if ($user->can('mail.view_all')) {
+            return true;
         }
 
         // L'utilisateur propriétaire peut toujours voir
@@ -43,16 +48,10 @@ class CorrespondenceAccessService
             return true;
         }
 
-        // A une affectation active
-        $hasAssignment = $correspondence->assignments()
+        // A une affectation
+        return $correspondence->assignments()
             ->where('to_user_id', $user->id)
             ->exists();
-
-        if ($hasAssignment) {
-            return true;
-        }
-
-        return false;
     }
 
     /**

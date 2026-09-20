@@ -57,6 +57,37 @@ class MailModuleFoundationTest extends TestCase
         $this->assertEquals('TEST/'.now()->year.'/000005', $numbers[4]);
     }
 
+    public function test_departure_numbering_resyncs_when_sequence_lags(): void
+    {
+        $year = (int) now()->format('Y');
+
+        NumberingSequence::query()->updateOrCreate(
+            ['code' => 'DEP', 'year' => $year, 'structure_id' => null],
+            [
+                'prefix' => 'DEP',
+                'padding' => 6,
+                'last_value' => 0,
+                'reset_yearly' => true,
+            ]
+        );
+
+        Correspondence::query()->create([
+            'direction' => CorrespondenceDirection::Sortant->value,
+            'medium' => 'physique',
+            'status' => CorrespondenceStatus::AExpedier->value,
+            'subject' => 'Déjà numéroté',
+            'correspondence_date' => now()->toDateString(),
+            'departure_number' => "DEP/{$year}/000001",
+            'is_registered' => true,
+            'registered_at' => now(),
+            'registered_by' => User::query()->where('email', 'agent.dsi@dgtcp.local')->value('id'),
+        ]);
+
+        $next = app(NumberingService::class)->generateDepartureNumber();
+
+        $this->assertSame("DEP/{$year}/000002", $next);
+    }
+
     public function test_create_incoming_correspondence_gets_arrival_number(): void
     {
         $user = User::query()->where('email', 'agent.dsi@dgtcp.local')->firstOrFail();
@@ -141,6 +172,34 @@ class MailModuleFoundationTest extends TestCase
         $accessService = app(\App\Services\CorrespondenceAccessService::class);
         $this->assertTrue($accessService->canView($admin, $correspondence));
         $this->assertFalse($accessService->canView($agent, $correspondence));
+    }
+
+    public function test_mail_view_all_can_open_other_structure_correspondence(): void
+    {
+        $admin = User::query()->where('email', 'admin@dgtcp.local')->firstOrFail();
+        $directeur = User::query()->where('email', 'directeur.dsi@dgtcp.local')->firstOrFail();
+
+        $correspondence = Correspondence::query()->create([
+            'uuid' => (string) \Illuminate\Support\Str::uuid(),
+            'direction' => 'sortant',
+            'medium' => 'physique',
+            'status' => 'expedie',
+            'subject' => 'Sortant autre structure',
+            'correspondence_date' => now()->toDateString(),
+            'registered_by' => $admin->id,
+            'owner_user_id' => $admin->id,
+            'structure_id' => $admin->structure_id,
+            'departure_number' => 'DEP/'.now()->year.'/000099',
+            'is_registered' => true,
+        ]);
+
+        $this->assertNotEquals($admin->structure_id, $directeur->structure_id);
+        $this->assertTrue($directeur->can('mail.view_all'));
+
+        $this->actingAs($directeur, 'sanctum')
+            ->getJson("/api/mail/correspondences/{$correspondence->id}")
+            ->assertOk()
+            ->assertJsonPath('id', $correspondence->id);
     }
 
     public function test_prepare_reply_creates_linked_outgoing(): void

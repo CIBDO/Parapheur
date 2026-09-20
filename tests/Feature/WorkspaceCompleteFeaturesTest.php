@@ -175,4 +175,83 @@ class WorkspaceCompleteFeaturesTest extends TestCase
             ->assertOk()
             ->assertJsonStructure(['viewed', 'modified']);
     }
+
+    public function test_collaborative_list_members_count_and_patch(): void
+    {
+        $owner = User::query()->where('email', 'agent.dsi@dgtcp.local')->firstOrFail();
+        $member = User::query()->where('email', 'directeur.dfm@dgtcp.local')->firstOrFail();
+        $owner->givePermissionTo('workspace.create_shared');
+        $owner->givePermissionTo('workspace.manage_own');
+
+        $ws = $this->actingAs($owner, 'sanctum')
+            ->postJson('/api/workspace', [
+                'name' => 'Projet Collab Count',
+                'type' => 'team',
+            ])
+            ->assertCreated()
+            ->json();
+
+        $this->actingAs($owner, 'sanctum')
+            ->postJson("/api/workspace/{$ws['id']}/members", [
+                'user_id' => $member->id,
+                'role' => 'contributor',
+            ])
+            ->assertCreated();
+
+        $this->actingAs($owner, 'sanctum')
+            ->getJson('/api/workspace/collaborative')
+            ->assertOk()
+            ->assertJsonFragment([
+                'id' => $ws['id'],
+                'members_count' => 2,
+            ]);
+
+        $this->actingAs($owner, 'sanctum')
+            ->patchJson("/api/workspace/{$ws['id']}", [
+                'name' => 'Projet Collab Renommé',
+                'description' => 'Description mise à jour',
+            ])
+            ->assertOk()
+            ->assertJsonPath('workspace.name', 'Projet Collab Renommé');
+
+        $this->assertDatabaseHas('workspace_activities', [
+            'workspace_id' => $ws['id'],
+            'action' => 'workspace_updated',
+        ]);
+    }
+
+    public function test_structure_quota_override_applies(): void
+    {
+        $admin = User::query()->where('email', 'admin@dgtcp.local')->firstOrFail();
+        $agent = User::query()->where('email', 'agent.dsi@dgtcp.local')->firstOrFail();
+        $agent->givePermissionTo('workspace.create_shared');
+
+        $structureId = $agent->structure_id;
+        $this->assertNotNull($structureId);
+
+        $this->actingAs($admin, 'sanctum')
+            ->postJson('/api/workspace/admin/quota-overrides', [
+                'scope_type' => 'structure',
+                'scope_id' => $structureId,
+                'quota_bytes' => 5 * 1024 ** 3,
+                'note' => 'Quota structure DSI',
+            ])
+            ->assertCreated();
+
+        $ws = $this->actingAs($agent, 'sanctum')
+            ->postJson('/api/workspace', [
+                'name' => 'Espace quota structure',
+                'type' => 'shared',
+                'structure_id' => $structureId,
+            ])
+            ->assertCreated()
+            ->json();
+
+        $show = $this->actingAs($agent, 'sanctum')
+            ->getJson("/api/workspace/{$ws['id']}")
+            ->assertOk();
+
+        $this->assertSame(5 * 1024 ** 3, (int) $show->json('storage.quota_bytes'));
+        $this->assertSame('structure', $show->json('storage.source'));
+    }
 }

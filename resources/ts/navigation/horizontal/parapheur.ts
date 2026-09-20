@@ -54,6 +54,27 @@ export default [
         subject: 'Workspace',
       },
       {
+        title: 'Collaboratifs',
+        icon: { icon: 'tabler-users' },
+        to: 'espace-collaboratifs',
+        action: 'read',
+        subject: 'Workspace',
+      },
+      {
+        title: 'Partagés',
+        icon: { icon: 'tabler-share' },
+        to: 'espace-partages',
+        action: 'read',
+        subject: 'Workspace',
+      },
+      {
+        title: 'Bibliothèque',
+        icon: { icon: 'tabler-books' },
+        to: 'espace-bibliotheque',
+        action: 'read',
+        subject: 'Library',
+      },
+      {
         title: 'Quotas',
         icon: { icon: 'tabler-database-cog' },
         to: 'espace-admin',

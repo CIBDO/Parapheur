@@ -9,6 +9,22 @@ use Illuminate\Support\Facades\DB;
 class NumberingService
 {
     /**
+     * Tables/colonnes qui consomment un code de séquence (pour resync si last_value est en retard).
+     *
+     * @var array<string, array{0: string, 1: string}>
+     */
+    private const SEQUENCE_SOURCES = [
+        'ARR' => ['correspondences', 'arrival_number'],
+        'DEP' => ['correspondences', 'departure_number'],
+        'BT' => ['transmission_slips', 'number'],
+        'FC' => ['circulation_sheets', 'number'],
+        'BE' => ['correspondence_dispatches', 'number'],
+        'AR' => ['correspondence_acknowledgements', 'number'],
+        'TCK' => ['tickets', 'number'],
+        'PRB' => ['problems', 'number'],
+    ];
+
+    /**
      * Prochain numéro transactionnel. Format : PREFIX/YEAR/000001
      * Les compteurs MVP sont globaux (structure_id ignoré pour l'unicité).
      */
@@ -43,6 +59,11 @@ class NumberingService
                     ->firstOrFail();
             }
 
+            $existingMax = $this->maxExistingValue($sequence->code, $sequence->prefix, $sequence->year);
+            if ($existingMax > (int) $sequence->last_value) {
+                $sequence->last_value = $existingMax;
+            }
+
             $sequence->last_value = (int) $sequence->last_value + 1;
             $sequence->save();
 
@@ -53,6 +74,37 @@ class NumberingService
                 str_pad((string) $sequence->last_value, (int) $sequence->padding, '0', STR_PAD_LEFT)
             );
         });
+    }
+
+    /**
+     * Plus grand suffixe numérique déjà attribué pour ce préfixe/année (évite les collisions unique).
+     */
+    private function maxExistingValue(string $code, string $prefix, int $year): int
+    {
+        $source = self::SEQUENCE_SOURCES[$code] ?? null;
+        if ($source === null) {
+            return 0;
+        }
+
+        [$table, $column] = $source;
+        if (! \Illuminate\Support\Facades\Schema::hasTable($table)) {
+            return 0;
+        }
+
+        $pattern = $prefix.'/'.$year.'/';
+        $values = DB::table($table)
+            ->whereNotNull($column)
+            ->where($column, 'like', $pattern.'%')
+            ->pluck($column);
+
+        $max = 0;
+        foreach ($values as $value) {
+            if (preg_match('#/(\d+)$#', (string) $value, $matches) === 1) {
+                $max = max($max, (int) $matches[1]);
+            }
+        }
+
+        return $max;
     }
 
     public function generate(NumberingSequenceCode|string $code, ?int $structureId = null): string

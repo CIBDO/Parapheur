@@ -6,9 +6,11 @@ use App\Enums\DocumentStatus;
 use App\Models\Document;
 use App\Models\DocumentVersion;
 use App\Models\User;
+use App\Models\WorkspaceDocumentLink;
 use App\Services\DocumentAccessService;
 use App\Services\DocumentWorkflowService;
 use App\Services\SignedDownloadService;
+use App\Services\WorkspaceAccessService;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\URL;
@@ -22,6 +24,7 @@ class OnlyOfficeService
         private readonly DocumentAccessService $access,
         private readonly DocumentWorkflowService $workflow,
         private readonly SignedDownloadService $signedDownloads,
+        private readonly WorkspaceAccessService $workspaceAccess,
     ) {}
 
     public function isEnabled(): bool
@@ -161,13 +164,24 @@ class OnlyOfficeService
         }
 
         $canEdit = $this->access->canProcess($user, $document, 'act')
-            || $this->access->canTransmit($user, $document);
+            || $this->access->canTransmit($user, $document)
+            || $this->workspaceCanEdit($user, $document);
 
         if ($canEdit) {
             return array_merge($base, [
                 'edit' => true,
                 'review' => true,
                 'comment' => true,
+                'chat' => true,
+            ]);
+        }
+
+        if ($this->workspaceCanView($user, $document)) {
+            return array_merge($base, [
+                'edit' => false,
+                'review' => true,
+                'comment' => true,
+                'chat' => true,
             ]);
         }
 
@@ -177,6 +191,38 @@ class OnlyOfficeService
             'review' => true,
             'comment' => true,
         ]);
+    }
+
+    private function workspaceCanEdit(User $user, Document $document): bool
+    {
+        $links = WorkspaceDocumentLink::query()
+            ->with('workspace')
+            ->where('document_id', $document->id)
+            ->get();
+
+        foreach ($links as $link) {
+            if ($link->workspace && $this->workspaceAccess->canEdit($user, $link->workspace)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function workspaceCanView(User $user, Document $document): bool
+    {
+        $links = WorkspaceDocumentLink::query()
+            ->with('workspace')
+            ->where('document_id', $document->id)
+            ->get();
+
+        foreach ($links as $link) {
+            if ($link->workspace && $this->workspaceAccess->canView($user, $link->workspace)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

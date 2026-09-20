@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { onMounted } from 'vue'
-import { useRoute } from 'vue-router'
+import { onMounted, ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useCorrespondence } from '@/composables/useCorrespondence'
 import CorrespondenceDetailView from '@/components/courrier/CorrespondenceDetailView.vue'
 
@@ -9,20 +9,53 @@ definePage({
 })
 
 const route = useRoute()
-const { correspondence, fetchCorrespondence, loading } = useCorrespondence()
+const router = useRouter()
+const { correspondence, fetchCorrespondence, loading, error } = useCorrespondence()
 const id = Number(route.params.id)
+const loadError = ref<string | null>(null)
 
-onMounted(() => fetchCorrespondence(id))
+onMounted(async () => {
+  try {
+    await fetchCorrespondence(id)
+  }
+  catch (e: any) {
+    const status = e?.statusCode || e?.response?.status || e?.status
+    loadError.value = status === 403
+      ? 'Accès refusé à ce courrier.'
+      : (error.value || e?.message || 'Impossible de charger le courrier.')
+  }
+})
 
 async function refresh() {
-  await fetchCorrespondence(id)
+  loadError.value = null
+  try {
+    await fetchCorrespondence(id)
+  }
+  catch (e: any) {
+    const status = e?.statusCode || e?.response?.status || e?.status
+    loadError.value = status === 403
+      ? 'Accès refusé à ce courrier.'
+      : (error.value || e?.message || 'Impossible de charger le courrier.')
+  }
 }
 </script>
 
 <template>
-  <div v-if="correspondence && !loading">
-    <CorrespondenceDetailView 
-      :correspondence="correspondence" 
+  <div v-if="loadError" class="pa-6">
+    <VAlert type="error" variant="tonal" class="mb-4">
+      {{ loadError }}
+    </VAlert>
+    <VBtn
+      variant="tonal"
+      prepend-icon="tabler-arrow-left"
+      @click="router.push({ name: 'courrier-sortants' })"
+    >
+      Retour aux sortants
+    </VBtn>
+  </div>
+  <div v-else-if="correspondence && !loading">
+    <CorrespondenceDetailView
+      :correspondence="correspondence"
       direction="sortant"
       @refresh="refresh"
     />

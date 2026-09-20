@@ -120,6 +120,16 @@ onMounted(load)
       {{ errorMsg }}
     </VAlert>
 
+    <VAlert
+      v-if="isOffice"
+      type="info"
+      variant="tonal"
+      class="mb-4"
+      density="comfortable"
+    >
+      Édition collaborative OnlyOffice : plusieurs membres peuvent ouvrir ce document simultanément ; les modifications sont synchronisées.
+    </VAlert>
+
     <VRow v-if="doc && !loading">
       <VCol
         cols="12"

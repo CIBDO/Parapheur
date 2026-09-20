@@ -820,7 +820,7 @@ class DatabaseSeeder extends Seeder
             ['code' => 'FC', 'prefix' => 'FC', 'padding' => 6, 'reset_yearly' => true],
         ];
         foreach ($sequences as $seq) {
-            \App\Models\NumberingSequence::query()->updateOrCreate(
+            \App\Models\NumberingSequence::query()->firstOrCreate(
                 ['code' => $seq['code'], 'year' => $year, 'structure_id' => null],
                 $seq + ['last_value' => 0]
             );

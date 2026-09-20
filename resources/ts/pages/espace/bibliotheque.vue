@@ -273,7 +273,7 @@ watch(scope, load)
         v-else
         class="text-medium-emphasis"
       >
-        {{ loading ? 'Chargement…' : 'Aucune référence.' }}
+        {{ loading ? 'Chargement…' : 'Aucune référence. Ajoutez une fiche pour constituer votre bibliothèque personnelle ou institutionnelle.' }}
       </VCardText>
     </VCard>
 

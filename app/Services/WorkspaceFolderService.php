@@ -104,6 +104,17 @@ class WorkspaceFolderService
                 $child->rebuildPath();
             }
 
+            $actor = auth()->user();
+            if ($actor) {
+                app(WorkspaceActivityService::class)->record(
+                    $folder->workspace,
+                    $actor,
+                    'folder_moved',
+                    $actor->name.' a déplacé le dossier « '.$folder->name.' »',
+                    $folder,
+                );
+            }
+
             return $folder->fresh(['parent', 'children']);
         });
     }

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import ParapheurPageHeader from '@/components/parapheur/ParapheurPageHeader.vue'
-import { formatDateFr } from '@/utils/parapheurUi'
+import { workspaceShareAbilityLabels } from '@/utils/workspaceUi'
+import { formatDateFr, labelOf } from '@/utils/parapheurUi'
 
 definePage({
   meta: {
@@ -10,6 +11,7 @@ definePage({
   },
 })
 
+const router = useRouter()
 const loading = ref(true)
 const filter = ref('all')
 const items = ref<any[]>([])
@@ -25,6 +27,42 @@ async function load() {
   }
 }
 
+function openItem(item: any) {
+  if (item.url) {
+    router.push(item.url)
+    return
+  }
+  if (item.kind === 'document' && item.document_id) {
+    router.push({ name: 'espace-documents-id', params: { id: String(item.document_id) } })
+    return
+  }
+  if (item.kind === 'folder' && item.workspace_id) {
+    router.push({
+      name: 'espace-dossiers',
+      query: {
+        workspace: String(item.workspace_id),
+        ...(item.folder_id ? { folder: String(item.folder_id) } : {}),
+      },
+    })
+    return
+  }
+  if (item.kind === 'workspace' && item.workspace_id) {
+    router.push({ name: 'espace-collaboratifs-id', params: { id: String(item.workspace_id) } })
+  }
+}
+
+function itemIcon(item: any) {
+  if (item.kind === 'folder')
+    return 'tabler-folder'
+  if (item.kind === 'workspace')
+    return 'tabler-users'
+  return 'tabler-file'
+}
+
+function itemTitle(item: any) {
+  return item.name || item.title || item.object || 'Élément partagé'
+}
+
 onMounted(load)
 watch(filter, load)
 </script>
@@ -33,9 +71,10 @@ watch(filter, load)
   <div>
     <ParapheurPageHeader
       title="Partagés avec moi"
-      subtitle="Documents, dossiers et espaces reçus"
+      subtitle="Documents, dossiers et espaces reçus de vos collègues"
       icon="tabler-share"
     />
+
     <VCard class="parapheur-section-card mb-4">
       <VCardText>
         <VBtnToggle
@@ -43,6 +82,7 @@ watch(filter, load)
           mandatory
           density="compact"
           divided
+          color="primary"
         >
           <VBtn value="all">
             Tout
@@ -59,22 +99,59 @@ watch(filter, load)
         </VBtnToggle>
       </VCardText>
     </VCard>
+
     <VCard class="parapheur-section-card">
       <VList v-if="items.length">
         <VListItem
           v-for="(item, idx) in items"
           :key="item.id || idx"
-          :title="item.name || item.title || item.object"
-          :subtitle="`${item.kind || item.type || ''} — ${formatDateFr(item.created_at || item.shared_at)}`"
-          :prepend-icon="item.kind === 'folder' ? 'tabler-folder' : 'tabler-file'"
-        />
+          :title="itemTitle(item)"
+          :prepend-icon="itemIcon(item)"
+          class="cursor-pointer"
+          @click="openItem(item)"
+        >
+          <template #subtitle>
+            <span>
+              {{ item.kind === 'document' ? 'Document' : item.kind === 'folder' ? 'Dossier' : 'Espace' }}
+              <template v-if="item.shared_by?.name">
+                · par {{ item.shared_by.name }}
+              </template>
+              · {{ formatDateFr(item.created_at || item.shared_at) }}
+              <template v-if="item.ability">
+                · {{ labelOf(workspaceShareAbilityLabels, item.ability) }}
+              </template>
+            </span>
+          </template>
+          <template #append>
+            <VIcon icon="tabler-chevron-right" />
+          </template>
+        </VListItem>
       </VList>
-      <VCardText
+      <div
         v-else
-        class="text-medium-emphasis"
+        class="text-center py-10"
       >
-        {{ loading ? 'Chargement…' : 'Aucun élément partagé.' }}
-      </VCardText>
+        <VIcon
+          icon="tabler-share-off"
+          size="40"
+          class="mb-2 text-medium-emphasis"
+        />
+        <div class="text-body-1 font-weight-medium mb-1">
+          {{ loading ? 'Chargement…' : 'Aucun élément partagé' }}
+        </div>
+        <div
+          v-if="!loading"
+          class="text-caption text-medium-emphasis"
+        >
+          Les documents ou dossiers partagés avec vous apparaîtront ici.
+        </div>
+      </div>
     </VCard>
   </div>
 </template>
+
+<style scoped>
+.cursor-pointer {
+  cursor: pointer;
+}
+</style>

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import ParapheurPageHeader from '@/components/parapheur/ParapheurPageHeader.vue'
-import { workspaceTypeLabels } from '@/utils/workspaceUi'
+import { workspaceMemberRoleLabels, workspaceTypeLabels } from '@/utils/workspaceUi'
 import { formatDateFr, labelOf } from '@/utils/parapheurUi'
 
 definePage({
@@ -11,11 +11,32 @@ definePage({
   },
 })
 
+const canCreate = computed(() => true)
+
 const loading = ref(true)
 const items = ref<any[]>([])
+const search = ref('')
 const dialog = ref(false)
 const form = ref({ name: '', description: '', type: 'project' })
 const errorMsg = ref('')
+
+const typeOptions = [
+  { title: 'Projet', value: 'project' },
+  { title: 'Équipe', value: 'team' },
+  { title: 'Partagé', value: 'shared' },
+]
+
+const filtered = computed(() => {
+  const q = search.value.trim().toLowerCase()
+  if (!q)
+    return items.value
+
+  return items.value.filter((ws: any) =>
+    [ws.name, ws.description, ws.type].filter(Boolean).some((s: string) =>
+      String(s).toLowerCase().includes(q),
+    ),
+  )
+})
 
 async function load() {
   loading.value = true
@@ -51,11 +72,12 @@ onMounted(load)
   <div>
     <ParapheurPageHeader
       title="Espaces collaboratifs"
-      subtitle="Projets et équipes partagés"
+      subtitle="Travaillez en équipe sur des dossiers et documents partagés"
       icon="tabler-users"
     >
       <template #actions>
         <VBtn
+          v-if="canCreate"
           color="primary"
           prepend-icon="tabler-plus"
           @click="dialog = true"
@@ -65,18 +87,50 @@ onMounted(load)
       </template>
     </ParapheurPageHeader>
 
-    <VRow>
+    <VCard class="parapheur-section-card mb-4">
+      <VCardText class="d-flex flex-wrap gap-3 align-center">
+        <AppTextField
+          v-model="search"
+          class="flex-grow-1"
+          style="max-inline-size: 420px"
+          placeholder="Rechercher un espace…"
+          prepend-inner-icon="tabler-search"
+          hide-details
+          clearable
+        />
+        <VChip
+          size="small"
+          variant="tonal"
+          color="primary"
+        >
+          {{ filtered.length }} espace{{ filtered.length > 1 ? 's' : '' }}
+        </VChip>
+      </VCardText>
+    </VCard>
+
+    <div
+      v-if="loading"
+      class="text-medium-emphasis"
+    >
+      Chargement…
+    </div>
+
+    <VRow v-else-if="filtered.length">
       <VCol
-        v-for="ws in items"
+        v-for="ws in filtered"
         :key="ws.id"
         cols="12"
         md="6"
       >
-        <VCard class="parapheur-section-card">
+        <VCard class="parapheur-section-card h-100">
           <VCardItem>
             <VCardTitle>{{ ws.name }}</VCardTitle>
             <VCardSubtitle>
-              {{ labelOf(workspaceTypeLabels, ws.type) }} · {{ ws.members_count ?? '—' }} membres
+              {{ labelOf(workspaceTypeLabels, ws.type) }}
+              · {{ ws.members_count ?? 0 }} membre{{ (ws.members_count ?? 0) > 1 ? 's' : '' }}
+              <span v-if="ws.my_role">
+                · {{ labelOf(workspaceMemberRoleLabels, ws.my_role) }}
+              </span>
             </VCardSubtitle>
           </VCardItem>
           <VCardText>
@@ -84,7 +138,7 @@ onMounted(load)
               {{ ws.description || 'Sans description' }}
             </p>
             <div class="text-caption text-medium-emphasis">
-              Dernière activité : {{ formatDateFr(ws.updated_at) }}
+              Mis à jour le {{ formatDateFr(ws.updated_at) }}
             </div>
           </VCardText>
           <VCardActions>
@@ -106,16 +160,34 @@ onMounted(load)
       </VCol>
     </VRow>
 
-    <div
-      v-if="!loading && !items.length"
-      class="text-medium-emphasis"
+    <VCard
+      v-else
+      class="parapheur-section-card text-center py-10"
     >
-      Aucun espace collaboratif.
-    </div>
+      <VIcon
+        icon="tabler-users-group"
+        size="40"
+        class="mb-2 text-medium-emphasis"
+      />
+      <div class="text-body-1 font-weight-medium mb-1">
+        Aucun espace collaboratif
+      </div>
+      <div class="text-caption text-medium-emphasis mb-4">
+        Créez un espace projet ou équipe pour partager dossiers et documents.
+      </div>
+      <VBtn
+        v-if="canCreate"
+        color="primary"
+        prepend-icon="tabler-plus"
+        @click="dialog = true"
+      >
+        Créer un espace
+      </VBtn>
+    </VCard>
 
     <VDialog
       v-model="dialog"
-      max-width="480"
+      max-width="520"
     >
       <VCard>
         <VCardTitle>Nouvel espace collaboratif</VCardTitle>
@@ -129,23 +201,19 @@ onMounted(load)
           </VAlert>
           <VTextField
             v-model="form.name"
-            label="Nom"
+            label="Nom *"
+            class="mb-3"
+          />
+          <VSelect
+            v-model="form.type"
+            :items="typeOptions"
+            label="Type"
             class="mb-3"
           />
           <VTextarea
             v-model="form.description"
             label="Description"
             rows="2"
-            class="mb-3"
-          />
-          <VSelect
-            v-model="form.type"
-            :items="[
-              { title: 'Projet', value: 'project' },
-              { title: 'Équipe', value: 'team' },
-              { title: 'Partagé', value: 'shared' },
-            ]"
-            label="Type"
           />
         </VCardText>
         <VCardActions>
@@ -158,6 +226,7 @@ onMounted(load)
           </VBtn>
           <VBtn
             color="primary"
+            :disabled="!form.name.trim()"
             @click="create"
           >
             Créer

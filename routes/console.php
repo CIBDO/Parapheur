@@ -37,3 +37,8 @@ Schedule::command('parapheur:auto-close-tickets')
     ->dailyAt('07:30')
     ->withoutOverlapping()
     ->appendOutputTo(storage_path('logs/ticket-auto-close.log'));
+
+Schedule::command('parapheur:purge-workspace-trash')
+    ->dailyAt('03:30')
+    ->withoutOverlapping()
+    ->appendOutputTo(storage_path('logs/workspace-trash-purge.log'));

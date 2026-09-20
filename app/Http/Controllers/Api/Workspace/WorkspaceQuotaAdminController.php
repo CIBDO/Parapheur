@@ -70,7 +70,11 @@ class WorkspaceQuotaAdminController extends Controller
         $this->authorize('manageQuotas', Workspace::class);
 
         $data = $request->validate([
-            'scope_type' => ['required', Rule::in([QuotaScopeType::User->value, QuotaScopeType::Workspace->value])],
+            'scope_type' => ['required', Rule::in([
+                QuotaScopeType::User->value,
+                QuotaScopeType::Workspace->value,
+                QuotaScopeType::Structure->value,
+            ])],
             'scope_id' => ['required', 'integer', 'min:1'],
             'quota_bytes' => ['required', 'integer', 'min:1048576'],
             'note' => ['nullable', 'string', 'max:500'],
@@ -78,8 +82,10 @@ class WorkspaceQuotaAdminController extends Controller
 
         if ($data['scope_type'] === QuotaScopeType::User->value) {
             User::query()->whereKey($data['scope_id'])->firstOrFail();
-        } else {
+        } elseif ($data['scope_type'] === QuotaScopeType::Workspace->value) {
             Workspace::query()->whereKey($data['scope_id'])->firstOrFail();
+        } else {
+            \App\Models\Structure::query()->whereKey($data['scope_id'])->firstOrFail();
         }
 
         $override = WorkspaceQuotaOverride::query()->updateOrCreate(

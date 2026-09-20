@@ -92,12 +92,6 @@ class WorkspaceMemberController extends Controller
 
         try {
             $this->workspaces->removeMember($member, $request->user());
-            $this->activities->record(
-                $workspace,
-                $request->user(),
-                'member_removed',
-                $request->user()->name.' a retiré un membre',
-            );
         } catch (InvalidArgumentException $e) {
             return response()->json(['message' => $e->getMessage()], 422);
         }

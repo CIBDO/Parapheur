@@ -77,7 +77,7 @@ class WorkspaceDocumentService
         }
 
         $bytes = $mainFile?->getSize() ?? 0;
-        $this->quotas->assertCanStore($workspace, $bytes);
+        $this->quotas->assertCanStore($workspace, $bytes, $mainFile?->getClientOriginalName());
 
         if (empty($data['document_type_id'])) {
             $data['document_type_id'] = DocumentType::query()->orderBy('id')->value('id');
@@ -136,6 +136,19 @@ class WorkspaceDocumentService
         $link->folder_id = $folderId;
         $link->save();
 
+        if ($link->workspace && $link->document) {
+            $actor = auth()->user();
+            if ($actor) {
+                app(WorkspaceActivityService::class)->record(
+                    $link->workspace,
+                    $actor,
+                    'document_moved',
+                    $actor->name.' a déplacé « '.($link->document->title ?: $link->document->object).' »',
+                    $link->document,
+                );
+            }
+        }
+
         return $link->fresh(['document', 'folder']);
     }
 
@@ -148,12 +161,15 @@ class WorkspaceDocumentService
                 ->firstOrFail();
         }
 
-        $existing = WorkspaceDocumentLink::query()
+        $existing = WorkspaceDocumentLink::withTrashed()
             ->where('workspace_id', $workspace->id)
             ->where('document_id', $document->id)
             ->first();
 
         if ($existing) {
+            if ($existing->trashed()) {
+                $existing->restore();
+            }
             if ($folderId !== null) {
                 $existing->folder_id = $folderId;
                 $existing->save();
@@ -207,8 +223,15 @@ class WorkspaceDocumentService
             ->where('document_id', $document->id)
             ->first();
 
-        // Les liens n'ont pas SoftDeletes — recréer si besoin
-        if (! $link) {
+        if ($link) {
+            if ($link->trashed()) {
+                $link->restore();
+            }
+            if ($folderId !== null) {
+                $link->folder_id = $folderId;
+                $link->save();
+            }
+        } else {
             $link = WorkspaceDocumentLink::query()->create([
                 'workspace_id' => $workspace->id,
                 'folder_id' => $folderId,

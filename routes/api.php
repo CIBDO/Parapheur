@@ -351,6 +351,8 @@ Route::middleware(['auth:sanctum', 'password.changed'])->group(function () {
         });
 
         Route::get('/{workspace}', [WorkspaceController::class, 'show']);
+        Route::patch('/{workspace}', [WorkspaceController::class, 'update']);
+        Route::put('/{workspace}', [WorkspaceController::class, 'update']);
         Route::get('/{workspace}/browse', [WorkspaceController::class, 'browse']);
         Route::get('/{workspace}/storage', [WorkspaceController::class, 'storage']);
         Route::get('/{workspace}/trash', [WorkspaceController::class, 'trash']);
