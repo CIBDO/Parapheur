@@ -15,13 +15,14 @@ definePage({
 })
 
 const route = useRoute()
+const router = useRouter()
 const { workspace, load: loadHome } = useWorkspaceHome()
 const overrideWorkspaceId = ref<number | null>(
   route.query.workspace ? Number(route.query.workspace) : null,
 )
 const workspaceId = computed(() => overrideWorkspaceId.value ?? workspace.value?.id ?? null)
 const {
-  loading, folderId, breadcrumb, folders, documents, viewMode, load, openFolder,
+  loading, folderId, breadcrumb, folders, documents, currentFolder, viewMode, load, openFolder,
 } = useWorkspaceExplorer(workspaceId)
 
 const createFolderDialog = ref(false)
@@ -39,6 +40,32 @@ const isDragOver = ref(false)
 const dropTargetFolderId = ref<number | null | undefined>(undefined)
 const dragging = ref<{ kind: 'document' | 'folder'; id: number } | null>(null)
 
+const isEmpty = computed(() => !folders.value.length && !documents.value.length)
+const isModelesFolder = computed(() =>
+  (currentFolder.value?.name || '').toLowerCase() === 'modèles'
+  || (currentFolder.value?.name || '').toLowerCase() === 'modeles',
+)
+
+const emptyTitle = computed(() => {
+  if (isModelesFolder.value)
+    return 'Aucun modèle pour le moment'
+  if (currentFolder.value)
+    return `Le dossier « ${currentFolder.value.name} » est vide`
+
+  return 'Glissez-déposez des fichiers ici pour les importer'
+})
+
+const emptySubtitle = computed(() => {
+  if (isModelesFolder.value) {
+    return 'Importez vos fichiers types (lettre, note, bordereau…) ou créez un sous-dossier pour les organiser. Ces modèles restent personnels à votre espace.'
+  }
+  if (currentFolder.value) {
+    return 'Importez des fichiers ou créez un sous-dossier pour commencer.'
+  }
+
+  return 'Ouvrez un dossier (ex. Modèles) pour y déposer du contenu, ou importez directement à la racine.'
+})
+
 onMounted(async () => {
   await loadHome()
   if (route.query.folder)
@@ -50,6 +77,19 @@ watch(workspaceId, async (id) => {
   if (id)
     await load()
 })
+
+watch(folderId, (id) => {
+  const query: Record<string, string> = {}
+  if (route.query.workspace)
+    query.workspace = String(route.query.workspace)
+  if (id)
+    query.folder = String(id)
+  router.replace({ query })
+})
+
+async function navigateToFolder(id: number | null) {
+  await openFolder(id)
+}
 
 function openShareDoc(doc: any) {
   shareDocId.value = doc.id
@@ -89,7 +129,9 @@ async function createFolder() {
     })
     createFolderDialog.value = false
     newFolderName.value = ''
-    successMsg.value = 'Dossier créé.'
+    successMsg.value = isModelesFolder.value
+      ? 'Sous-dossier créé dans Modèles.'
+      : 'Dossier créé.'
     await load()
   }
   catch (e: any) {
@@ -114,7 +156,9 @@ async function uploadFiles(files: FileList | File[]) {
         body: form,
       })
     }
-    successMsg.value = `${Array.from(files).length} fichier(s) importé(s).`
+    successMsg.value = isModelesFolder.value
+      ? `${Array.from(files).length} modèle(s) ajouté(s).`
+      : `${Array.from(files).length} fichier(s) importé(s).`
     await load()
   }
   catch (e: any) {
@@ -134,6 +178,14 @@ async function onFilesSelected(ev: Event) {
 }
 
 function onDragStartItem(kind: 'document' | 'folder', id: number, ev: DragEvent) {
+  // Les dossiers système restent à la racine : on ne les déplace pas
+  if (kind === 'folder') {
+    const folder = folders.value.find((f: any) => f.id === id)
+    if (folder?.is_system) {
+      ev.preventDefault()
+      return
+    }
+  }
   dragging.value = { kind, id }
   ev.dataTransfer?.setData('application/x-workspace-item', JSON.stringify({ kind, id }))
   ev.dataTransfer!.effectAllowed = 'move'
@@ -240,11 +292,9 @@ async function onFolderDrop(folderIdTarget: number, ev: DragEvent) {
     return
   }
 
-  // Dépôt de fichiers OS dans un sous-dossier : on ouvre le dossier puis upload
   const files = ev.dataTransfer?.files
   if (files?.length && workspaceId.value) {
-    folderId.value = folderIdTarget
-    await load()
+    await navigateToFolder(folderIdTarget)
     await uploadFiles(files)
   }
   onDragEndItem()
@@ -263,13 +313,24 @@ async function dropOnRoot(ev: DragEvent) {
     await moveItemToFolder(null)
   }
 }
+
+function folderSubtitle(folder: any) {
+  if (folder.description)
+    return folder.description
+  if (folder.is_system && folder.name === 'Modèles')
+    return 'Ouvrir pour y ajouter vos modèles personnels'
+  if (folder.is_system)
+    return 'Dossier système — cliquez pour ouvrir'
+
+  return 'Cliquez pour ouvrir · poignée pour déplacer'
+}
 </script>
 
 <template>
   <div>
     <ParapheurPageHeader
       title="Mes dossiers"
-      subtitle="Créez des dossiers, importez et glissez-déposez vos fichiers"
+      subtitle="Naviguez, importez et organisez vos documents — y compris vos modèles personnels"
       icon="tabler-folder"
     >
       <template #actions>
@@ -278,15 +339,15 @@ async function dropOnRoot(ev: DragEvent) {
           prepend-icon="tabler-folder-plus"
           @click="createFolderDialog = true"
         >
-          Nouveau dossier
+          {{ isModelesFolder ? 'Nouveau sous-dossier' : 'Nouveau dossier' }}
         </VBtn>
         <VBtn
           variant="tonal"
-          prepend-icon="tabler-upload"
+          :prepend-icon="isModelesFolder ? 'tabler-file-plus' : 'tabler-upload'"
           :loading="uploading"
           @click="uploadInput?.click()"
         >
-          Importer
+          {{ isModelesFolder ? 'Ajouter un modèle' : 'Importer' }}
         </VBtn>
         <input
           ref="uploadInput"
@@ -317,13 +378,23 @@ async function dropOnRoot(ev: DragEvent) {
       {{ errorMsg }}
     </VAlert>
 
+    <VAlert
+      v-if="isModelesFolder"
+      type="info"
+      variant="tonal"
+      class="mb-4"
+      density="comfortable"
+    >
+      Dossier <strong>Modèles</strong> — importez ici vos documents types. Vous pouvez créer autant de sous-dossiers et de fichiers que nécessaire.
+    </VAlert>
+
     <VCard class="parapheur-section-card mb-4">
       <VCardText class="d-flex flex-wrap align-center gap-2">
         <VBtn
           size="small"
           variant="text"
           :color="dropTargetFolderId === null ? 'primary' : undefined"
-          @click="openFolder(null)"
+          @click="navigateToFolder(null)"
           @dragover.prevent="dropTargetFolderId = null"
           @drop="dropOnRoot"
         >
@@ -342,7 +413,7 @@ async function dropOnRoot(ev: DragEvent) {
             variant="text"
             :disabled="idx === breadcrumb.length - 1"
             :color="dropTargetFolderId === crumb.id ? 'primary' : undefined"
-            @click="openFolder(crumb.id)"
+            @click="navigateToFolder(crumb.id)"
             @dragover.prevent.stop="dropTargetFolderId = crumb.id"
             @drop.stop="onFolderDrop(crumb.id, $event)"
           >
@@ -386,37 +457,51 @@ async function dropOnRoot(ev: DragEvent) {
         </div>
         <template v-else>
           <div
-            class="workspace-dropzone__hint text-center py-8 mb-4"
+            v-if="isEmpty"
+            class="workspace-dropzone__hint text-center py-10 mb-2"
             :class="{ 'workspace-dropzone__hint--active': isDragOver }"
           >
             <VIcon
-              icon="tabler-cloud-upload"
-              size="40"
+              :icon="isModelesFolder ? 'tabler-files' : 'tabler-cloud-upload'"
+              size="44"
               class="mb-2"
               :color="isDragOver ? 'primary' : undefined"
             />
             <div class="text-body-1 font-weight-medium">
-              Glissez-déposez des fichiers ici pour les importer
+              {{ emptyTitle }}
             </div>
-            <div class="text-caption text-medium-emphasis mt-1">
-              Vous pouvez aussi déposer un document ou un dossier sur un autre dossier pour le déplacer.
+            <div class="text-caption text-medium-emphasis mt-1 mx-auto"
+                 style="max-inline-size: 36rem"
+            >
+              {{ emptySubtitle }}
             </div>
-            <div class="d-flex justify-center flex-wrap gap-2 mt-4">
+            <div class="d-flex justify-center flex-wrap gap-2 mt-5">
               <VBtn
                 color="primary"
-                prepend-icon="tabler-folder-plus"
-                @click="createFolderDialog = true"
-              >
-                Nouveau dossier
-              </VBtn>
-              <VBtn
-                variant="tonal"
-                prepend-icon="tabler-upload"
+                :prepend-icon="isModelesFolder ? 'tabler-file-plus' : 'tabler-upload'"
                 :loading="uploading"
                 @click="uploadInput?.click()"
               >
-                Importer des fichiers
+                {{ isModelesFolder ? 'Importer mon modèle' : 'Importer des fichiers' }}
               </VBtn>
+              <VBtn
+                variant="tonal"
+                prepend-icon="tabler-folder-plus"
+                @click="createFolderDialog = true"
+              >
+                {{ isModelesFolder ? 'Créer un sous-dossier' : 'Nouveau dossier' }}
+              </VBtn>
+            </div>
+          </div>
+
+          <div
+            v-else
+            class="workspace-dropzone__hint workspace-dropzone__hint--compact text-center py-4 mb-4"
+            :class="{ 'workspace-dropzone__hint--active': isDragOver }"
+          >
+            <div class="text-body-2 text-medium-emphasis">
+              Déposez des fichiers ici pour les importer dans
+              <strong>{{ currentFolder?.name || 'la racine' }}</strong>
             </div>
           </div>
 
@@ -430,25 +515,49 @@ async function dropOnRoot(ev: DragEvent) {
             >
               <VCard
                 variant="outlined"
-                class="cursor-pointer"
-                draggable="true"
+                class="folder-card h-100"
                 :class="{ 'border-primary': dropTargetFolderId === f.id }"
-                @click="openFolder(f.id)"
-                @dragstart="onDragStartItem('folder', f.id, $event)"
-                @dragend="onDragEndItem"
                 @dragover="onFolderDragOver(f.id, $event)"
                 @drop="onFolderDrop(f.id, $event)"
               >
-                <VCardText class="text-center">
+                <VCardText
+                  class="text-center cursor-pointer"
+                  @click="navigateToFolder(f.id)"
+                >
                   <VIcon
-                    icon="tabler-folder"
+                    :icon="f.name === 'Modèles' ? 'tabler-files' : 'tabler-folder'"
                     size="40"
-                    color="warning"
+                    :color="f.name === 'Modèles' ? 'primary' : 'warning'"
                   />
-                  <div class="mt-2 text-body-2">
+                  <div class="mt-2 text-body-2 font-weight-medium">
                     {{ f.name }}
                   </div>
+                  <div
+                    v-if="f.description || f.is_system"
+                    class="text-caption text-medium-emphasis mt-1"
+                  >
+                    {{ folderSubtitle(f) }}
+                  </div>
                 </VCardText>
+                <div class="d-flex justify-center gap-1 pb-2">
+                  <VBtn
+                    v-if="!f.is_system"
+                    icon="tabler-grip-vertical"
+                    size="x-small"
+                    variant="text"
+                    title="Glisser pour déplacer"
+                    draggable="true"
+                    @click.stop
+                    @dragstart="onDragStartItem('folder', f.id, $event)"
+                    @dragend="onDragEndItem"
+                  />
+                  <VBtn
+                    icon="tabler-share"
+                    size="x-small"
+                    variant="text"
+                    @click.stop="openShareFolder(f)"
+                  />
+                </div>
               </VCard>
             </VCol>
             <VCol
@@ -485,22 +594,52 @@ async function dropOnRoot(ev: DragEvent) {
             </VCol>
           </VRow>
 
-          <VList v-else-if="folders.length || documents.length">
+          <VList
+            v-else-if="folders.length || documents.length"
+            class="folder-list"
+          >
             <VListItem
               v-for="f in folders"
               :key="`lf-${f.id}`"
               :title="f.name"
-              subtitle="Glisser pour déplacer · déposer ici pour y mettre un élément"
-              prepend-icon="tabler-folder"
-              draggable="true"
+              :subtitle="folderSubtitle(f)"
               :class="{ 'bg-primary-lighten': dropTargetFolderId === f.id }"
-              @click="openFolder(f.id)"
-              @dragstart="onDragStartItem('folder', f.id, $event)"
-              @dragend="onDragEndItem"
+              class="folder-list-item"
+              @click="navigateToFolder(f.id)"
               @dragover="onFolderDragOver(f.id, $event)"
               @drop="onFolderDrop(f.id, $event)"
             >
+              <template #prepend>
+                <VAvatar
+                  size="40"
+                  :color="f.name === 'Modèles' ? 'primary' : 'warning'"
+                  variant="tonal"
+                  class="me-3"
+                >
+                  <VIcon :icon="f.name === 'Modèles' ? 'tabler-files' : 'tabler-folder'" />
+                </VAvatar>
+              </template>
               <template #append>
+                <VChip
+                  v-if="f.is_system"
+                  size="x-small"
+                  variant="tonal"
+                  class="me-2"
+                >
+                  Système
+                </VChip>
+                <VBtn
+                  v-if="!f.is_system"
+                  icon="tabler-grip-vertical"
+                  size="x-small"
+                  variant="text"
+                  title="Glisser pour déplacer"
+                  draggable="true"
+                  class="me-1"
+                  @click.stop
+                  @dragstart="onDragStartItem('folder', f.id, $event)"
+                  @dragend="onDragEndItem"
+                />
                 <VBtn
                   icon="tabler-share"
                   size="x-small"
@@ -564,13 +703,17 @@ async function dropOnRoot(ev: DragEvent) {
       max-width="420"
     >
       <VCard>
-        <VCardTitle>Nouveau dossier</VCardTitle>
+        <VCardTitle>
+          {{ isModelesFolder ? 'Nouveau sous-dossier dans Modèles' : 'Nouveau dossier' }}
+        </VCardTitle>
         <VCardText>
           <VTextField
             v-model="newFolderName"
-            label="Nom du dossier"
+            :label="isModelesFolder ? 'Nom du sous-dossier' : 'Nom du dossier'"
             autofocus
-            hint="Le dossier sera créé dans l’emplacement courant"
+            :hint="isModelesFolder
+              ? 'Ex. Correspondance, Notes de service, Bordereaux…'
+              : 'Le dossier sera créé dans l’emplacement courant'"
             persistent-hint
             @keyup.enter="createFolder"
           />
@@ -629,12 +772,39 @@ async function dropOnRoot(ev: DragEvent) {
   transition: border-color 0.15s ease, background-color 0.15s ease;
 }
 
+.workspace-dropzone__hint--compact {
+  border-style: dashed;
+  opacity: 0.9;
+}
+
 .workspace-dropzone__hint--active {
   border-color: rgb(var(--v-theme-primary));
   background: rgba(var(--v-theme-primary), 0.06);
 }
 
+.folder-card {
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.folder-card:hover {
+  border-color: rgba(var(--v-theme-primary), 0.45);
+}
+
+.folder-list-item {
+  cursor: pointer;
+  border-radius: 8px;
+  margin-block: 2px;
+}
+
+.folder-list-item:hover {
+  background: rgba(var(--v-theme-primary), 0.04);
+}
+
 .cursor-grab {
   cursor: grab;
+}
+
+.cursor-pointer {
+  cursor: pointer;
 }
 </style>

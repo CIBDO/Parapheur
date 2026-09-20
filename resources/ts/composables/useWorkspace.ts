@@ -58,6 +58,7 @@ export function useWorkspaceExplorer(workspaceId: Ref<number | null>) {
   const breadcrumb = ref<any[]>([])
   const folders = ref<any[]>([])
   const documents = ref<any[]>([])
+  const currentFolder = ref<any | null>(null)
   const viewMode = ref<'list' | 'grid'>('list')
 
   async function load() {
@@ -73,6 +74,7 @@ export function useWorkspaceExplorer(workspaceId: Ref<number | null>) {
       folders.value = res.folders || []
       documents.value = res.documents || []
       breadcrumb.value = res.breadcrumb || []
+      currentFolder.value = res.current_folder || null
     }
     finally {
       loading.value = false
@@ -90,6 +92,7 @@ export function useWorkspaceExplorer(workspaceId: Ref<number | null>) {
     breadcrumb,
     folders,
     documents,
+    currentFolder,
     viewMode,
     load,
     openFolder,

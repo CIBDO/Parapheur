@@ -30,13 +30,47 @@ class WorkspaceDocumentController extends Controller
             'folder_id' => ['nullable', 'integer'],
             'q' => ['nullable', 'string', 'max:255'],
             'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
+            'page' => ['nullable', 'integer', 'min:1'],
         ]);
 
-        $folderId = array_key_exists('folder_id', $data) ? $data['folder_id'] : null;
+        // Sans folder_id : tous les documents de l’espace (pas seulement la racine)
+        $folderId = array_key_exists('folder_id', $data) ? $data['folder_id'] : false;
+        $filters = $data;
+        if ($folderId === false) {
+            $folderId = null;
+            unset($filters['folder_id']);
+        }
 
-        return response()->json(
-            $this->documents->list($workspace, $folderId, $data, $data['per_page'] ?? 20)
+        $paginator = $this->documents->list(
+            $workspace,
+            is_int($folderId) ? $folderId : null,
+            $filters,
+            $data['per_page'] ?? 25
         );
+
+        $paginator->setCollection(
+            $paginator->getCollection()->map(function (WorkspaceDocumentLink $link) {
+                $document = $link->document;
+                if (! $document) {
+                    return null;
+                }
+
+                return array_merge($document->toArray(), [
+                    'link_id' => $link->id,
+                    'folder_id' => $link->folder_id,
+                    'folder' => $link->folder ? [
+                        'id' => $link->folder->id,
+                        'name' => $link->folder->name,
+                        'path' => $link->folder->path,
+                    ] : null,
+                    'added_at' => $link->created_at,
+                    'size' => $document->latestVersion?->size,
+                    'latest_version' => $document->latestVersion,
+                ]);
+            })->filter()->values()
+        );
+
+        return response()->json($paginator);
     }
 
     public function store(Request $request, Workspace $workspace): JsonResponse

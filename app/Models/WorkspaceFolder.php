@@ -22,12 +22,29 @@ class WorkspaceFolder extends Model
         'depth',
     ];
 
+    protected $appends = [
+        'is_system',
+    ];
+
     protected function casts(): array
     {
         return [
             'position' => 'integer',
             'depth' => 'integer',
         ];
+    }
+
+    /**
+     * Dossiers racine créés automatiquement (Mes projets, Modèles…).
+     * On peut y ajouter du contenu, mais pas les renommer ni les supprimer.
+     */
+    public function getIsSystemAttribute(): bool
+    {
+        if ($this->parent_id !== null) {
+            return false;
+        }
+
+        return in_array($this->name, \App\Services\WorkspaceBootstrapService::DEFAULT_PERSONAL_FOLDERS, true);
     }
 
     public function workspace(): BelongsTo

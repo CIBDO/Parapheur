@@ -20,10 +20,13 @@ class WorkspaceFolderService
                 ->firstOrFail();
         }
 
-        $position = (int) WorkspaceFolder::query()
-            ->where('workspace_id', $workspace->id)
-            ->where('parent_id', $parentId)
-            ->max('position') + 1;
+        $siblings = WorkspaceFolder::query()->where('workspace_id', $workspace->id);
+        if ($parentId === null) {
+            $siblings->whereNull('parent_id');
+        } else {
+            $siblings->where('parent_id', $parentId);
+        }
+        $position = (int) $siblings->max('position') + 1;
 
         $folder = WorkspaceFolder::query()->create([
             'workspace_id' => $workspace->id,
@@ -51,6 +54,10 @@ class WorkspaceFolderService
 
     public function rename(WorkspaceFolder $folder, string $name, ?string $description = null): WorkspaceFolder
     {
+        if ($folder->is_system && $name !== $folder->name) {
+            throw new InvalidArgumentException('Ce dossier système ne peut pas être renommé. Vous pouvez y ajouter librement vos fichiers et sous-dossiers.');
+        }
+
         $folder->name = $name;
         if ($description !== null) {
             $folder->description = $description;
@@ -62,6 +69,10 @@ class WorkspaceFolderService
 
     public function move(WorkspaceFolder $folder, ?int $newParentId): WorkspaceFolder
     {
+        if ($folder->is_system) {
+            throw new InvalidArgumentException('Ce dossier système doit rester à la racine de votre espace. Ouvrez-le pour y déposer vos modèles ou documents.');
+        }
+
         if ($newParentId !== null && (int) $newParentId === (int) $folder->id) {
             throw new InvalidArgumentException('Un dossier ne peut pas être son propre parent.');
         }
@@ -99,6 +110,10 @@ class WorkspaceFolderService
 
     public function softDelete(WorkspaceFolder $folder): void
     {
+        if ($folder->is_system) {
+            throw new InvalidArgumentException('Ce dossier système ne peut pas être supprimé. Vous pouvez y ajouter ou y retirer du contenu.');
+        }
+
         $folder->delete();
     }
 

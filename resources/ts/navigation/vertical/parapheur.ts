@@ -142,27 +142,6 @@ export default [
         subject: 'Workspace',
       },
       {
-        title: 'Partagés avec moi',
-        icon: { icon: 'tabler-share' },
-        to: 'espace-partages',
-        action: 'read',
-        subject: 'Workspace',
-      },
-      {
-        title: 'Espaces collaboratifs',
-        icon: { icon: 'tabler-users' },
-        to: 'espace-collaboratifs',
-        action: 'read',
-        subject: 'Workspace',
-      },
-      {
-        title: 'Bibliothèque de références',
-        icon: { icon: 'tabler-books' },
-        to: 'espace-bibliotheque',
-        action: 'read',
-        subject: 'Library',
-      },
-      {
         title: 'Administration quotas',
         icon: { icon: 'tabler-database-cog' },
         to: 'espace-admin',

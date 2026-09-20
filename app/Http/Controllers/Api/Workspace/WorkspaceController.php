@@ -173,23 +173,41 @@ class WorkspaceController extends Controller
             'folder_id' => ['nullable', 'integer'],
         ]);
 
-        $folderId = $data['folder_id'] ?? null;
+        $folderId = isset($data['folder_id']) ? (int) $data['folder_id'] : null;
 
-        $childFolders = WorkspaceFolder::query()
+        $childFoldersQuery = WorkspaceFolder::query()
             ->where('workspace_id', $workspace->id)
-            ->where('parent_id', $folderId)
             ->orderBy('position')
-            ->orderBy('name')
-            ->get();
+            ->orderBy('name');
 
-        $documentLinks = $this->documents->list($workspace, $folderId, [], 100);
+        if ($folderId === null) {
+            $childFoldersQuery->whereNull('parent_id');
+        } else {
+            $childFoldersQuery->where('parent_id', $folderId);
+        }
+
+        $childFolders = $childFoldersQuery->get();
+
+        // À la racine : uniquement les documents sans dossier ; sinon ceux du dossier courant
+        $documentLinks = $this->documents->list(
+            $workspace,
+            $folderId,
+            $folderId === null ? ['folder_id' => null] : [],
+            100
+        );
+
+        $currentFolder = $folderId
+            ? WorkspaceFolder::query()
+                ->where('workspace_id', $workspace->id)
+                ->whereKey($folderId)
+                ->firstOrFail()
+            : null;
 
         return response()->json([
             'folders' => $childFolders,
             'documents' => collect($documentLinks->items())->map(fn ($link) => $link->document)->filter()->values(),
-            'breadcrumb' => $folderId
-                ? $this->folders->breadcrumb(WorkspaceFolder::query()->findOrFail($folderId))
-                : [],
+            'breadcrumb' => $currentFolder ? $this->folders->breadcrumb($currentFolder) : [],
+            'current_folder' => $currentFolder,
             'storage' => $this->quotas->storagePayload($workspace),
         ]);
     }

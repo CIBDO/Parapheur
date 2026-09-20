@@ -105,7 +105,11 @@ class WorkspaceFolderController extends Controller
         abort_unless((int) $folder->workspace_id === (int) $workspace->id, 404);
         abort_unless($this->access->canManageFolders($request->user(), $workspace), 403);
 
-        $this->folders->softDelete($folder);
+        try {
+            $this->folders->softDelete($folder);
+        } catch (InvalidArgumentException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
 
         return response()->json(['message' => 'Dossier placé en corbeille.']);
     }

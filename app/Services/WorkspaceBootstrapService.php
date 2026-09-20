@@ -22,6 +22,14 @@ class WorkspaceBootstrapService
         'Archives personnelles',
     ];
 
+    /** @var array<string, string> */
+    public const DEFAULT_PERSONAL_FOLDER_DESCRIPTIONS = [
+        'Mes projets' => 'Travaux et dossiers en cours',
+        'Modèles' => 'Vos modèles de documents personnels — importez ou créez-y vos fichiers types',
+        'Références' => 'Documents de référence utiles au quotidien',
+        'Archives personnelles' => 'Documents classés pour conservation',
+    ];
+
     public function ensureStoragePolicy(): WorkspaceStoragePolicy
     {
         $policy = WorkspaceStoragePolicy::query()->first();
@@ -90,7 +98,13 @@ class WorkspaceBootstrapService
                 ->where('name', $name)
                 ->first();
 
+            $description = self::DEFAULT_PERSONAL_FOLDER_DESCRIPTIONS[$name] ?? null;
+
             if ($folder) {
+                if ($description && blank($folder->description)) {
+                    $folder->update(['description' => $description]);
+                }
+
                 continue;
             }
 
@@ -98,6 +112,7 @@ class WorkspaceBootstrapService
                 'workspace_id' => $workspace->id,
                 'parent_id' => null,
                 'name' => $name,
+                'description' => $description,
                 'owner_id' => $user->id,
                 'position' => $index,
                 'path' => '/tmp/',

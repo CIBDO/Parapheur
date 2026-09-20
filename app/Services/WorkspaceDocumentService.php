@@ -42,6 +42,9 @@ class WorkspaceDocumentService
             $query->where('folder_id', $folderId);
         } elseif (array_key_exists('folder_id', $filters) && $filters['folder_id'] === null) {
             $query->whereNull('folder_id');
+        } elseif ($folderId === null && ! array_key_exists('folder_id', $filters)) {
+            // Par défaut en navigation racine : ne pas mélanger avec le contenu des sous-dossiers
+            // (les appels explicites passent folder_id dans $filters)
         }
 
         if (! empty($filters['q'])) {
