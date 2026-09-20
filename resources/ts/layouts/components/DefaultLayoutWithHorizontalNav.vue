@@ -38,3 +38,18 @@ import { VNodeRenderer } from '@layouts/components/VNodeRenderer'
     </template>
   </HorizontalNavLayout>
 </template>
+
+<style lang="scss">
+// Menu horizontal : une seule ligne, labels non coupés
+.layout-wrapper.layout-nav-type-horizontal {
+  .layout-horizontal-nav {
+    .horizontal-nav-content-container {
+      overflow-x: auto;
+    }
+
+    .nav-item-title {
+      white-space: nowrap;
+    }
+  }
+}
+</style>
