@@ -8,9 +8,11 @@ use App\Models\User;
 use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use App\Support\Civilities;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password as PasswordRule;
 use Illuminate\Validation\ValidationException;
 
@@ -51,6 +53,53 @@ class AuthController extends Controller
         $user = $request->user()->load(['structure', 'roles']);
 
         return response()->json([
+            'userData' => $this->userPayload($user),
+            'userAbilityRules' => $user->abilityRules(),
+        ]);
+    }
+
+    public function updateProfile(Request $request): JsonResponse
+    {
+        /** @var User $user */
+        $user = $request->user();
+
+        $data = $request->validate([
+            'first_name' => ['required', 'string', 'max:100'],
+            'last_name' => ['required', 'string', 'max:100'],
+            'title' => ['nullable', 'string', Rule::in(Civilities::values())],
+            'phone' => ['nullable', 'string', 'max:50'],
+            'email' => [
+                'required',
+                'email',
+                'max:255',
+                Rule::unique('users', 'email')->ignore($user->id),
+            ],
+            'position_title' => ['nullable', 'string', 'max:150'],
+        ], [
+            'first_name.required' => 'Le prénom est obligatoire.',
+            'last_name.required' => 'Le nom est obligatoire.',
+            'email.required' => 'L’adresse e-mail est obligatoire.',
+            'email.email' => 'L’adresse e-mail n’est pas valide.',
+            'email.unique' => 'Cette adresse e-mail est déjà utilisée par un autre compte.',
+            'title.in' => 'La civilité sélectionnée est invalide.',
+        ]);
+
+        $composedName = trim($data['first_name'].' '.$data['last_name']);
+
+        $user->fill([
+            'first_name' => $data['first_name'],
+            'last_name' => $data['last_name'],
+            'name' => $composedName !== '' ? $composedName : $user->name,
+            'title' => $data['title'] ?? null,
+            'phone' => $data['phone'] ?? null,
+            'email' => $data['email'],
+            'position_title' => $data['position_title'] ?? null,
+        ])->save();
+
+        $user->load(['structure', 'roles']);
+
+        return response()->json([
+            'message' => 'Profil mis à jour.',
             'userData' => $this->userPayload($user),
             'userAbilityRules' => $user->abilityRules(),
         ]);
@@ -171,6 +220,8 @@ class AuthController extends Controller
             'fullName' => $user->name,
             'firstName' => $user->first_name,
             'lastName' => $user->last_name,
+            'title' => $user->title,
+            'phone' => $user->phone,
             'username' => strstr($user->email, '@', true) ?: $user->email,
             'email' => $user->email,
             'role' => $user->getRoleNames()->first() ?? 'agent',

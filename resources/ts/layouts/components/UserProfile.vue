@@ -93,6 +93,16 @@ const logout = async () => {
 
           <VDivider class="my-2" />
 
+          <VListItem :to="{ name: 'profil' }">
+            <template #prepend>
+              <VIcon
+                icon="tabler-user-circle"
+                size="22"
+              />
+            </template>
+            <VListItemTitle>Mon profil</VListItemTitle>
+          </VListItem>
+
           <VListItem :to="{ name: 'parapheur' }">
             <template #prepend>
               <VIcon

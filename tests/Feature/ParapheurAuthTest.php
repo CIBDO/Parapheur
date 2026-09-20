@@ -137,4 +137,40 @@ class ParapheurAuthTest extends TestCase
             ->getJson('/api/parapheur/counts')
             ->assertOk();
     }
+
+    public function test_user_can_update_own_profile(): void
+    {
+        $this->seed(DatabaseSeeder::class);
+
+        $user = User::query()->where('email', 'agent.dsi@dgtcp.local')->firstOrFail();
+        $token = $user->createToken('test')->plainTextToken;
+
+        $response = $this->withToken($token)->putJson('/api/auth/profile', [
+            'first_name' => 'Alice',
+            'last_name' => 'Martin',
+            'title' => 'Mme',
+            'phone' => '+225 01 02 03 04',
+            'email' => 'alice.martin@dgtcp.local',
+            'position_title' => 'Chargée de projet',
+        ]);
+
+        $response->assertOk()
+            ->assertJsonPath('userData.firstName', 'Alice')
+            ->assertJsonPath('userData.lastName', 'Martin')
+            ->assertJsonPath('userData.fullName', 'Alice Martin')
+            ->assertJsonPath('userData.title', 'Mme')
+            ->assertJsonPath('userData.phone', '+225 01 02 03 04')
+            ->assertJsonPath('userData.email', 'alice.martin@dgtcp.local')
+            ->assertJsonPath('userData.position_title', 'Chargée de projet');
+
+        $this->assertDatabaseHas('users', [
+            'id' => $user->id,
+            'first_name' => 'Alice',
+            'last_name' => 'Martin',
+            'name' => 'Alice Martin',
+            'email' => 'alice.martin@dgtcp.local',
+            'phone' => '+225 01 02 03 04',
+            'position_title' => 'Chargée de projet',
+        ]);
+    }
 }
