@@ -109,6 +109,7 @@ declare module 'vue-router/auto-routes' {
     'ticketing-catalogue': RouteRecordInfo<'ticketing-catalogue', '/ticketing/catalogue', Record<never, never>, Record<never, never>>,
     'ticketing-connaissances': RouteRecordInfo<'ticketing-connaissances', '/ticketing/connaissances', Record<never, never>, Record<never, never>>,
     'ticketing-connaissances-id': RouteRecordInfo<'ticketing-connaissances-id', '/ticketing/connaissances/:id', { id: ParamValue<true> }, { id: ParamValue<false> }>,
+    'ticketing-demande': RouteRecordInfo<'ticketing-demande', '/ticketing/demande', Record<never, never>, Record<never, never>>,
     'ticketing-equipe': RouteRecordInfo<'ticketing-equipe', '/ticketing/equipe', Record<never, never>, Record<never, never>>,
     'ticketing-file': RouteRecordInfo<'ticketing-file', '/ticketing/file', Record<never, never>, Record<never, never>>,
     'ticketing-kanban': RouteRecordInfo<'ticketing-kanban', '/ticketing/kanban', Record<never, never>, Record<never, never>>,

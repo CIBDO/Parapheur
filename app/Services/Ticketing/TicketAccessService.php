@@ -2,6 +2,7 @@
 
 namespace App\Services\Ticketing;
 
+use App\Enums\TicketStatus;
 use App\Models\SupportTeamMember;
 use App\Models\Ticket;
 use App\Models\User;
@@ -125,6 +126,145 @@ class TicketAccessService
         }
 
         return $this->isAdmin($user) || $user->can('ticket.escalate');
+    }
+
+    public function canCancel(User $user, Ticket $ticket): bool
+    {
+        if (! $this->canView($user, $ticket)) {
+            return false;
+        }
+
+        return $this->isAdmin($user)
+            || $user->can('ticket.cancel')
+            || $user->can('ticket.admin');
+    }
+
+    public function canApprove(User $user, Ticket $ticket): bool
+    {
+        if (! $this->canView($user, $ticket)) {
+            return false;
+        }
+
+        if ($ticket->status !== TicketStatus::EnAttenteValidation) {
+            return false;
+        }
+
+        return $this->isAdmin($user)
+            || $user->can('ticket.update')
+            || ($ticket->support_team_id && $this->isTeamLead($user, (int) $ticket->support_team_id));
+    }
+
+    /**
+     * Actions réellement proposables à l’utilisateur pour ce ticket (permissions + statut + rôle).
+     *
+     * @return list<string>
+     */
+    public function availableActions(User $user, Ticket $ticket): array
+    {
+        if (! $this->canView($user, $ticket)) {
+            return [];
+        }
+
+        $status = $ticket->status instanceof TicketStatus
+            ? $ticket->status
+            : TicketStatus::tryFrom((string) $ticket->status);
+
+        if (! $status) {
+            return [];
+        }
+
+        $closed = in_array($status, [TicketStatus::Cloture, TicketStatus::Annule], true);
+        $pendingApproval = $status === TicketStatus::EnAttenteValidation;
+        $isRequester = (int) $ticket->requester_id === (int) $user->id;
+        $isAssignee = $ticket->assignee_id && (int) $ticket->assignee_id === (int) $user->id;
+        $isTeamMember = $ticket->support_team_id
+            && $this->isTeamMember($user, (int) $ticket->support_team_id);
+        $isAgentContext = $this->isAdmin($user)
+            || $isAssignee
+            || $isTeamMember
+            || $user->can('ticket.view_all')
+            || $user->can('ticket.view_team');
+
+        $actions = [];
+
+        if ($this->canComment($user, $ticket) && ! $closed) {
+            $actions[] = 'comment';
+        }
+
+        if ($this->canInternalNote($user, $ticket) && ! $closed && $isAgentContext) {
+            $actions[] = 'internal_note';
+        }
+
+        if ($pendingApproval && $this->canApprove($user, $ticket)) {
+            $actions[] = 'approve';
+            $actions[] = 'refuse';
+
+            return array_values(array_unique($actions));
+        }
+
+        if ($this->canTakeCharge($user, $ticket)
+            && ! $ticket->assignee_id
+            && ! $closed
+            && ! $pendingApproval
+            && $isAgentContext
+        ) {
+            $actions[] = 'take_charge';
+        }
+
+        if ($this->canAssign($user, $ticket) && ! $closed && ! $pendingApproval) {
+            $actions[] = 'assign';
+            $actions[] = 'transfer';
+        }
+
+        if ($this->canEdit($user, $ticket) && ! $closed && ! $pendingApproval && $isAgentContext) {
+            $actions[] = 'wait';
+            $actions[] = 'merge';
+            $actions[] = 'link_problem';
+            $actions[] = 'major_incident';
+        }
+
+        if ($this->canEscalate($user, $ticket) && ! $closed && ! $pendingApproval) {
+            $actions[] = 'escalate';
+        }
+
+        if ($this->canResolve($user, $ticket)
+            && ! $closed
+            && ! $pendingApproval
+            && ! in_array($status, [TicketStatus::Resolu, TicketStatus::AValider], true)
+            && ($isAssignee || $this->isAdmin($user) || $isTeamMember)
+        ) {
+            $actions[] = 'resolve';
+        }
+
+        if ($this->canClose($user, $ticket)
+            && in_array($status, [TicketStatus::Resolu, TicketStatus::AValider], true)
+        ) {
+            $actions[] = 'close';
+            if ($isRequester || $this->isAdmin($user)) {
+                $actions[] = 'accept_solution';
+                $actions[] = 'refuse_solution';
+            }
+        }
+
+        if ($this->canReopen($user, $ticket)
+            && in_array($status, [TicketStatus::Cloture, TicketStatus::Annule, TicketStatus::Resolu], true)
+        ) {
+            $actions[] = 'reopen';
+        }
+
+        if ($this->canCancel($user, $ticket) && ! $closed && ! $pendingApproval) {
+            $actions[] = 'cancel';
+        }
+
+        if (
+            ($ticket->resolution_summary || in_array($status, [TicketStatus::Resolu, TicketStatus::Cloture, TicketStatus::AValider], true))
+            && ($this->canEdit($user, $ticket) || $this->isAdmin($user))
+            && $isAgentContext
+        ) {
+            $actions[] = 'kb';
+        }
+
+        return array_values(array_unique($actions));
     }
 
     /**

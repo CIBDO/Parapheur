@@ -67,6 +67,15 @@ class TicketNotificationService
 
         $addAssignee = fn () => $assigneeId && $ids->push($assigneeId);
         $addRequester = fn () => $ticket->requester_id && $ids->push($ticket->requester_id);
+        $addObservers = function () use ($ids, $ticket) {
+            $observerIds = \App\Models\TicketActor::query()
+                ->where('ticket_id', $ticket->id)
+                ->where('role', 'observer')
+                ->pluck('user_id');
+            foreach ($observerIds as $id) {
+                $ids->push((int) $id);
+            }
+        };
         $addLeads = function () use ($ids, $teamId, $context) {
             $targetTeam = $context['to_team_id'] ?? $teamId;
             if (! $targetTeam) {
@@ -97,19 +106,29 @@ class TicketNotificationService
         };
 
         match ($event) {
-            'created' => tap(null, function () use ($addRequester, $addTeamQueue, $unassigned) {
+            'created' => tap(null, function () use ($addRequester, $addTeamQueue, $addObservers, $unassigned) {
                 $addRequester();
+                $addObservers();
                 if ($unassigned) {
                     $addTeamQueue();
                 }
             }),
-            'assigned' => $addAssignee(),
-            'taken_charge' => $addRequester(),
+            'assigned', 'transferred' => tap(null, function () use ($addAssignee, $addObservers) {
+                $addAssignee();
+                $addObservers();
+            }),
+            'taken_charge' => tap(null, function () use ($addRequester, $addObservers) {
+                $addRequester();
+                $addObservers();
+            }),
             'comment_requester', 'requester_replied' => tap(null, function () use ($addAssignee, $addTeamQueue) {
                 $addAssignee();
                 $addTeamQueue();
             }),
-            'comment_agent' => $addRequester(),
+            'comment_agent' => tap(null, function () use ($addRequester, $addObservers) {
+                $addRequester();
+                $addObservers();
+            }),
             'internal_note' => null,
             'waiting_requester' => $addRequester(),
             'escalated' => tap(null, function () use ($ids, $context, $addLeads, $isConfidential) {
@@ -126,7 +145,7 @@ class TicketNotificationService
                     }
                 }
             }),
-            'sla_warning' => tap(null, function () use ($addAssignee, $addTeamQueue, $addLeads, $ticket) {
+            'sla_warning', 'ola_warning' => tap(null, function () use ($addAssignee, $addTeamQueue, $addLeads, $ticket) {
                 $addAssignee();
                 $addTeamQueue();
                 $level = (int) ($ticket->priority?->level ?? 99);
@@ -134,14 +153,15 @@ class TicketNotificationService
                     $addLeads();
                 }
             }),
-            'sla_breach' => tap(null, function () use ($addAssignee, $addTeamQueue, $addLeads) {
+            'sla_breach', 'ola_breach' => tap(null, function () use ($addAssignee, $addTeamQueue, $addLeads) {
                 $addAssignee();
                 $addTeamQueue();
                 $addLeads();
             }),
-            'resolved', 'closed' => tap(null, function () use ($addRequester, $addAssignee, $event) {
+            'resolved', 'closed', 'solution_accepted', 'approval_accepted', 'approval_refused' => tap(null, function () use ($addRequester, $addAssignee, $addObservers, $event) {
                 $addRequester();
-                if ($event === 'closed') {
+                $addObservers();
+                if (in_array($event, ['closed', 'solution_accepted'], true)) {
                     $addAssignee();
                 }
             }),
@@ -153,9 +173,10 @@ class TicketNotificationService
                 $addAssignee();
                 $addLeads();
             }),
-            default => tap(null, function () use ($addAssignee, $addRequester) {
+            default => tap(null, function () use ($addAssignee, $addRequester, $addObservers) {
                 $addAssignee();
                 $addRequester();
+                $addObservers();
             }),
         };
 

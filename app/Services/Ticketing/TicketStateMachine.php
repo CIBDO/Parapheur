@@ -16,9 +16,16 @@ class TicketStateMachine
         TicketStatus::Nouveau->value => [
             TicketStatus::AQualifier->value,
             TicketStatus::Affecte->value,
+            TicketStatus::EnAttenteValidation->value,
             TicketStatus::Annule->value,
         ],
         TicketStatus::AQualifier->value => [
+            TicketStatus::Affecte->value,
+            TicketStatus::EnAttenteValidation->value,
+            TicketStatus::Annule->value,
+        ],
+        TicketStatus::EnAttenteValidation->value => [
+            TicketStatus::AQualifier->value,
             TicketStatus::Affecte->value,
             TicketStatus::Annule->value,
         ],

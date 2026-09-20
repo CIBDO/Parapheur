@@ -33,11 +33,15 @@ use App\Http\Controllers\Api\Ticketing\KnownErrorController;
 use App\Http\Controllers\Api\Ticketing\ProblemController;
 use App\Http\Controllers\Api\Ticketing\ServiceCatalogController;
 use App\Http\Controllers\Api\Ticketing\TicketActionController;
+use App\Http\Controllers\Api\Ticketing\TicketActorController;
 use App\Http\Controllers\Api\Ticketing\TicketAttachmentController;
 use App\Http\Controllers\Api\Ticketing\TicketCommentController;
 use App\Http\Controllers\Api\Ticketing\TicketController;
+use App\Http\Controllers\Api\Ticketing\TicketCostController;
 use App\Http\Controllers\Api\Ticketing\TicketNotificationPreferenceController;
 use App\Http\Controllers\Api\Ticketing\TicketRelationController;
+use App\Http\Controllers\Api\Ticketing\TicketSolutionController;
+use App\Http\Controllers\Api\Ticketing\TicketTaskController;
 use App\Http\Controllers\Api\Ticketing\TicketWorklogController;
 use App\Http\Controllers\Api\Ticketing\TicketingAdminController;
 use App\Http\Controllers\Api\Ticketing\TicketingAiController;
@@ -600,6 +604,8 @@ Route::middleware(['auth:sanctum', 'password.changed'])->group(function () {
 
         Route::post('/tickets/{ticket}/assign', [TicketActionController::class, 'assign'])
             ->middleware('permission:ticket.assign|admin.access');
+        Route::post('/tickets/{ticket}/transfer', [TicketActionController::class, 'transfer'])
+            ->middleware('permission:ticket.assign|ticket.reassign|admin.access');
         Route::post('/tickets/{ticket}/take-charge', [TicketActionController::class, 'takeCharge'])
             ->middleware('permission:ticket.take_charge|admin.access');
         Route::post('/tickets/{ticket}/escalate', [TicketActionController::class, 'escalate'])
@@ -618,6 +624,42 @@ Route::middleware(['auth:sanctum', 'password.changed'])->group(function () {
             ->middleware('permission:ticket.update|admin.access');
         Route::post('/tickets/{ticket}/satisfaction', [TicketActionController::class, 'satisfaction'])
             ->middleware('permission:ticket.view|admin.access');
+        Route::post('/tickets/{ticket}/merge', [TicketActionController::class, 'merge'])
+            ->middleware('permission:ticket.update|admin.access');
+        Route::post('/tickets/{ticket}/approvals/accept', [TicketActionController::class, 'acceptApproval'])
+            ->middleware('permission:ticket.update|admin.access');
+        Route::post('/tickets/{ticket}/approvals/refuse', [TicketActionController::class, 'refuseApproval'])
+            ->middleware('permission:ticket.update|admin.access');
+
+        Route::get('/tickets/{ticket}/actors', [TicketActorController::class, 'index']);
+        Route::post('/tickets/{ticket}/actors', [TicketActorController::class, 'store'])
+            ->middleware('permission:ticket.update|admin.access');
+        Route::put('/tickets/{ticket}/actors/observers', [TicketActorController::class, 'syncObservers'])
+            ->middleware('permission:ticket.update|admin.access');
+        Route::delete('/tickets/{ticket}/actors', [TicketActorController::class, 'destroy'])
+            ->middleware('permission:ticket.update|admin.access');
+
+        Route::get('/tickets/{ticket}/solutions', [TicketSolutionController::class, 'index']);
+        Route::post('/tickets/{ticket}/solutions', [TicketSolutionController::class, 'store'])
+            ->middleware('permission:ticket.resolve|admin.access');
+        Route::post('/tickets/{ticket}/solutions/{solution}/accept', [TicketSolutionController::class, 'accept'])
+            ->middleware('permission:ticket.close|admin.access');
+        Route::post('/tickets/{ticket}/solutions/{solution}/refuse', [TicketSolutionController::class, 'refuse'])
+            ->middleware('permission:ticket.reopen|admin.access');
+
+        Route::get('/tickets/{ticket}/tasks', [TicketTaskController::class, 'index']);
+        Route::post('/tickets/{ticket}/tasks', [TicketTaskController::class, 'store'])
+            ->middleware('permission:ticket.update|admin.access');
+        Route::put('/tickets/{ticket}/tasks/{task}', [TicketTaskController::class, 'update'])
+            ->middleware('permission:ticket.update|admin.access');
+        Route::delete('/tickets/{ticket}/tasks/{task}', [TicketTaskController::class, 'destroy'])
+            ->middleware('permission:ticket.update|admin.access');
+
+        Route::get('/tickets/{ticket}/costs', [TicketCostController::class, 'index']);
+        Route::post('/tickets/{ticket}/costs', [TicketCostController::class, 'store'])
+            ->middleware('permission:ticket.update|admin.access');
+        Route::delete('/tickets/{ticket}/costs/{cost}', [TicketCostController::class, 'destroy'])
+            ->middleware('permission:ticket.update|admin.access');
 
         Route::get('/tickets/{ticket}/comments', [TicketCommentController::class, 'index']);
         Route::post('/tickets/{ticket}/comments', [TicketCommentController::class, 'store'])

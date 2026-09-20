@@ -47,11 +47,12 @@ class TicketingSeeder extends Seeder
             ['code' => 'EN_ATTENTE_DEMANDEUR', 'name' => 'En attente demandeur', 'pauses_sla' => true, 'sort_order' => 6],
             ['code' => 'EN_ATTENTE_TIERS', 'name' => 'En attente tiers', 'pauses_sla' => true, 'sort_order' => 7],
             ['code' => 'ESCALADE', 'name' => 'Escaladé', 'sort_order' => 8],
-            ['code' => 'RESOLU', 'name' => 'Résolu', 'sort_order' => 9],
-            ['code' => 'A_VALIDER', 'name' => 'À valider', 'sort_order' => 10],
-            ['code' => 'REOUVERT', 'name' => 'Réouvert', 'sort_order' => 11],
-            ['code' => 'CLOTURE', 'name' => 'Clôturé', 'sort_order' => 12],
-            ['code' => 'ANNULE', 'name' => 'Annulé', 'sort_order' => 13],
+            ['code' => 'EN_ATTENTE_VALIDATION', 'name' => 'En attente validation', 'pauses_sla' => true, 'sort_order' => 9],
+            ['code' => 'RESOLU', 'name' => 'Résolu', 'sort_order' => 10],
+            ['code' => 'A_VALIDER', 'name' => 'À valider', 'sort_order' => 11],
+            ['code' => 'REOUVERT', 'name' => 'Réouvert', 'sort_order' => 12],
+            ['code' => 'CLOTURE', 'name' => 'Clôturé', 'sort_order' => 13],
+            ['code' => 'ANNULE', 'name' => 'Annulé', 'sort_order' => 14],
         ];
         foreach ($statuses as $row) {
             TicketStatusRef::query()->updateOrCreate(
@@ -192,6 +193,11 @@ class TicketingSeeder extends Seeder
         if ($appsTeam && $admin) {
             $appsTeam->users()->syncWithoutDetaching([
                 $admin->id => ['level' => 'N3', 'is_lead' => true],
+            ]);
+        }
+        if ($appsTeam && $agent) {
+            $appsTeam->users()->syncWithoutDetaching([
+                $agent->id => ['level' => 'N2', 'is_lead' => false],
             ]);
         }
         if ($supportTeam && $agent) {

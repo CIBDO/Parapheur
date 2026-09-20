@@ -58,6 +58,24 @@ class TicketingModuleTest extends TestCase
         return $user;
     }
 
+    /**
+     * @param  array<string, mixed>  $overrides
+     * @return array<string, mixed>
+     */
+    private function ticketPayload(array $overrides = []): array
+    {
+        $item = ServiceItem::query()->where('code', 'ASSIST_APP')->first();
+
+        return array_merge([
+            'title' => 'Ticket test',
+            'description' => 'Description test',
+            'service_item_id' => $item?->id,
+            'custom_fields' => [
+                'application' => 'SIGRAC',
+            ],
+        ], $overrides);
+    }
+
     public function test_create_ticket_assigns_number_and_notifies_team(): void
     {
         Notification::fake();
@@ -71,41 +89,121 @@ class TicketingModuleTest extends TestCase
             $agent->id => ['level' => 'N1', 'is_lead' => false],
         ]);
 
-        $item = ServiceItem::query()->where('code', 'ASSIST_APP')->first();
         $impact = TicketImpactLevel::query()->where('code', 'MOYEN')->first();
         $urgency = TicketUrgencyLevel::query()->where('code', 'HAUTE')->first();
 
-        $response = $this->postJson('/api/ticketing/tickets', [
+        $response = $this->postJson('/api/ticketing/tickets', $this->ticketPayload([
             'title' => 'Impossible de se connecter à SIGRAC',
             'description' => 'Erreur 500 au login',
-            'service_item_id' => $item?->id,
             'impact_id' => $impact?->id,
             'urgency_id' => $urgency?->id,
-        ]);
+        ]));
 
         $response->assertCreated();
         $this->assertStringStartsWith('TCK/', $response->json('number'));
         $this->assertDatabaseHas('tickets', ['title' => 'Impossible de se connecter à SIGRAC']);
+        $this->assertDatabaseHas('ticket_actors', [
+            'ticket_id' => $response->json('id'),
+            'user_id' => $agent->id,
+            'role' => 'requester',
+        ]);
+        $this->assertDatabaseHas('ticket_comments', [
+            'ticket_id' => $response->json('id'),
+            'is_internal' => false,
+        ]);
 
         Notification::assertSentTo($lead, TicketNotification::class);
+    }
+
+    public function test_create_incident_without_catalog(): void
+    {
+        $this->actingAsAgent();
+        $typeId = \App\Models\TicketType::query()->where('code', 'INCIDENT')->value('id');
+
+        $response = $this->postJson('/api/ticketing/tickets', [
+            'title' => 'Incident classique sans catalogue',
+            'description' => 'Poste bloqué',
+            'ticket_type_id' => $typeId,
+            'location_label' => 'Bureau 12',
+        ]);
+
+        $response->assertCreated();
+        $this->assertEquals($typeId, $response->json('ticket_type_id'));
+    }
+
+    public function test_solution_propose_accept_closes_ticket(): void
+    {
+        $agent = $this->actingAsAgent();
+        $item = ServiceItem::query()->where('code', 'ASSIST_APP')->first();
+        $team = SupportTeam::query()->find($item?->support_team_id);
+        $this->assertNotNull($team);
+        $team->users()->syncWithoutDetaching([
+            $agent->id => ['level' => 'N1', 'is_lead' => false],
+        ]);
+
+        $id = $this->postJson('/api/ticketing/tickets', $this->ticketPayload([
+            'title' => 'Solution accept test',
+        ]))->assertCreated()->json('id');
+
+        $this->postJson("/api/ticketing/tickets/{$id}/assign", [
+            'assignee_id' => $agent->id,
+            'support_team_id' => $team->id,
+        ])->assertOk();
+        $this->postJson("/api/ticketing/tickets/{$id}/take-charge")->assertOk();
+
+        $solution = $this->postJson("/api/ticketing/tickets/{$id}/solutions", [
+            'content' => 'Redémarrage du service',
+            'solution_type' => 'solution',
+        ])->assertCreated();
+
+        $this->postJson("/api/ticketing/tickets/{$id}/solutions/{$solution->json('id')}/accept")
+            ->assertOk();
+
+        $this->assertEquals('CLOTURE', Ticket::query()->find($id)?->status->value);
+    }
+
+    public function test_ticket_task_lifecycle(): void
+    {
+        $this->actingAsAgent();
+        $id = $this->postJson('/api/ticketing/tickets', $this->ticketPayload([
+            'title' => 'Task test',
+        ]))->assertCreated()->json('id');
+
+        $task = $this->postJson("/api/ticketing/tickets/{$id}/tasks", [
+            'title' => 'Diagnostiquer le poste',
+            'content' => 'Vérifier le réseau',
+        ])->assertCreated();
+
+        $this->putJson("/api/ticketing/tickets/{$id}/tasks/{$task->json('id')}", [
+            'status' => 'done',
+        ])->assertOk();
+
+        $this->assertDatabaseHas('ticket_tasks', [
+            'id' => $task->json('id'),
+            'status' => 'done',
+        ]);
     }
 
     public function test_lifecycle_assign_take_charge_resolve_close(): void
     {
         $agent = $this->actingAsAgent();
         $item = ServiceItem::query()->where('code', 'ASSIST_APP')->first();
+        $team = SupportTeam::query()->find($item?->support_team_id);
+        $this->assertNotNull($team);
+        $team->users()->syncWithoutDetaching([
+            $agent->id => ['level' => 'N1', 'is_lead' => false],
+        ]);
 
-        $create = $this->postJson('/api/ticketing/tickets', [
+        $create = $this->postJson('/api/ticketing/tickets', $this->ticketPayload([
             'title' => 'Test cycle de vie',
             'description' => 'Cycle complet',
-            'service_item_id' => $item?->id,
-        ])->assertCreated();
+        ]))->assertCreated();
 
         $id = $create->json('id');
 
         $this->postJson("/api/ticketing/tickets/{$id}/assign", [
             'assignee_id' => $agent->id,
-            'support_team_id' => $item?->support_team_id,
+            'support_team_id' => $team->id,
         ])->assertOk();
 
         $this->postJson("/api/ticketing/tickets/{$id}/take-charge")->assertOk();
@@ -129,10 +227,9 @@ class TicketingModuleTest extends TestCase
         $requester->assignRole($role);
 
         $item = ServiceItem::query()->where('code', 'ASSIST_APP')->first();
-        $create = $this->postJson('/api/ticketing/tickets', [
+        $create = $this->postJson('/api/ticketing/tickets', $this->ticketPayload([
             'title' => 'Note interne test',
-            'service_item_id' => $item?->id,
-        ])->assertCreated();
+        ]))->assertCreated();
         $id = $create->json('id');
 
         Ticket::query()->whereKey($id)->update(['requester_id' => $requester->id, 'assignee_id' => $agent->id]);
@@ -171,10 +268,9 @@ class TicketingModuleTest extends TestCase
         $agent->givePermissionTo(['problem.view', 'problem.create', 'problem.update']);
 
         $item = ServiceItem::query()->where('code', 'ASSIST_APP')->first();
-        $ticketId = $this->postJson('/api/ticketing/tickets', [
+        $ticketId = $this->postJson('/api/ticketing/tickets', $this->ticketPayload([
             'title' => 'Incident lié problème',
-            'service_item_id' => $item?->id,
-        ])->assertCreated()->json('id');
+        ]))->assertCreated()->json('id');
 
         $problem = $this->postJson('/api/ticketing/problems', [
             'title' => 'Problème SSO récurrent',
@@ -203,10 +299,9 @@ class TicketingModuleTest extends TestCase
         $agent->givePermissionTo(['knowledge.view', 'knowledge.create', 'knowledge.publish']);
 
         $item = ServiceItem::query()->where('code', 'ASSIST_APP')->first();
-        $ticketId = $this->postJson('/api/ticketing/tickets', [
+        $ticketId = $this->postJson('/api/ticketing/tickets', $this->ticketPayload([
             'title' => 'Ticket pour capitalisation KB',
-            'service_item_id' => $item?->id,
-        ])->assertCreated()->json('id');
+        ]))->assertCreated()->json('id');
 
         $article = $this->postJson('/api/ticketing/knowledge', [
             'title' => 'Procédure reset SIGRAC',
@@ -234,15 +329,13 @@ class TicketingModuleTest extends TestCase
         $this->actingAsAgent();
         $item = ServiceItem::query()->where('code', 'ASSIST_APP')->first();
 
-        $a = $this->postJson('/api/ticketing/tickets', [
+        $a = $this->postJson('/api/ticketing/tickets', $this->ticketPayload([
             'title' => 'Ticket A relations',
-            'service_item_id' => $item?->id,
-        ])->assertCreated()->json('id');
+        ]))->assertCreated()->json('id');
 
-        $b = $this->postJson('/api/ticketing/tickets', [
+        $b = $this->postJson('/api/ticketing/tickets', $this->ticketPayload([
             'title' => 'Ticket B relations',
-            'service_item_id' => $item?->id,
-        ])->assertCreated()->json('id');
+        ]))->assertCreated()->json('id');
 
         $relation = $this->postJson("/api/ticketing/tickets/{$a}/relations", [
             'related_ticket_id' => $b,
@@ -287,10 +380,9 @@ class TicketingModuleTest extends TestCase
         );
 
         $item = ServiceItem::query()->where('code', 'ASSIST_APP')->first();
-        $this->postJson('/api/ticketing/tickets', [
+        $this->postJson('/api/ticketing/tickets', $this->ticketPayload([
             'title' => 'Notif prefs test',
-            'service_item_id' => $item?->id,
-        ])->assertCreated();
+        ]))->assertCreated();
 
         Notification::assertNotSentTo($lead, TicketNotification::class);
     }
@@ -299,17 +391,21 @@ class TicketingModuleTest extends TestCase
     {
         $agent = $this->actingAsAgent();
         $item = ServiceItem::query()->where('code', 'ASSIST_APP')->first();
+        $team = SupportTeam::query()->find($item?->support_team_id);
+        $this->assertNotNull($team);
+        $team->users()->syncWithoutDetaching([
+            $agent->id => ['level' => 'N1', 'is_lead' => false],
+        ]);
 
-        $id = $this->postJson('/api/ticketing/tickets', [
+        $id = $this->postJson('/api/ticketing/tickets', $this->ticketPayload([
             'title' => 'SLA pause test',
-            'service_item_id' => $item?->id,
             'impact_id' => TicketImpactLevel::query()->where('code', 'MOYEN')->value('id'),
             'urgency_id' => TicketUrgencyLevel::query()->where('code', 'HAUTE')->value('id'),
-        ])->assertCreated()->json('id');
+        ]))->assertCreated()->json('id');
 
         $this->postJson("/api/ticketing/tickets/{$id}/assign", [
             'assignee_id' => $agent->id,
-            'support_team_id' => $item?->support_team_id,
+            'support_team_id' => $team->id,
         ])->assertOk();
 
         $this->postJson("/api/ticketing/tickets/{$id}/take-charge")->assertOk();
@@ -338,16 +434,21 @@ class TicketingModuleTest extends TestCase
 
         $agent = $this->actingAsAgent();
         $item = ServiceItem::query()->where('code', 'ASSIST_APP')->first();
+        $team = SupportTeam::query()->find($item?->support_team_id);
+        $this->assertNotNull($team);
+        $team->users()->syncWithoutDetaching([
+            $agent->id => ['level' => 'N1', 'is_lead' => false],
+        ]);
 
-        $id = $this->postJson('/api/ticketing/tickets', [
+        $id = $this->postJson('/api/ticketing/tickets', $this->ticketPayload([
             'title' => 'SLA breach test',
-            'service_item_id' => $item?->id,
             'impact_id' => TicketImpactLevel::query()->where('code', 'CRITIQUE')->value('id'),
             'urgency_id' => TicketUrgencyLevel::query()->where('code', 'CRITIQUE')->value('id'),
-        ])->assertCreated()->json('id');
+        ]))->assertCreated()->json('id');
 
         $this->postJson("/api/ticketing/tickets/{$id}/assign", [
             'assignee_id' => $agent->id,
+            'support_team_id' => $team->id,
         ])->assertOk();
 
         $ticket = Ticket::query()->with('sla')->findOrFail($id);
@@ -370,16 +471,21 @@ class TicketingModuleTest extends TestCase
     {
         $agent = $this->actingAsAgent();
         $item = ServiceItem::query()->where('code', 'ASSIST_APP')->first();
+        $team = SupportTeam::query()->find($item?->support_team_id);
+        $this->assertNotNull($team);
+        $team->users()->syncWithoutDetaching([
+            $agent->id => ['level' => 'N1', 'is_lead' => false],
+        ]);
 
-        $id = $this->postJson('/api/ticketing/tickets', [
+        $id = $this->postJson('/api/ticketing/tickets', $this->ticketPayload([
             'title' => 'Satisfaction test',
-            'service_item_id' => $item?->id,
-        ])->assertCreated()->json('id');
+        ]))->assertCreated()->json('id');
 
         Ticket::query()->whereKey($id)->update(['requester_id' => $agent->id]);
 
         $this->postJson("/api/ticketing/tickets/{$id}/assign", [
             'assignee_id' => $agent->id,
+            'support_team_id' => $team->id,
         ])->assertOk();
         $this->postJson("/api/ticketing/tickets/{$id}/take-charge")->assertOk();
         $this->postJson("/api/ticketing/tickets/{$id}/resolve", [
@@ -403,11 +509,10 @@ class TicketingModuleTest extends TestCase
         $item = ServiceItem::query()->where('code', 'ASSIST_APP')->first();
         $typeId = \App\Models\TicketType::query()->where('code', 'INCIDENT')->value('id');
 
-        $id = $this->postJson('/api/ticketing/tickets', [
+        $id = $this->postJson('/api/ticketing/tickets', $this->ticketPayload([
             'title' => 'Recherche filtre type unique XYZ',
-            'service_item_id' => $item?->id,
             'ticket_type_id' => $typeId,
-        ])->assertCreated()->json('id');
+        ]))->assertCreated()->json('id');
 
         $found = $this->getJson('/api/ticketing/tickets/search?'.http_build_query([
             'q' => 'XYZ',
@@ -444,5 +549,130 @@ class TicketingModuleTest extends TestCase
 
         $show = $this->getJson('/api/ticketing/problems/'.$problem->json('id'))->assertOk();
         $this->assertNotEmpty($show->json('known_errors') ?? $show->json('knownErrors'));
+    }
+
+    public function test_create_ticket_with_assignee_sets_affecte_when_no_approval(): void
+    {
+        $agent = $this->actingAsAgent();
+        $item = ServiceItem::query()->where('code', 'ASSIST_APP')->first();
+        $this->assertNotNull($item);
+        $item->update(['requires_approval' => false]);
+
+        $team = SupportTeam::query()->find($item->support_team_id);
+        $this->assertNotNull($team);
+        $team->users()->syncWithoutDetaching([
+            $agent->id => ['level' => 'N1', 'is_lead' => false],
+        ]);
+
+        $response = $this->postJson('/api/ticketing/tickets', $this->ticketPayload([
+            'title' => 'Demande affectée à la création',
+            'support_team_id' => $team->id,
+            'assignee_id' => $agent->id,
+        ]))->assertCreated();
+
+        $this->assertSame(TicketStatus::Affecte->value, $response->json('status'));
+        $this->assertSame($agent->id, $response->json('assignee_id'));
+        $this->assertSame($team->id, $response->json('support_team_id'));
+        $this->assertDatabaseHas('ticket_assignments', [
+            'ticket_id' => $response->json('id'),
+            'assignee_id' => $agent->id,
+            'support_team_id' => $team->id,
+            'action' => 'assign',
+        ]);
+        $this->assertDatabaseHas('ticket_actors', [
+            'ticket_id' => $response->json('id'),
+            'user_id' => $agent->id,
+            'role' => 'assignee',
+        ]);
+    }
+
+    public function test_create_ticket_ignores_assignee_when_approval_required(): void
+    {
+        $agent = $this->actingAsAgent();
+        $item = ServiceItem::query()->where('code', 'ASSIST_APP')->first();
+        $this->assertNotNull($item);
+        $item->update(['requires_approval' => true]);
+
+        $team = SupportTeam::query()->find($item->support_team_id);
+        $this->assertNotNull($team);
+
+        $response = $this->postJson('/api/ticketing/tickets', $this->ticketPayload([
+            'title' => 'Demande soumise à validation',
+            'support_team_id' => $team->id,
+            'assignee_id' => $agent->id,
+        ]))->assertCreated();
+
+        $this->assertSame(TicketStatus::EnAttenteValidation->value, $response->json('status'));
+        $this->assertNull($response->json('assignee_id'));
+        $this->assertDatabaseMissing('ticket_assignments', [
+            'ticket_id' => $response->json('id'),
+            'assignee_id' => $agent->id,
+        ]);
+        $this->assertDatabaseHas('ticket_approvals', [
+            'ticket_id' => $response->json('id'),
+            'status' => 'pending',
+        ]);
+    }
+
+    public function test_assign_rejects_non_team_member(): void
+    {
+        $agent = $this->actingAsAgent();
+        $outsider = User::factory()->create(['must_change_password' => false]);
+        $item = ServiceItem::query()->where('code', 'ASSIST_APP')->first();
+        $team = SupportTeam::query()->find($item?->support_team_id);
+        $this->assertNotNull($team);
+        $team->users()->syncWithoutDetaching([
+            $agent->id => ['level' => 'N1', 'is_lead' => false],
+        ]);
+
+        $id = $this->postJson('/api/ticketing/tickets', $this->ticketPayload([
+            'title' => 'Assign non membre',
+        ]))->assertCreated()->json('id');
+
+        $this->postJson("/api/ticketing/tickets/{$id}/assign", [
+            'support_team_id' => $team->id,
+            'assignee_id' => $outsider->id,
+        ])->assertStatus(422);
+    }
+
+    public function test_available_actions_differ_for_requester_and_agent(): void
+    {
+        $agent = $this->actingAsAgent();
+        $item = ServiceItem::query()->where('code', 'ASSIST_APP')->first();
+        $team = SupportTeam::query()->find($item?->support_team_id);
+        $this->assertNotNull($team);
+        $team->users()->syncWithoutDetaching([
+            $agent->id => ['level' => 'N1', 'is_lead' => false],
+        ]);
+
+        $id = $this->postJson('/api/ticketing/tickets', $this->ticketPayload([
+            'title' => 'Actions disponibles test',
+            'support_team_id' => $team->id,
+            'assignee_id' => $agent->id,
+        ]))->assertCreated()->json('id');
+
+        $agentShow = $this->getJson("/api/ticketing/tickets/{$id}")->assertOk();
+        $agentActions = $agentShow->json('available_actions') ?? [];
+        $this->assertContains('resolve', $agentActions);
+        $this->assertContains('assign', $agentActions);
+        $this->assertContains('comment', $agentActions);
+
+        $requester = User::factory()->create(['must_change_password' => false]);
+        foreach (['ticket.view', 'ticket.comment', 'ticket.close', 'ticket.reopen'] as $perm) {
+            Permission::findOrCreate($perm, 'web');
+        }
+        $role = Role::findOrCreate('Demandeur Test Actions', 'web');
+        $role->syncPermissions(['ticket.view', 'ticket.comment', 'ticket.close', 'ticket.reopen']);
+        $requester->assignRole($role);
+
+        Ticket::query()->whereKey($id)->update(['requester_id' => $requester->id]);
+
+        Sanctum::actingAs($requester);
+        $reqShow = $this->getJson("/api/ticketing/tickets/{$id}")->assertOk();
+        $reqActions = $reqShow->json('available_actions') ?? [];
+        $this->assertContains('comment', $reqActions);
+        $this->assertNotContains('assign', $reqActions);
+        $this->assertNotContains('escalate', $reqActions);
+        $this->assertNotContains('resolve', $reqActions);
     }
 }

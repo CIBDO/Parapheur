@@ -195,9 +195,16 @@ export default [
         subject: 'Ticketing',
       },
       {
-        title: 'Nouveau ticket',
-        icon: { icon: 'tabler-plus' },
+        title: 'Nouvel incident',
+        icon: { icon: 'tabler-alert-triangle' },
         to: 'ticketing-nouveau',
+        action: 'create',
+        subject: 'Ticketing',
+      },
+      {
+        title: 'Nouvelle demande',
+        icon: { icon: 'tabler-file-plus' },
+        to: 'ticketing-demande',
         action: 'create',
         subject: 'Ticketing',
       },

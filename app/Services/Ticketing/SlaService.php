@@ -15,17 +15,25 @@ class SlaService
         private readonly TicketNotificationService $notifications,
     ) {}
 
-    public function attachOnCreate(Ticket $ticket): ?TicketSla
+    public function attachOnCreate(Ticket $ticket, ?int $preferredPolicyId = null): ?TicketSla
     {
-        if (! $ticket->priority_id) {
-            return null;
+        $policy = null;
+
+        if ($preferredPolicyId) {
+            $policy = SlaPolicy::query()
+                ->whereKey($preferredPolicyId)
+                ->where('is_active', true)
+                ->with('calendar.exceptions')
+                ->first();
         }
 
-        $policy = SlaPolicy::query()
-            ->where('priority_id', $ticket->priority_id)
-            ->where('is_active', true)
-            ->with('calendar.exceptions')
-            ->first();
+        if (! $policy && $ticket->priority_id) {
+            $policy = SlaPolicy::query()
+                ->where('priority_id', $ticket->priority_id)
+                ->where('is_active', true)
+                ->with('calendar.exceptions')
+                ->first();
+        }
 
         if (! $policy || ! $policy->calendar) {
             return null;
@@ -199,6 +207,20 @@ class SlaService
                     'kind' => 'resolution',
                 ]);
                 $breaches++;
+
+                if ($policy?->auto_escalate_on_breach && $policy->escalate_to_team_id) {
+                    try {
+                        app(TicketEscalationService::class)->escalate(
+                            $ticket,
+                            null,
+                            (int) $policy->escalate_to_team_id,
+                            null,
+                            'Escalade automatique suite au dépassement SLA'
+                        );
+                    } catch (\Throwable $e) {
+                        report($e);
+                    }
+                }
             }
 
             if ($sla->warning_sent_at || ! $sla->resolution_due_at || $sla->resolution_met_at) {

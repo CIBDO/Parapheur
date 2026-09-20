@@ -7,6 +7,7 @@ export const ticketStatusLabels: Record<string, string> = {
   EN_ATTENTE_DEMANDEUR: 'En attente demandeur',
   EN_ATTENTE_TIERS: 'En attente tiers',
   ESCALADE: 'Escaladé',
+  EN_ATTENTE_VALIDATION: 'En attente validation',
   RESOLU: 'Résolu',
   A_VALIDER: 'À valider',
   REOUVERT: 'Réouvert',
@@ -23,6 +24,7 @@ export const ticketStatusColors: Record<string, string> = {
   EN_ATTENTE_DEMANDEUR: 'default',
   EN_ATTENTE_TIERS: 'default',
   ESCALADE: 'error',
+  EN_ATTENTE_VALIDATION: 'warning',
   RESOLU: 'success',
   A_VALIDER: 'teal',
   REOUVERT: 'orange',
@@ -148,9 +150,44 @@ export function listItems<T = any>(payload: any): T[] {
   return []
 }
 
+/**
+ * Agents d’une équipe pour les selects (évite d’afficher tous les users → 422).
+ * Compare les ids en Number pour éviter les mismatches string/number du VSelect.
+ */
+export function teamAgentSelectItems(
+  teams: any[] | null | undefined,
+  teamId: number | string | null | undefined,
+): { value: number; title: string }[] {
+  if (teamId === null || teamId === undefined || teamId === '')
+    return []
+
+  const tid = Number(teamId)
+  if (!Number.isFinite(tid))
+    return []
+
+  const team = (teams || []).find(t => Number(t.id) === tid)
+  if (!team)
+    return []
+
+  const members = team.members || team.users || []
+
+  return members
+    .map((m: any) => {
+      const user = m?.user || m
+      const id = Number(user?.id ?? m?.user_id)
+      const name = user?.name || m?.name
+      if (!Number.isFinite(id) || !name)
+        return null
+
+      return { value: id, title: String(name) }
+    })
+    .filter(Boolean) as { value: number; title: string }[]
+}
+
 export const ticketKanbanColumnOrder = [
   'NOUVEAU',
   'A_QUALIFIER',
+  'EN_ATTENTE_VALIDATION',
   'AFFECTE',
   'PRIS_EN_CHARGE',
   'EN_COURS',

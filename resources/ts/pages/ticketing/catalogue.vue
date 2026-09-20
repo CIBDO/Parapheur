@@ -46,7 +46,7 @@ onMounted(async () => {
 })
 
 function requestService(item: any) {
-  router.push({ name: 'ticketing-nouveau', query: { service_item_id: item.id } })
+  router.push({ name: 'ticketing-demande', query: { service_item_id: item.id } })
 }
 </script>
 

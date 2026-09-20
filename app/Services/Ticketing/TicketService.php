@@ -4,6 +4,7 @@ namespace App\Services\Ticketing;
 
 use App\Enums\TicketStatus;
 use App\Models\Ticket;
+use App\Models\TicketAssignment;
 use App\Models\TicketAttachment;
 use App\Models\TicketChannel;
 use App\Models\TicketComment;
@@ -42,6 +43,37 @@ class TicketService
             $channelId = $data['channel_id']
                 ?? TicketChannel::query()->where('code', 'PORTAIL')->value('id');
 
+            $explicitTeamId = array_key_exists('support_team_id', $data) && $data['support_team_id']
+                ? (int) $data['support_team_id']
+                : null;
+            $explicitAssigneeId = array_key_exists('assignee_id', $data) && $data['assignee_id']
+                ? (int) $data['assignee_id']
+                : null;
+
+            $serviceItem = null;
+            if (! empty($data['service_item_id'])) {
+                $serviceItem = \App\Models\ServiceItem::query()
+                    ->with('fields')
+                    ->find($data['service_item_id']);
+
+                if ($serviceItem) {
+                    // Source de vérité serveur : dériver type / catégorie / priorité défaut
+                    // L'équipe fournie à la création prime sur celle du catalogue.
+                    $data['ticket_type_id'] = $serviceItem->ticket_type_id ?? $data['ticket_type_id'] ?? null;
+                    $data['ticket_category_id'] = $serviceItem->ticket_category_id ?? $data['ticket_category_id'] ?? null;
+                    $data['support_team_id'] = $data['support_team_id'] ?? $serviceItem->support_team_id ?? null;
+
+                    $customFields = is_array($data['custom_fields'] ?? null) ? $data['custom_fields'] : [];
+                    $data['custom_fields'] = $this->catalog->validateCustomFields($serviceItem, $customFields);
+                }
+            }
+
+            $requiresApproval = (bool) ($serviceItem?->requires_approval);
+            if ($requiresApproval) {
+                $data['assignee_id'] = null;
+                $explicitAssigneeId = null;
+            }
+
             $impactId = $data['impact_id'] ?? null;
             $urgencyId = $data['urgency_id'] ?? null;
             $priority = $this->priorities->resolveFromMatrix(
@@ -49,53 +81,116 @@ class TicketService
                 $urgencyId ? (int) $urgencyId : null
             );
 
-            if (! empty($data['service_item_id']) && ! empty($data['custom_fields']) && is_array($data['custom_fields'])) {
-                $item = \App\Models\ServiceItem::query()->with('fields')->find($data['service_item_id']);
-                if ($item) {
-                    $data['custom_fields'] = $this->catalog->validateCustomFields($item, $data['custom_fields']);
-                }
+            $priorityId = $priority?->id
+                ?? ($data['priority_id'] ?? null)
+                ?? $serviceItem?->default_priority_id;
+
+            $assigneeId = ! empty($data['assignee_id']) ? (int) $data['assignee_id'] : null;
+            $supportTeamId = ! empty($data['support_team_id']) ? (int) $data['support_team_id'] : null;
+
+            if ($assigneeId) {
+                $this->assignments->assertAssigneeBelongsToTeam($assigneeId, $supportTeamId);
+            }
+
+            $initialStatus = TicketStatus::Nouveau;
+            if ($requiresApproval) {
+                $initialStatus = TicketStatus::EnAttenteValidation;
+            } elseif ($assigneeId) {
+                $initialStatus = TicketStatus::Affecte;
             }
 
             $number = $this->numbering->generateTicketNumber($data['structure_id'] ?? $actor->structure_id);
+
+            $requesterId = (int) ($data['requester_id'] ?? $actor->id);
+            $assetIds = collect($data['asset_ids'] ?? [])
+                ->when(! empty($data['asset_id']), fn ($c) => $c->push($data['asset_id']))
+                ->map(fn ($id) => (int) $id)
+                ->filter()
+                ->unique()
+                ->values()
+                ->all();
 
             $ticket = Ticket::query()->create([
                 'number' => $number,
                 'title' => $data['title'],
                 'description' => $data['description'] ?? null,
-                'status' => TicketStatus::Nouveau,
+                'status' => $initialStatus,
                 'confidentiality' => $data['confidentiality'] ?? 'NORMAL',
                 'source' => $data['source'] ?? null,
                 'location_label' => $data['location_label'] ?? null,
                 'channel_id' => $channelId,
-                'requester_id' => $data['requester_id'] ?? $actor->id,
+                'requester_id' => $requesterId,
                 'structure_id' => $data['structure_id'] ?? $actor->structure_id,
                 'ticket_type_id' => $data['ticket_type_id'] ?? null,
                 'ticket_category_id' => $data['ticket_category_id'] ?? null,
                 'service_item_id' => $data['service_item_id'] ?? null,
                 'impact_id' => $impactId,
                 'urgency_id' => $urgencyId,
-                'priority_id' => $priority?->id ?? ($data['priority_id'] ?? null),
-                'support_team_id' => $data['support_team_id'] ?? null,
-                'assignee_id' => $data['assignee_id'] ?? null,
+                'priority_id' => $priorityId,
+                'support_team_id' => $supportTeamId,
+                'assignee_id' => $assigneeId,
                 'parent_id' => $data['parent_id'] ?? null,
                 'application_id' => $data['application_id'] ?? null,
-                'asset_id' => $data['asset_id'] ?? null,
+                'asset_id' => $assetIds[0] ?? ($data['asset_id'] ?? null),
                 'custom_fields' => $data['custom_fields'] ?? null,
                 'is_major_incident' => (bool) ($data['is_major_incident'] ?? false),
             ]);
 
+            // Acteurs
+            $this->syncActor($ticket, $requesterId, 'requester');
+            if ($assigneeId) {
+                $this->syncActor($ticket, $assigneeId, 'assignee');
+            }
+            foreach (($data['observer_ids'] ?? []) as $observerId) {
+                $this->syncActor($ticket, (int) $observerId, 'observer');
+            }
+
+            if ($assetIds !== []) {
+                $ticket->assets()->sync($assetIds);
+            }
+
+            if (! empty($data['tag_ids']) && is_array($data['tag_ids'])) {
+                $ticket->tags()->sync(array_map('intval', $data['tag_ids']));
+            }
+
+            // Premier suivi public (sémantique followup GLPI)
+            if (! empty($data['description'])) {
+                TicketComment::query()->create([
+                    'ticket_id' => $ticket->id,
+                    'user_id' => $actor->id,
+                    'body' => $data['description'],
+                    'is_internal' => false,
+                ]);
+            }
+
             $this->assignments->autoAssignFromServiceItem($ticket);
             $ticket->refresh();
 
-            $this->sla->attachOnCreate($ticket);
+            if (! $requiresApproval && ($explicitAssigneeId || $explicitTeamId)) {
+                TicketAssignment::query()->create([
+                    'ticket_id' => $ticket->id,
+                    'support_team_id' => $ticket->support_team_id,
+                    'assignee_id' => $assigneeId,
+                    'assigned_by' => $actor->id,
+                    'action' => $assigneeId ? 'assign' : 'assign_team',
+                    'comment' => 'Affectation à la création',
+                ]);
+            }
+
+            $this->sla->attachOnCreate($ticket, $serviceItem?->sla_policy_id);
+            app(OlaService::class)->attachOnCreate($ticket);
 
             TicketStatusHistory::query()->create([
                 'ticket_id' => $ticket->id,
                 'from_status' => null,
-                'to_status' => TicketStatus::Nouveau->value,
+                'to_status' => $initialStatus->value,
                 'user_id' => $actor->id,
                 'comment' => 'Création du ticket',
             ]);
+
+            if ($serviceItem?->requires_approval) {
+                app(TicketApprovalService::class)->requestApproval($ticket, $actor);
+            }
 
             $this->audit->log('ticket.created', $ticket, [
                 'actor_id' => $actor->id,
@@ -103,7 +198,8 @@ class TicketService
             ]);
 
             $fresh = $ticket->fresh([
-                'requester', 'assignee', 'team', 'priority', 'channel', 'sla', 'serviceItem',
+                'requester', 'assignee', 'team', 'priority', 'channel', 'sla', 'ola', 'serviceItem',
+                'actors.user', 'assets', 'tags', 'approvals',
             ]);
 
             $this->notifications->notify(
@@ -115,6 +211,44 @@ class TicketService
 
             return $fresh;
         });
+    }
+
+    public function syncActor(Ticket $ticket, int $userId, string $role): void
+    {
+        \App\Models\TicketActor::query()->updateOrCreate(
+            [
+                'ticket_id' => $ticket->id,
+                'user_id' => $userId,
+                'role' => $role,
+            ],
+            []
+        );
+    }
+
+    public function removeActor(Ticket $ticket, int $userId, string $role): void
+    {
+        \App\Models\TicketActor::query()
+            ->where('ticket_id', $ticket->id)
+            ->where('user_id', $userId)
+            ->where('role', $role)
+            ->delete();
+    }
+
+    /**
+     * @param  list<int>  $observerIds
+     */
+    public function syncObservers(Ticket $ticket, array $observerIds): Ticket
+    {
+        \App\Models\TicketActor::query()
+            ->where('ticket_id', $ticket->id)
+            ->where('role', 'observer')
+            ->delete();
+
+        foreach ($observerIds as $id) {
+            $this->syncActor($ticket, (int) $id, 'observer');
+        }
+
+        return $ticket->fresh(['actors.user']);
     }
 
     /**

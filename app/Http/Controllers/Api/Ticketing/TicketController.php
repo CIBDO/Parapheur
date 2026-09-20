@@ -9,6 +9,7 @@ use App\Services\Ticketing\TicketService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use InvalidArgumentException;
 
 class TicketController extends Controller
 {
@@ -25,7 +26,7 @@ class TicketController extends Controller
             min((int) $request->input('per_page', 20), 100)
         );
 
-        $paginator->getCollection()->transform(fn (Ticket $t) => $this->ticketPayload($t));
+        $paginator->getCollection()->transform(fn (Ticket $t) => $this->ticketPayload($t, $request->user()));
 
         return response()->json($paginator);
     }
@@ -59,16 +60,26 @@ class TicketController extends Controller
             'parent_id' => 'nullable|exists:tickets,id',
             'application_id' => 'nullable|exists:applications,id',
             'asset_id' => 'nullable|exists:assets,id',
+            'asset_ids' => 'nullable|array',
+            'asset_ids.*' => 'integer|exists:assets,id',
+            'observer_ids' => 'nullable|array',
+            'observer_ids.*' => 'integer|exists:users,id',
+            'tag_ids' => 'nullable|array',
+            'tag_ids.*' => 'integer|exists:ticket_tags,id',
             'custom_fields' => 'nullable|array',
             'is_major_incident' => 'nullable|boolean',
         ]);
 
-        $ticket = $this->tickets->create($request->user(), $validated);
+        try {
+            $ticket = $this->tickets->create($request->user(), $validated);
+        } catch (InvalidArgumentException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
 
-        return response()->json($this->ticketPayload($ticket), 201);
+        return response()->json($this->ticketPayload($ticket, $request->user()), 201);
     }
 
-    public function show(Ticket $ticket): JsonResponse
+    public function show(Request $request, Ticket $ticket): JsonResponse
     {
         $this->authorize('view', $ticket);
 
@@ -83,18 +94,30 @@ class TicketController extends Controller
             'impact:id,code,name',
             'urgency:id,code,name',
             'team:id,code,name',
-            'serviceItem:id,code,name',
+            'serviceItem:id,code,name,requires_approval',
             'sla',
+            'ola.policy',
             'tags:id,code,name,color',
             'application:id,code,name',
             'asset:id,inventory_number,name',
+            'assets:id,inventory_number,name',
+            'actors.user:id,name,email',
+            'solutions.author:id,name',
+            'approvals',
             'attachments',
             'satisfactions',
+            'knowledgeArticles:id,title,summary,slug,status',
         ]);
 
-        $payload = $this->ticketPayload($ticket);
+        $payload = $this->ticketPayload($ticket, $request->user());
         $payload['attachments'] = $ticket->attachments;
         $payload['satisfaction'] = $ticket->satisfactions->sortByDesc('id')->first();
+        $payload['actors'] = $ticket->actors;
+        $payload['assets'] = $ticket->assets;
+        $payload['solutions'] = $ticket->solutions;
+        $payload['approvals'] = $ticket->approvals;
+        $payload['ola'] = $ticket->ola;
+        $payload['knowledge_articles'] = $ticket->knowledgeArticles;
 
         return response()->json($payload);
     }
@@ -117,6 +140,12 @@ class TicketController extends Controller
             'urgency_id' => 'nullable|exists:ticket_urgency_levels,id',
             'application_id' => 'nullable|exists:applications,id',
             'asset_id' => 'nullable|exists:assets,id',
+            'asset_ids' => 'nullable|array',
+            'asset_ids.*' => 'integer|exists:assets,id',
+            'observer_ids' => 'nullable|array',
+            'observer_ids.*' => 'integer|exists:users,id',
+            'tag_ids' => 'nullable|array',
+            'tag_ids.*' => 'integer|exists:ticket_tags,id',
             'custom_fields' => 'nullable|array',
             'is_major_incident' => 'nullable|boolean',
             'structure_id' => 'nullable|exists:structures,id',
@@ -124,7 +153,21 @@ class TicketController extends Controller
 
         $updated = $this->tickets->update($ticket, $request->user(), $validated);
 
-        return response()->json($this->ticketPayload($updated));
+        if (array_key_exists('asset_ids', $validated)) {
+            $ids = array_map('intval', $validated['asset_ids'] ?? []);
+            $ticket->assets()->sync($ids);
+            if ($ids !== []) {
+                $ticket->update(['asset_id' => $ids[0]]);
+            }
+        }
+        if (array_key_exists('tag_ids', $validated)) {
+            $ticket->tags()->sync(array_map('intval', $validated['tag_ids'] ?? []));
+        }
+        if (array_key_exists('observer_ids', $validated)) {
+            $this->tickets->syncObservers($ticket, $validated['observer_ids'] ?? []);
+        }
+
+        return response()->json($this->ticketPayload($updated->fresh(['assets', 'tags', 'actors.user']), $request->user()));
     }
 
     public function duplicateCheck(Request $request): JsonResponse
@@ -316,7 +359,7 @@ class TicketController extends Controller
     /**
      * @return array<string, mixed>
      */
-    private function ticketPayload(Ticket $ticket): array
+    private function ticketPayload(Ticket $ticket, ?\App\Models\User $actor = null): array
     {
         $ticket->loadMissing([
             'requester:id,name,email',
@@ -336,7 +379,7 @@ class TicketController extends Controller
             'tags:id,code,name,color',
         ]);
 
-        return [
+        $payload = [
             'id' => $ticket->id,
             'number' => $ticket->number,
             'title' => $ticket->title,
@@ -387,6 +430,11 @@ class TicketController extends Controller
             'tags' => $ticket->relationLoaded('tags')
                 ? $ticket->tags->map->only(['id', 'code', 'name', 'color'])->values()
                 : [],
+            'available_actions' => $actor
+                ? $this->access->availableActions($actor, $ticket)
+                : [],
         ];
+
+        return $payload;
     }
 }

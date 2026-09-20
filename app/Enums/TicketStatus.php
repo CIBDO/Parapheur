@@ -12,6 +12,7 @@ enum TicketStatus: string
     case EnAttenteDemandeur = 'EN_ATTENTE_DEMANDEUR';
     case EnAttenteTiers = 'EN_ATTENTE_TIERS';
     case Escalade = 'ESCALADE';
+    case EnAttenteValidation = 'EN_ATTENTE_VALIDATION';
     case Resolu = 'RESOLU';
     case AValider = 'A_VALIDER';
     case Reouvert = 'REOUVERT';
@@ -29,6 +30,7 @@ enum TicketStatus: string
             self::EnAttenteDemandeur => 'En attente demandeur',
             self::EnAttenteTiers => 'En attente tiers',
             self::Escalade => 'Escaladé',
+            self::EnAttenteValidation => 'En attente validation',
             self::Resolu => 'Résolu',
             self::AValider => 'À valider',
             self::Reouvert => 'Réouvert',
@@ -39,7 +41,11 @@ enum TicketStatus: string
 
     public function pausesSla(): bool
     {
-        return in_array($this, [self::EnAttenteDemandeur, self::EnAttenteTiers], true);
+        return in_array($this, [
+            self::EnAttenteDemandeur,
+            self::EnAttenteTiers,
+            self::EnAttenteValidation,
+        ], true);
     }
 
     public static function values(): array

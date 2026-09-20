@@ -15,8 +15,9 @@ class CheckTicketSlaJob implements ShouldQueue
 
     public int $tries = 1;
 
-    public function handle(SlaService $sla): void
+    public function handle(SlaService $sla, \App\Services\Ticketing\OlaService $ola): void
     {
         $sla->checkBreaches();
+        $ola->checkBreaches();
     }
 }

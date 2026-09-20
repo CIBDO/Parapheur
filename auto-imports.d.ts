@@ -229,6 +229,7 @@ declare global {
   const storeToRefs: typeof import('pinia')['storeToRefs']
   const syncRef: typeof import('@vueuse/core')['syncRef']
   const syncRefs: typeof import('@vueuse/core')['syncRefs']
+  const teamAgentSelectItems: typeof import('./resources/ts/utils/ticketingUi')['teamAgentSelectItems']
   const templateCategoryLabels: typeof import('./resources/ts/utils/courrierUi')['templateCategoryLabels']
   const templateRef: typeof import('@vueuse/core')['templateRef']
   const throttledRef: typeof import('@vueuse/core')['throttledRef']
@@ -691,6 +692,7 @@ declare module 'vue' {
     readonly storeToRefs: UnwrapRef<typeof import('pinia')['storeToRefs']>
     readonly syncRef: UnwrapRef<typeof import('@vueuse/core')['syncRef']>
     readonly syncRefs: UnwrapRef<typeof import('@vueuse/core')['syncRefs']>
+    readonly teamAgentSelectItems: UnwrapRef<typeof import('./resources/ts/utils/ticketingUi')['teamAgentSelectItems']>
     readonly templateRef: UnwrapRef<typeof import('@vueuse/core')['templateRef']>
     readonly throttledRef: UnwrapRef<typeof import('@vueuse/core')['throttledRef']>
     readonly throttledWatch: UnwrapRef<typeof import('@vueuse/core')['throttledWatch']>

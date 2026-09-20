@@ -19,6 +19,8 @@ class SlaPolicy extends Model
         'response_minutes',
         'resolution_minutes',
         'warning_percent',
+        'escalate_to_team_id',
+        'auto_escalate_on_breach',
         'is_active',
     ];
 
@@ -28,6 +30,7 @@ class SlaPolicy extends Model
             'response_minutes' => 'integer',
             'resolution_minutes' => 'integer',
             'warning_percent' => 'integer',
+            'auto_escalate_on_breach' => 'boolean',
             'is_active' => 'boolean',
         ];
     }
@@ -40,6 +43,11 @@ class SlaPolicy extends Model
     public function calendar(): BelongsTo
     {
         return $this->belongsTo(SlaCalendar::class, 'sla_calendar_id');
+    }
+
+    public function escalateToTeam(): BelongsTo
+    {
+        return $this->belongsTo(SupportTeam::class, 'escalate_to_team_id');
     }
 
     public function ticketSlas(): HasMany

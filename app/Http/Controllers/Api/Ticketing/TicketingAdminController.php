@@ -335,6 +335,8 @@ class TicketingAdminController extends Controller
             'support_team_id' => 'nullable|exists:support_teams,id',
             'sla_policy_id' => 'nullable|exists:sla_policies,id',
             'default_priority_id' => 'nullable|exists:ticket_priorities,id',
+            'requires_approval' => 'nullable|boolean',
+            'approval_template' => 'nullable|string|max:100',
             'is_active' => 'nullable|boolean',
             'sort_order' => 'nullable|integer',
         ]);
@@ -358,6 +360,8 @@ class TicketingAdminController extends Controller
             'support_team_id' => 'nullable|exists:support_teams,id',
             'sla_policy_id' => 'nullable|exists:sla_policies,id',
             'default_priority_id' => 'nullable|exists:ticket_priorities,id',
+            'requires_approval' => 'nullable|boolean',
+            'approval_template' => 'nullable|string|max:100',
             'is_active' => 'nullable|boolean',
             'sort_order' => 'nullable|integer',
         ]);

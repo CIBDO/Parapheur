@@ -215,4 +215,46 @@ class Ticket extends Model
     {
         return $this->belongsToMany(KnowledgeArticle::class, 'knowledge_article_ticket_links');
     }
+
+    public function actors(): HasMany
+    {
+        return $this->hasMany(TicketActor::class);
+    }
+
+    public function observers(): BelongsToMany
+    {
+        return $this->belongsToMany(User::class, 'ticket_actors')
+            ->wherePivot('role', 'observer')
+            ->withTimestamps();
+    }
+
+    public function assets(): BelongsToMany
+    {
+        return $this->belongsToMany(Asset::class, 'ticket_asset')->withTimestamps();
+    }
+
+    public function solutions(): HasMany
+    {
+        return $this->hasMany(TicketSolution::class)->orderByDesc('id');
+    }
+
+    public function tasks(): HasMany
+    {
+        return $this->hasMany(TicketTask::class)->orderByDesc('id');
+    }
+
+    public function approvals(): HasMany
+    {
+        return $this->hasMany(TicketApproval::class)->orderByDesc('id');
+    }
+
+    public function ola(): HasOne
+    {
+        return $this->hasOne(TicketOla::class);
+    }
+
+    public function costs(): HasMany
+    {
+        return $this->hasMany(TicketCost::class)->orderByDesc('id');
+    }
 }

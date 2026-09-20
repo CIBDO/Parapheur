@@ -16,7 +16,7 @@ class TicketEscalationService
      */
     public function escalate(
         Ticket $ticket,
-        User $actor,
+        ?User $actor,
         ?int $toTeamId = null,
         ?int $toUserId = null,
         ?string $reason = null,

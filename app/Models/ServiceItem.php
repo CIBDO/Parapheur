@@ -22,6 +22,8 @@ class ServiceItem extends Model
         'name',
         'description',
         'is_active',
+        'requires_approval',
+        'approval_template',
         'sort_order',
     ];
 
@@ -29,6 +31,7 @@ class ServiceItem extends Model
     {
         return [
             'is_active' => 'boolean',
+            'requires_approval' => 'boolean',
         ];
     }
 

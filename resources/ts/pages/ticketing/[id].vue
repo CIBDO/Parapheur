@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
-import { useRoute } from 'vue-router'
+import { computed, onMounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { $api } from '@/utils/api'
 import { useTicketing } from '@/composables/useTicketing'
 import {
@@ -8,6 +8,7 @@ import {
   formatTicketNumber,
   listItems,
   slaBadge,
+  teamAgentSelectItems,
   ticketPriorityColor,
   ticketPriorityLabel,
   ticketStatusColor,
@@ -23,6 +24,7 @@ definePage({
 })
 
 const route = useRoute()
+const router = useRouter()
 const {
   ticket,
   fetchTicket,
@@ -55,6 +57,16 @@ const problems = ref<any[]>([])
 const applications = ref<any[]>([])
 const assets = ref<any[]>([])
 const relations = ref<any[]>([])
+const solutions = ref<any[]>([])
+const tasks = ref<any[]>([])
+const costs = ref<any[]>([])
+const costsTotal = ref(0)
+const actors = ref<any[]>([])
+const observerIds = ref<number[]>([])
+const taskForm = ref({ title: '', content: '', status: 'todo' })
+const costForm = ref({ name: '', amount: 0, cost_type: '' })
+const solutionRefuseReason = ref('')
+const approvalRefuseReason = ref('')
 const relationForm = ref({
   related_ticket_id: null as number | null,
   relation_type: 'related',
@@ -82,6 +94,14 @@ const problemDialog = ref(false)
 const selectedProblemId = ref<number | null>(null)
 const kbDialog = ref(false)
 const kbForm = ref({ title: '', summary: '', body: '' })
+const transferDialog = ref(false)
+const transferForm = ref({ support_team_id: null as number | null, assignee_id: null as number | null, comment: '' })
+const mergeDialog = ref(false)
+const mergeTargetId = ref<number | null>(null)
+const mergeSearch = ref('')
+const mergeResults = ref<any[]>([])
+const linkedKnowledge = ref<any[]>([])
+const assetIdsForm = ref<number[]>([])
 const assignDialog = ref(false)
 const assignForm = ref({ support_team_id: null as number | null, assignee_id: null as number | null, comment: '' })
 const worklogForm = ref({ minutes: 15, note: '' })
@@ -90,6 +110,55 @@ const uploadFile = ref<File | null>(null)
 
 const teamItems = computed(() => teams.value.map(t => ({ value: t.id, title: t.name })))
 const userItems = computed(() => users.value.map(u => ({ value: u.id, title: u.name })))
+
+const assignAgentItems = computed(() => teamAgentSelectItems(teams.value, assignForm.value.support_team_id))
+const transferAgentItems = computed(() => teamAgentSelectItems(teams.value, transferForm.value.support_team_id))
+const escalateAgentItems = computed(() => teamAgentSelectItems(teams.value, escalateForm.value.to_team_id))
+
+const availableActions = computed(() => ticket.value?.available_actions || [])
+function canAction(action: string) {
+  return availableActions.value.includes(action)
+}
+
+watch(() => assignForm.value.support_team_id, () => {
+  if (assignForm.value.assignee_id && !assignAgentItems.value.some(a => a.value === Number(assignForm.value.assignee_id)))
+    assignForm.value.assignee_id = null
+})
+watch(() => transferForm.value.support_team_id, () => {
+  if (transferForm.value.assignee_id && !transferAgentItems.value.some(a => a.value === Number(transferForm.value.assignee_id)))
+    transferForm.value.assignee_id = null
+})
+watch(() => escalateForm.value.to_team_id, () => {
+  if (escalateForm.value.to_user_id && !escalateAgentItems.value.some(a => a.value === Number(escalateForm.value.to_user_id)))
+    escalateForm.value.to_user_id = null
+})
+
+function openAssignDialog() {
+  assignForm.value = {
+    support_team_id: ticket.value?.support_team_id || null,
+    assignee_id: null,
+    comment: '',
+  }
+  assignDialog.value = true
+}
+
+function openTransferDialog() {
+  transferForm.value = {
+    support_team_id: ticket.value?.support_team_id || null,
+    assignee_id: null,
+    comment: '',
+  }
+  transferDialog.value = true
+}
+
+function openEscalateDialog() {
+  escalateForm.value = {
+    to_team_id: ticket.value?.support_team_id || null,
+    to_user_id: null,
+    reason: '',
+  }
+  escalateDialog.value = true
+}
 
 const canShowSatisfaction = computed(() =>
   ticket.value && ['RESOLU', 'CLOTURE', 'A_VALIDER'].includes(ticket.value.status) && !ticket.value.satisfaction,
@@ -133,16 +202,35 @@ onMounted(async () => {
 async function refresh() {
   errorMsg.value = ''
   await fetchTicket(id.value)
-  const [c, t, w, rel] = await Promise.all([
+  const [c, t, w, rel, sol, tsk, cst, act] = await Promise.all([
     fetchComments(id.value),
     fetchTimeline(id.value),
     fetchWorklogs(id.value),
     $api(`/ticketing/tickets/${id.value}/relations`).catch(() => ({ data: [] })),
+    $api(`/ticketing/tickets/${id.value}/solutions`).catch(() => ({ data: [] })),
+    $api(`/ticketing/tickets/${id.value}/tasks`).catch(() => ({ data: [] })),
+    $api(`/ticketing/tickets/${id.value}/costs`).catch(() => ({ data: [], total: 0 })),
+    $api(`/ticketing/tickets/${id.value}/actors`).catch(() => ({ data: [] })),
   ])
   comments.value = Array.isArray(c) ? c : (c?.data || [])
   timeline.value = t?.events || []
   worklogs.value = Array.isArray(w) ? w : (w?.data || [])
   relations.value = listItems(rel).length ? listItems(rel) : (Array.isArray(rel?.data) ? rel.data : [])
+  solutions.value = Array.isArray(sol) ? sol : (sol?.data || [])
+  tasks.value = Array.isArray(tsk) ? tsk : (tsk?.data || [])
+  costs.value = Array.isArray(cst) ? cst : (cst?.data || [])
+  costsTotal.value = Number(cst?.total || 0)
+  actors.value = Array.isArray(act) ? act : (act?.data || [])
+  observerIds.value = actors.value.filter((a: any) => a.role === 'observer').map((a: any) => a.user_id || a.user?.id)
+  assetIdsForm.value = (ticket.value?.assets || []).map((a: any) => a.id)
+  if (!assetIdsForm.value.length && ticket.value?.asset_id)
+    assetIdsForm.value = [ticket.value.asset_id]
+  try {
+    linkedKnowledge.value = ticket.value?.knowledge_articles || []
+  }
+  catch {
+    linkedKnowledge.value = []
+  }
 }
 
 async function runAction(fn: () => Promise<any>) {
@@ -166,9 +254,86 @@ async function doTakeCharge() {
 
 async function doResolve() {
   await runAction(async () => {
-    await resolve(id.value, { summary: resolveSummary.value, await_validation: true })
+    await $api(`/ticketing/tickets/${id.value}/solutions`, {
+      method: 'POST',
+      body: {
+        content: resolveSummary.value,
+        solution_type: 'solution',
+        await_validation: true,
+      },
+    })
     resolveDialog.value = false
     resolveSummary.value = ''
+  })
+}
+
+async function acceptSolution(solutionId: number) {
+  await runAction(() => $api(`/ticketing/tickets/${id.value}/solutions/${solutionId}/accept`, { method: 'POST', body: {} }))
+}
+
+async function refuseSolution(solutionId: number) {
+  if (!solutionRefuseReason.value.trim()) {
+    errorMsg.value = 'Motif de refus requis.'
+
+    return
+  }
+  await runAction(async () => {
+    await $api(`/ticketing/tickets/${id.value}/solutions/${solutionId}/refuse`, {
+      method: 'POST',
+      body: { reason: solutionRefuseReason.value },
+    })
+    solutionRefuseReason.value = ''
+  })
+}
+
+async function acceptApproval() {
+  await runAction(() => $api(`/ticketing/tickets/${id.value}/approvals/accept`, { method: 'POST', body: {} }))
+}
+
+async function refuseApproval() {
+  if (!approvalRefuseReason.value.trim()) {
+    errorMsg.value = 'Motif de refus requis.'
+
+    return
+  }
+  await runAction(async () => {
+    await $api(`/ticketing/tickets/${id.value}/approvals/refuse`, {
+      method: 'POST',
+      body: { reason: approvalRefuseReason.value },
+    })
+    approvalRefuseReason.value = ''
+  })
+}
+
+async function saveObservers() {
+  await runAction(() => $api(`/ticketing/tickets/${id.value}/actors/observers`, {
+    method: 'PUT',
+    body: { observer_ids: observerIds.value },
+  }))
+}
+
+async function addTask() {
+  if (!taskForm.value.title.trim())
+    return
+  await runAction(async () => {
+    await $api(`/ticketing/tickets/${id.value}/tasks`, { method: 'POST', body: taskForm.value })
+    taskForm.value = { title: '', content: '', status: 'todo' }
+  })
+}
+
+async function updateTaskStatus(taskId: number, status: string) {
+  await runAction(() => $api(`/ticketing/tickets/${id.value}/tasks/${taskId}`, {
+    method: 'PUT',
+    body: { status },
+  }))
+}
+
+async function addCost() {
+  if (!costForm.value.name.trim() || !costForm.value.amount)
+    return
+  await runAction(async () => {
+    await $api(`/ticketing/tickets/${id.value}/costs`, { method: 'POST', body: costForm.value })
+    costForm.value = { name: '', amount: 0, cost_type: '' }
   })
 }
 
@@ -196,10 +361,16 @@ async function doWait() {
 }
 
 async function doEscalate() {
+  if (escalateForm.value.to_user_id
+    && !escalateAgentItems.value.some(a => a.value === Number(escalateForm.value.to_user_id))) {
+    errorMsg.value = 'Choisissez un agent membre de l’équipe sélectionnée.'
+
+    return
+  }
   await runAction(async () => {
     await escalate(id.value, {
-      to_team_id: escalateForm.value.to_team_id,
-      to_user_id: escalateForm.value.to_user_id,
+      to_team_id: escalateForm.value.to_team_id ? Number(escalateForm.value.to_team_id) : null,
+      to_user_id: escalateForm.value.to_user_id ? Number(escalateForm.value.to_user_id) : null,
       reason: escalateForm.value.reason || undefined,
     })
     escalateDialog.value = false
@@ -327,9 +498,79 @@ function otherTicket(rel: any) {
 }
 
 async function doAssign() {
+  if (assignForm.value.assignee_id
+    && !assignAgentItems.value.some(a => a.value === Number(assignForm.value.assignee_id))) {
+    errorMsg.value = 'Choisissez un agent membre de l’équipe sélectionnée.'
+
+    return
+  }
   await runAction(async () => {
-    await assign(id.value, assignForm.value)
+    await assign(id.value, {
+      ...assignForm.value,
+      support_team_id: assignForm.value.support_team_id ? Number(assignForm.value.support_team_id) : null,
+      assignee_id: assignForm.value.assignee_id ? Number(assignForm.value.assignee_id) : null,
+    })
     assignDialog.value = false
+  })
+}
+
+async function doTransfer() {
+  if (transferForm.value.assignee_id
+    && !transferAgentItems.value.some(a => a.value === Number(transferForm.value.assignee_id))) {
+    errorMsg.value = 'Choisissez un agent membre de l’équipe sélectionnée.'
+
+    return
+  }
+  await runAction(async () => {
+    await $api(`/ticketing/tickets/${id.value}/transfer`, {
+      method: 'POST',
+      body: {
+        ...transferForm.value,
+        support_team_id: transferForm.value.support_team_id ? Number(transferForm.value.support_team_id) : null,
+        assignee_id: transferForm.value.assignee_id ? Number(transferForm.value.assignee_id) : null,
+      },
+    })
+    transferDialog.value = false
+    successMsg.value = 'Ticket transféré'
+  })
+}
+
+async function searchMergeTargets() {
+  const q = mergeSearch.value.trim()
+  if (q.length < 2) {
+    mergeResults.value = []
+
+    return
+  }
+  try {
+    const res = await $api('/ticketing/tickets', { query: { q, per_page: 10 } })
+    mergeResults.value = listItems(res).filter((t: any) => t.id !== id.value)
+  }
+  catch {
+    mergeResults.value = []
+  }
+}
+
+async function doMerge() {
+  if (!mergeTargetId.value)
+    return
+  await runAction(async () => {
+    await $api(`/ticketing/tickets/${id.value}/merge`, {
+      method: 'POST',
+      body: { target_ticket_id: mergeTargetId.value },
+    })
+    mergeDialog.value = false
+    successMsg.value = 'Ticket fusionné'
+    await router.push({ name: 'ticketing-id', params: { id: mergeTargetId.value } })
+  })
+}
+
+async function saveAssets() {
+  await runAction(async () => {
+    await $api(`/ticketing/tickets/${id.value}`, {
+      method: 'PUT',
+      body: { asset_ids: assetIdsForm.value },
+    })
   })
 }
 
@@ -399,28 +640,33 @@ function timelineLabel(event: any) {
         :subtitle="ticket.title"
       >
         <template #actions>
-          <VBtn
+          <VChip
+            :color="ticketStatusColor(ticket.status)"
             variant="tonal"
-            prepend-icon="tabler-refresh"
-            :loading="loading || actionLoading"
-            @click="refresh"
+            size="small"
+            class="me-1"
           >
-            Actualiser
-          </VBtn>
-          <VBtn
+            {{ ticketStatusLabel(ticket.status) }}
+          </VChip>
+          <VChip
+            v-if="ticket.priority"
+            :color="ticketPriorityColor(ticket.priority)"
             variant="tonal"
+            size="small"
+            class="me-2"
+          >
+            {{ ticketPriorityLabel(ticket.priority) }}
+          </VChip>
+
+          <VBtn
+            v-if="canAction('take_charge')"
             color="primary"
             @click="doTakeCharge"
           >
             Prendre en charge
           </VBtn>
           <VBtn
-            variant="tonal"
-            @click="assignDialog = true"
-          >
-            Affecter
-          </VBtn>
-          <VBtn
+            v-if="canAction('resolve')"
             color="success"
             variant="tonal"
             @click="resolveDialog = true"
@@ -428,63 +674,143 @@ function timelineLabel(event: any) {
             Résoudre
           </VBtn>
           <VBtn
+            v-if="canAction('close')"
             color="secondary"
             variant="tonal"
             @click="doClose"
           >
             Clôturer
           </VBtn>
-          <VBtn
-            color="warning"
-            variant="tonal"
-            @click="reopenDialog = true"
-          >
-            Réouvrir
-          </VBtn>
-          <VBtn
-            variant="tonal"
-            color="info"
-            @click="waitDialog = true"
-          >
-            Mettre en attente
-          </VBtn>
-          <VBtn
-            variant="tonal"
-            color="error"
-            @click="escalateDialog = true"
-          >
-            Escalader
-          </VBtn>
-          <VBtn
-            variant="text"
-            color="error"
-            @click="cancelDialog = true"
-          >
-            Annuler
-          </VBtn>
-          <VBtn
-            variant="tonal"
-            :color="ticket.is_major_incident ? 'error' : 'default'"
-            @click="toggleMajorIncident"
-          >
-            {{ ticket.is_major_incident ? 'Retirer incident majeur' : 'Incident majeur' }}
-          </VBtn>
-          <VBtn
-            variant="tonal"
-            @click="problemDialog = true"
-          >
-            Lier problème
-          </VBtn>
-          <VBtn
-            v-if="ticket.resolution_summary || ['RESOLU', 'CLOTURE', 'A_VALIDER'].includes(ticket.status)"
-            variant="tonal"
-            color="success"
-            @click="kbDialog = true"
-          >
-            Capitaliser (KB)
-          </VBtn>
+
+          <VMenu>
+            <template #activator="{ props: menuProps }">
+              <VBtn
+                v-bind="menuProps"
+                variant="tonal"
+                append-icon="tabler-chevron-down"
+              >
+                Actions
+              </VBtn>
+            </template>
+            <VList density="compact">
+              <VListItem
+                prepend-icon="tabler-refresh"
+                title="Actualiser"
+                @click="refresh"
+              />
+              <VListItem
+                v-if="canAction('assign')"
+                prepend-icon="tabler-user-plus"
+                title="Affecter"
+                @click="openAssignDialog"
+              />
+              <VListItem
+                v-if="canAction('transfer')"
+                prepend-icon="tabler-arrows-exchange"
+                title="Transférer"
+                @click="openTransferDialog"
+              />
+              <VListItem
+                v-if="canAction('wait')"
+                prepend-icon="tabler-clock-pause"
+                title="Mettre en attente"
+                @click="waitDialog = true"
+              />
+              <VListItem
+                v-if="canAction('escalate')"
+                prepend-icon="tabler-arrow-up-right"
+                title="Escalader"
+                @click="openEscalateDialog"
+              />
+              <VListItem
+                v-if="canAction('reopen')"
+                prepend-icon="tabler-rotate-clockwise"
+                title="Réouvrir"
+                @click="reopenDialog = true"
+              />
+              <VDivider v-if="canAction('merge') || canAction('link_problem') || canAction('kb') || canAction('major_incident')" />
+              <VListItem
+                v-if="canAction('merge')"
+                prepend-icon="tabler-git-merge"
+                title="Fusionner"
+                @click="mergeDialog = true"
+              />
+              <VListItem
+                v-if="canAction('link_problem')"
+                prepend-icon="tabler-bug"
+                title="Lier à un problème"
+                @click="problemDialog = true"
+              />
+              <VListItem
+                v-if="canAction('kb')"
+                prepend-icon="tabler-book"
+                title="Capitaliser (KB)"
+                @click="kbDialog = true"
+              />
+              <VListItem
+                v-if="canAction('major_incident')"
+                :prepend-icon="ticket.is_major_incident ? 'tabler-alert-triangle-off' : 'tabler-alert-triangle'"
+                :title="ticket.is_major_incident ? 'Retirer incident majeur' : 'Marquer incident majeur'"
+                @click="toggleMajorIncident"
+              />
+              <VDivider v-if="canAction('cancel')" />
+              <VListItem
+                v-if="canAction('cancel')"
+                prepend-icon="tabler-x"
+                title="Annuler le ticket"
+                class="text-error"
+                @click="cancelDialog = true"
+              />
+            </VList>
+          </VMenu>
         </template>
       </ParapheurPageHeader>
+
+      <VAlert
+        v-if="ticket.status === 'EN_ATTENTE_VALIDATION'"
+        type="warning"
+        variant="tonal"
+        class="mb-4"
+      >
+        <div class="d-flex flex-wrap align-center justify-space-between gap-3">
+          <div>
+            <div class="font-weight-medium">
+              En attente d'approbation
+            </div>
+            <div class="text-body-2">
+              Le traitement est bloqué jusqu'à validation.
+            </div>
+          </div>
+          <div
+            v-if="canAction('approve') || canAction('refuse')"
+            class="d-flex flex-wrap align-center gap-2"
+          >
+            <AppTextField
+              v-if="canAction('refuse')"
+              v-model="approvalRefuseReason"
+              label="Motif si refus"
+              hide-details
+              density="compact"
+              style="min-inline-size: 180px"
+            />
+            <VBtn
+              v-if="canAction('approve')"
+              color="success"
+              @click="acceptApproval"
+            >
+              Approuver
+            </VBtn>
+            <VBtn
+              v-if="canAction('refuse')"
+              color="error"
+              variant="tonal"
+              @click="refuseApproval"
+            >
+              Refuser
+            </VBtn>
+          </div>
+        </div>
+      </VAlert>
 
       <VAlert
         v-if="successMsg"
@@ -560,18 +886,27 @@ function timelineLabel(event: any) {
           </VCard>
 
           <VCard>
-            <VTabs v-model="activeTab">
+            <VTabs
+              v-model="activeTab"
+              class="px-2"
+            >
               <VTab value="comments">
-                Commentaires
+                Suivis
+              </VTab>
+              <VTab value="tasks">
+                Tâches
+              </VTab>
+              <VTab value="solutions">
+                Solutions
               </VTab>
               <VTab value="timeline">
-                Chronologie
+                Historique
               </VTab>
               <VTab value="attachments">
-                Pièces jointes
+                Fichiers
               </VTab>
-              <VTab value="worklogs">
-                Temps passé
+              <VTab value="actors">
+                Acteurs
               </VTab>
               <VTab value="relations">
                 Liens
@@ -585,7 +920,6 @@ function timelineLabel(event: any) {
                     v-for="c in comments"
                     :key="c.id"
                     class="mb-4 pa-3 rounded"
-                    :class="c.is_internal ? 'bg-warning-lighten' : 'bg-grey-lighten'"
                     style="background: rgba(var(--v-theme-on-surface), 0.04)"
                   >
                     <div class="d-flex justify-space-between mb-1">
@@ -606,17 +940,20 @@ function timelineLabel(event: any) {
                   </div>
                   <AppTextarea
                     v-model="commentBody"
-                    label="Nouveau commentaire"
+                    label="Nouveau suivi"
                     rows="3"
                     class="mb-2"
                   />
                   <div class="d-flex align-center justify-space-between">
                     <VCheckbox
+                      v-if="canAction('internal_note')"
                       v-model="commentInternal"
                       label="Note interne"
                       hide-details
                     />
+                    <VSpacer v-else />
                     <VBtn
+                      v-if="canAction('comment')"
                       color="primary"
                       :loading="actionLoading"
                       @click="postComment"
@@ -624,6 +961,232 @@ function timelineLabel(event: any) {
                       Publier
                     </VBtn>
                   </div>
+                </VCardText>
+              </VWindowItem>
+
+              <VWindowItem value="tasks">
+                <VCardText>
+                  <div
+                    v-for="task in tasks"
+                    :key="task.id"
+                    class="d-flex align-center justify-space-between mb-3 pa-2 rounded"
+                    style="background: rgba(var(--v-theme-on-surface), 0.04)"
+                  >
+                    <div>
+                      <div class="font-weight-medium">
+                        {{ task.title }}
+                      </div>
+                      <div class="text-caption">
+                        {{ task.status }} — {{ task.assignee?.name || 'Non assigné' }}
+                      </div>
+                    </div>
+                    <div class="d-flex gap-1">
+                      <VBtn
+                        size="x-small"
+                        variant="tonal"
+                        @click="updateTaskStatus(task.id, 'doing')"
+                      >
+                        En cours
+                      </VBtn>
+                      <VBtn
+                        size="x-small"
+                        color="success"
+                        variant="tonal"
+                        @click="updateTaskStatus(task.id, 'done')"
+                      >
+                        Fait
+                      </VBtn>
+                    </div>
+                  </div>
+                  <VDivider class="mb-3" />
+                  <AppTextField
+                    v-model="taskForm.title"
+                    label="Titre de la tâche"
+                    class="mb-2"
+                    hide-details
+                  />
+                  <AppTextarea
+                    v-model="taskForm.content"
+                    label="Contenu"
+                    rows="2"
+                    class="mb-2"
+                    hide-details
+                  />
+                  <VBtn
+                    color="primary"
+                    :loading="actionLoading"
+                    @click="addTask"
+                  >
+                    Ajouter la tâche
+                  </VBtn>
+                </VCardText>
+              </VWindowItem>
+
+              <VWindowItem value="solutions">
+                <VCardText>
+                  <div
+                    v-for="sol in solutions"
+                    :key="sol.id"
+                    class="mb-4 pa-3 rounded"
+                    style="background: rgba(var(--v-theme-on-surface), 0.04)"
+                  >
+                    <div class="d-flex justify-space-between mb-1">
+                      <span class="font-weight-medium">{{ sol.author?.name || '—' }} — {{ sol.solution_type }}</span>
+                      <VChip
+                        size="small"
+                        :color="sol.status === 'accepted' ? 'success' : sol.status === 'refused' ? 'error' : 'warning'"
+                      >
+                        {{ sol.status }}
+                      </VChip>
+                    </div>
+                    <div class="text-body-2 mb-2">
+                      {{ sol.content }}
+                    </div>
+                    <div
+                      v-if="sol.status === 'proposed' && (canAction('accept_solution') || canAction('refuse_solution') || canAction('close'))"
+                      class="d-flex flex-wrap gap-2 align-center"
+                    >
+                      <VBtn
+                        v-if="canAction('accept_solution') || canAction('close')"
+                        size="small"
+                        color="success"
+                        @click="acceptSolution(sol.id)"
+                      >
+                        Accepter
+                      </VBtn>
+                      <AppTextField
+                        v-if="canAction('refuse_solution') || canAction('reopen')"
+                        v-model="solutionRefuseReason"
+                        label="Motif refus"
+                        hide-details
+                        density="compact"
+                        style="min-inline-size: 200px"
+                      />
+                      <VBtn
+                        v-if="canAction('refuse_solution') || canAction('reopen')"
+                        size="small"
+                        color="error"
+                        variant="tonal"
+                        @click="refuseSolution(sol.id)"
+                      >
+                        Refuser
+                      </VBtn>
+                    </div>
+                  </div>
+                  <div
+                    v-if="!solutions.length"
+                    class="text-medium-emphasis"
+                  >
+                    Aucune solution proposée.
+                  </div>
+                </VCardText>
+              </VWindowItem>
+
+              <VWindowItem value="actors">
+                <VCardText>
+                  <div
+                    v-for="a in actors"
+                    :key="`${a.role}-${a.user_id}`"
+                    class="mb-2"
+                  >
+                    <VChip
+                      size="small"
+                      class="me-2"
+                    >
+                      {{ a.role }}
+                    </VChip>
+                    {{ a.user?.name || a.user_id }}
+                  </div>
+                  <VDivider class="my-4" />
+                  <AppSelect
+                    v-model="observerIds"
+                    :items="userItems"
+                    label="Observateurs"
+                    multiple
+                    chips
+                    clearable
+                    class="mb-3"
+                    hide-details
+                  />
+                  <VBtn
+                    color="primary"
+                    :loading="actionLoading"
+                    @click="saveObservers"
+                  >
+                    Enregistrer observateurs
+                  </VBtn>
+                </VCardText>
+              </VWindowItem>
+
+              <VWindowItem value="elements">
+                <VCardText>
+                  <div class="mb-3">
+                    <div class="text-caption text-medium-emphasis mb-1">
+                      Application
+                    </div>
+                    <div>{{ ticket.application ? `${ticket.application.code} — ${ticket.application.name}` : '—' }}</div>
+                  </div>
+                  <AppSelect
+                    v-model="assetIdsForm"
+                    :items="assets.map(a => ({
+                      value: a.id,
+                      title: a.inventory_number ? `${a.name} (${a.inventory_number})` : a.name,
+                    }))"
+                    label="Actifs liés"
+                    multiple
+                    chips
+                    clearable
+                    class="mb-3"
+                    hide-details
+                  />
+                  <div
+                    v-if="ticket.location_label"
+                    class="mb-3"
+                  >
+                    <div class="text-caption text-medium-emphasis">
+                      Lieu
+                    </div>
+                    <div>{{ ticket.location_label }}</div>
+                  </div>
+                  <VBtn
+                    color="primary"
+                    :loading="actionLoading"
+                    @click="saveAssets"
+                  >
+                    Enregistrer les éléments
+                  </VBtn>
+                </VCardText>
+              </VWindowItem>
+
+              <VWindowItem value="knowledge">
+                <VCardText>
+                  <div
+                    v-for="art in linkedKnowledge"
+                    :key="art.id"
+                    class="mb-3"
+                  >
+                    <RouterLink
+                      :to="{ name: 'ticketing-connaissances-id', params: { id: art.id } }"
+                      class="font-weight-medium text-primary"
+                    >
+                      {{ art.title }}
+                    </RouterLink>
+                    <div class="text-caption">
+                      {{ art.summary || '' }}
+                    </div>
+                  </div>
+                  <div
+                    v-if="!linkedKnowledge.length"
+                    class="text-medium-emphasis mb-3"
+                  >
+                    Aucun article lié. Utilisez « Capitaliser en KB » après résolution.
+                  </div>
+                  <VBtn
+                    variant="tonal"
+                    :to="{ name: 'ticketing-connaissances' }"
+                  >
+                    Parcourir la base
+                  </VBtn>
                 </VCardText>
               </VWindowItem>
 
@@ -760,6 +1323,42 @@ function timelineLabel(event: any) {
                       </VBtn>
                     </VCol>
                   </VRow>
+                </VCardText>
+              </VWindowItem>
+
+              <VWindowItem value="costs">
+                <VCardText>
+                  <div class="text-subtitle-2 mb-3">
+                    Total : {{ costsTotal }} XOF
+                  </div>
+                  <div
+                    v-for="cost in costs"
+                    :key="cost.id"
+                    class="mb-2"
+                  >
+                    {{ cost.name }} — {{ cost.amount }} {{ cost.currency }}
+                  </div>
+                  <VDivider class="my-3" />
+                  <AppTextField
+                    v-model="costForm.name"
+                    label="Libellé"
+                    class="mb-2"
+                    hide-details
+                  />
+                  <AppTextField
+                    v-model.number="costForm.amount"
+                    type="number"
+                    label="Montant"
+                    class="mb-2"
+                    hide-details
+                  />
+                  <VBtn
+                    color="primary"
+                    :loading="actionLoading"
+                    @click="addCost"
+                  >
+                    Ajouter un coût
+                  </VBtn>
                 </VCardText>
               </VWindowItem>
 
@@ -1064,9 +1663,12 @@ function timelineLabel(event: any) {
           />
           <AppSelect
             v-model="assignForm.assignee_id"
-            :items="userItems"
+            :items="assignAgentItems"
             label="Agent"
             clearable
+            :disabled="!assignForm.support_team_id"
+            :hint="assignForm.support_team_id && !assignAgentItems.length ? 'Aucun membre dans cette équipe.' : undefined"
+            :persistent-hint="Boolean(assignForm.support_team_id && !assignAgentItems.length)"
             class="mb-3"
           />
           <AppTextField
@@ -1088,6 +1690,101 @@ function timelineLabel(event: any) {
             @click="doAssign"
           >
             Affecter
+          </VBtn>
+        </VCardActions>
+      </VCard>
+    </VDialog>
+
+    <VDialog
+      v-model="transferDialog"
+      max-width="480"
+    >
+      <VCard>
+        <VCardTitle>Transférer</VCardTitle>
+        <VCardText>
+          <AppSelect
+            v-model="transferForm.support_team_id"
+            :items="teamItems"
+            label="Équipe cible"
+            clearable
+            class="mb-3"
+          />
+          <AppSelect
+            v-model="transferForm.assignee_id"
+            :items="transferAgentItems"
+            label="Agent cible"
+            clearable
+            :disabled="!transferForm.support_team_id"
+            :hint="transferForm.support_team_id && !transferAgentItems.length ? 'Aucun membre dans cette équipe.' : undefined"
+            :persistent-hint="Boolean(transferForm.support_team_id && !transferAgentItems.length)"
+            class="mb-3"
+          />
+          <AppTextField
+            v-model="transferForm.comment"
+            label="Motif du transfert"
+          />
+        </VCardText>
+        <VCardActions>
+          <VSpacer />
+          <VBtn
+            variant="text"
+            @click="transferDialog = false"
+          >
+            Annuler
+          </VBtn>
+          <VBtn
+            color="primary"
+            :loading="actionLoading"
+            @click="doTransfer"
+          >
+            Transférer
+          </VBtn>
+        </VCardActions>
+      </VCard>
+    </VDialog>
+
+    <VDialog
+      v-model="mergeDialog"
+      max-width="520"
+    >
+      <VCard>
+        <VCardTitle>Fusionner dans un autre ticket</VCardTitle>
+        <VCardText>
+          <AppTextField
+            v-model="mergeSearch"
+            label="Rechercher le ticket cible"
+            class="mb-3"
+            hide-details
+            @update:model-value="searchMergeTargets"
+          />
+          <AppSelect
+            v-model="mergeTargetId"
+            :items="mergeResults.map((t: any) => ({
+              value: t.id,
+              title: `${formatTicketNumber(t.number)} — ${t.title}`,
+            }))"
+            label="Ticket cible"
+            clearable
+          />
+          <div class="text-caption text-medium-emphasis mt-2">
+            Ce ticket sera clôturé et marqué comme doublon du ticket cible.
+          </div>
+        </VCardText>
+        <VCardActions>
+          <VSpacer />
+          <VBtn
+            variant="text"
+            @click="mergeDialog = false"
+          >
+            Annuler
+          </VBtn>
+          <VBtn
+            color="error"
+            :loading="actionLoading"
+            :disabled="!mergeTargetId"
+            @click="doMerge"
+          >
+            Fusionner
           </VBtn>
         </VCardActions>
       </VCard>
@@ -1150,9 +1847,12 @@ function timelineLabel(event: any) {
           />
           <AppSelect
             v-model="escalateForm.to_user_id"
-            :items="userItems"
+            :items="escalateAgentItems"
             label="Agent cible"
             clearable
+            :disabled="!escalateForm.to_team_id"
+            :hint="escalateForm.to_team_id && !escalateAgentItems.length ? 'Aucun membre dans cette équipe.' : undefined"
+            :persistent-hint="Boolean(escalateForm.to_team_id && !escalateAgentItems.length)"
             class="mb-3"
           />
           <AppTextarea

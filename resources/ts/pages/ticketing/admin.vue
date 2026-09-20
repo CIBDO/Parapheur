@@ -549,6 +549,20 @@ const dialogTitle = computed(() => {
       <VCard>
         <VCardTitle>Membres — {{ selectedTeam?.name }}</VCardTitle>
         <VCardText>
+          <VAlert
+            type="info"
+            variant="tonal"
+            density="compact"
+            class="mb-4"
+          >
+            Un utilisateur doit être membre d’une équipe pour apparaître dans les listes Agent à la création ou à l’affectation.
+          </VAlert>
+          <div
+            v-if="!(selectedTeam?.members || []).length"
+            class="text-body-2 text-medium-emphasis mb-4"
+          >
+            Aucun membre pour le moment.
+          </div>
           <div
             v-for="m in (selectedTeam?.members || [])"
             :key="m.id"

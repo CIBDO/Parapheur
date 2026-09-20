@@ -5,8 +5,10 @@ namespace App\Http\Controllers\Api\Ticketing;
 use App\Enums\TicketStatus;
 use App\Http\Controllers\Controller;
 use App\Models\Ticket;
+use App\Services\Ticketing\TicketApprovalService;
 use App\Services\Ticketing\TicketAssignmentService;
 use App\Services\Ticketing\TicketEscalationService;
+use App\Services\Ticketing\TicketRelationService;
 use App\Services\Ticketing\TicketService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -18,6 +20,8 @@ class TicketActionController extends Controller
         private readonly TicketService $tickets,
         private readonly TicketAssignmentService $assignments,
         private readonly TicketEscalationService $escalations,
+        private readonly TicketRelationService $relations,
+        private readonly TicketApprovalService $approvals,
     ) {}
 
     public function assign(Request $request, Ticket $ticket): JsonResponse
@@ -210,5 +214,84 @@ class TicketActionController extends Controller
         );
 
         return response()->json($row, 201);
+    }
+
+    public function transfer(Request $request, Ticket $ticket): JsonResponse
+    {
+        $this->authorize('assign', $ticket);
+
+        $validated = $request->validate([
+            'support_team_id' => 'nullable|exists:support_teams,id',
+            'assignee_id' => 'nullable|exists:users,id',
+            'comment' => 'nullable|string|max:2000',
+        ]);
+
+        try {
+            $fresh = $this->assignments->transfer(
+                $ticket,
+                $request->user(),
+                $validated['support_team_id'] ?? null,
+                $validated['assignee_id'] ?? null,
+                $validated['comment'] ?? null,
+            );
+        } catch (InvalidArgumentException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+
+        return response()->json($fresh);
+    }
+
+    public function merge(Request $request, Ticket $ticket): JsonResponse
+    {
+        $this->authorize('update', $ticket);
+
+        $validated = $request->validate([
+            'target_ticket_id' => 'required|exists:tickets,id',
+        ]);
+
+        $target = Ticket::query()->findOrFail($validated['target_ticket_id']);
+        $this->authorize('update', $target);
+
+        try {
+            $fresh = $this->relations->merge($ticket, $target, $request->user());
+        } catch (InvalidArgumentException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+
+        return response()->json($fresh);
+    }
+
+    public function acceptApproval(Request $request, Ticket $ticket): JsonResponse
+    {
+        $this->authorize('update', $ticket);
+
+        $validated = $request->validate([
+            'comment' => 'nullable|string|max:2000',
+        ]);
+
+        try {
+            $fresh = $this->approvals->accept($ticket, $request->user(), $validated['comment'] ?? null);
+        } catch (InvalidArgumentException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+
+        return response()->json($fresh);
+    }
+
+    public function refuseApproval(Request $request, Ticket $ticket): JsonResponse
+    {
+        $this->authorize('update', $ticket);
+
+        $validated = $request->validate([
+            'reason' => 'required|string|max:2000',
+        ]);
+
+        try {
+            $fresh = $this->approvals->refuse($ticket, $request->user(), $validated['reason']);
+        } catch (InvalidArgumentException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+
+        return response()->json($fresh);
     }
 }

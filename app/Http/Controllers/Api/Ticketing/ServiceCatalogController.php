@@ -48,6 +48,7 @@ class ServiceCatalogController extends Controller
             'ticketType:id,code,name',
             'ticketCategory:id,code,name',
             'supportTeam:id,code,name',
+            'supportTeam.members.user:id,name',
             'slaPolicy:id,code,name',
             'defaultPriority:id,code,name,level',
         ]);

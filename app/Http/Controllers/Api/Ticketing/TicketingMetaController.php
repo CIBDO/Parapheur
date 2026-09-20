@@ -35,7 +35,11 @@ class TicketingMetaController extends Controller
             'impacts' => TicketImpactLevel::query()->where('is_active', true)->orderBy('sort_order')->get(['id', 'code', 'name', 'level', 'sort_order']),
             'urgencies' => TicketUrgencyLevel::query()->where('is_active', true)->orderBy('sort_order')->get(['id', 'code', 'name', 'level', 'sort_order']),
             'channels' => TicketChannel::query()->where('is_active', true)->orderBy('sort_order')->get(['id', 'code', 'name', 'sort_order']),
-            'teams' => SupportTeam::query()->where('is_active', true)->orderBy('name')->get(['id', 'code', 'name']),
+            'teams' => SupportTeam::query()
+                ->where('is_active', true)
+                ->orderBy('name')
+                ->with(['members.user:id,name'])
+                ->get(['id', 'code', 'name']),
             'statuses' => TicketStatusRef::query()->where('is_active', true)->orderBy('sort_order')->get(['id', 'code', 'name', 'pauses_sla', 'sort_order']),
             'tags' => TicketTag::query()->where('is_active', true)->orderBy('name')->get(['id', 'code', 'name', 'color']),
             'catalog' => ServiceCatalog::query()
