@@ -95,6 +95,7 @@ declare global {
   const formatDateFr: typeof import('./resources/ts/utils/parapheurUi')['formatDateFr']
   const formatDateTimeFr: typeof import('./resources/ts/utils/parapheurUi')['formatDateTimeFr']
   const formatDateToMonthShort: typeof import('./resources/ts/@core/utils/formatters')['formatDateToMonthShort']
+  const formatTaskDue: typeof import('./resources/ts/utils/tasksUi')['formatTaskDue']
   const formatTicketDate: typeof import('./resources/ts/utils/ticketingUi')['formatTicketDate']
   const formatTicketDateTime: typeof import('./resources/ts/utils/ticketingUi')['formatTicketDateTime']
   const formatTicketNumber: typeof import('./resources/ts/utils/ticketingUi')['formatTicketNumber']
@@ -124,6 +125,7 @@ declare global {
   const ignorableWatch: typeof import('@vueuse/core')['ignorableWatch']
   const inject: typeof import('vue')['inject']
   const injectLocal: typeof import('@vueuse/core')['injectLocal']
+  const instructionStatusLabels: typeof import('./resources/ts/utils/tasksUi')['instructionStatusLabels']
   const integerValidator: typeof import('./resources/ts/@core/utils/validators')['integerValidator']
   const isDefined: typeof import('@vueuse/core')['isDefined']
   const isEmpty: typeof import('./resources/ts/@core/utils/helpers')['isEmpty']
@@ -229,6 +231,10 @@ declare global {
   const storeToRefs: typeof import('pinia')['storeToRefs']
   const syncRef: typeof import('@vueuse/core')['syncRef']
   const syncRefs: typeof import('@vueuse/core')['syncRefs']
+  const taskPriorityColor: typeof import('./resources/ts/utils/tasksUi')['taskPriorityColor']
+  const taskPriorityLabels: typeof import('./resources/ts/utils/tasksUi')['taskPriorityLabels']
+  const taskStatusColor: typeof import('./resources/ts/utils/tasksUi')['taskStatusColor']
+  const taskStatusLabels: typeof import('./resources/ts/utils/tasksUi')['taskStatusLabels']
   const teamAgentSelectItems: typeof import('./resources/ts/utils/ticketingUi')['teamAgentSelectItems']
   const templateCategoryLabels: typeof import('./resources/ts/utils/courrierUi')['templateCategoryLabels']
   const templateRef: typeof import('@vueuse/core')['templateRef']
@@ -367,6 +373,7 @@ declare global {
   const useMouseInElement: typeof import('@vueuse/core')['useMouseInElement']
   const useMousePressed: typeof import('@vueuse/core')['useMousePressed']
   const useMutationObserver: typeof import('@vueuse/core')['useMutationObserver']
+  const useMyWork: typeof import('./resources/ts/composables/useMyWork')['useMyWork']
   const useNavigatorLanguage: typeof import('@vueuse/core')['useNavigatorLanguage']
   const useNetwork: typeof import('@vueuse/core')['useNetwork']
   const useNow: typeof import('@vueuse/core')['useNow']
@@ -416,6 +423,7 @@ declare global {
   const useSum: typeof import('@vueuse/math')['useSum']
   const useSupported: typeof import('@vueuse/core')['useSupported']
   const useSwipe: typeof import('@vueuse/core')['useSwipe']
+  const useTasks: typeof import('./resources/ts/composables/useTasks')['useTasks']
   const useTemplateRef: typeof import('vue')['useTemplateRef']
   const useTemplateRefsList: typeof import('@vueuse/core')['useTemplateRefsList']
   const useTextDirection: typeof import('@vueuse/core')['useTextDirection']
@@ -565,6 +573,7 @@ declare module 'vue' {
     readonly formatDateFr: UnwrapRef<typeof import('./resources/ts/utils/parapheurUi')['formatDateFr']>
     readonly formatDateTimeFr: UnwrapRef<typeof import('./resources/ts/utils/parapheurUi')['formatDateTimeFr']>
     readonly formatDateToMonthShort: UnwrapRef<typeof import('./resources/ts/@core/utils/formatters')['formatDateToMonthShort']>
+    readonly formatTaskDue: UnwrapRef<typeof import('./resources/ts/utils/tasksUi')['formatTaskDue']>
     readonly formatTicketDate: UnwrapRef<typeof import('./resources/ts/utils/ticketingUi')['formatTicketDate']>
     readonly formatTicketDateTime: UnwrapRef<typeof import('./resources/ts/utils/ticketingUi')['formatTicketDateTime']>
     readonly formatTicketNumber: UnwrapRef<typeof import('./resources/ts/utils/ticketingUi')['formatTicketNumber']>
@@ -587,6 +596,7 @@ declare module 'vue' {
     readonly ignorableWatch: UnwrapRef<typeof import('@vueuse/core')['ignorableWatch']>
     readonly inject: UnwrapRef<typeof import('vue')['inject']>
     readonly injectLocal: UnwrapRef<typeof import('@vueuse/core')['injectLocal']>
+    readonly instructionStatusLabels: UnwrapRef<typeof import('./resources/ts/utils/tasksUi')['instructionStatusLabels']>
     readonly integerValidator: UnwrapRef<typeof import('./resources/ts/@core/utils/validators')['integerValidator']>
     readonly isDefined: UnwrapRef<typeof import('@vueuse/core')['isDefined']>
     readonly isEmpty: UnwrapRef<typeof import('./resources/ts/@core/utils/helpers')['isEmpty']>
@@ -693,6 +703,10 @@ declare module 'vue' {
     readonly storeToRefs: UnwrapRef<typeof import('pinia')['storeToRefs']>
     readonly syncRef: UnwrapRef<typeof import('@vueuse/core')['syncRef']>
     readonly syncRefs: UnwrapRef<typeof import('@vueuse/core')['syncRefs']>
+    readonly taskPriorityColor: UnwrapRef<typeof import('./resources/ts/utils/tasksUi')['taskPriorityColor']>
+    readonly taskPriorityLabels: UnwrapRef<typeof import('./resources/ts/utils/tasksUi')['taskPriorityLabels']>
+    readonly taskStatusColor: UnwrapRef<typeof import('./resources/ts/utils/tasksUi')['taskStatusColor']>
+    readonly taskStatusLabels: UnwrapRef<typeof import('./resources/ts/utils/tasksUi')['taskStatusLabels']>
     readonly teamAgentSelectItems: UnwrapRef<typeof import('./resources/ts/utils/ticketingUi')['teamAgentSelectItems']>
     readonly templateRef: UnwrapRef<typeof import('@vueuse/core')['templateRef']>
     readonly throttledRef: UnwrapRef<typeof import('@vueuse/core')['throttledRef']>
@@ -830,6 +844,7 @@ declare module 'vue' {
     readonly useMouseInElement: UnwrapRef<typeof import('@vueuse/core')['useMouseInElement']>
     readonly useMousePressed: UnwrapRef<typeof import('@vueuse/core')['useMousePressed']>
     readonly useMutationObserver: UnwrapRef<typeof import('@vueuse/core')['useMutationObserver']>
+    readonly useMyWork: UnwrapRef<typeof import('./resources/ts/composables/useMyWork')['useMyWork']>
     readonly useNavigatorLanguage: UnwrapRef<typeof import('@vueuse/core')['useNavigatorLanguage']>
     readonly useNetwork: UnwrapRef<typeof import('@vueuse/core')['useNetwork']>
     readonly useNow: UnwrapRef<typeof import('@vueuse/core')['useNow']>
@@ -879,6 +894,7 @@ declare module 'vue' {
     readonly useSum: UnwrapRef<typeof import('@vueuse/math')['useSum']>
     readonly useSupported: UnwrapRef<typeof import('@vueuse/core')['useSupported']>
     readonly useSwipe: UnwrapRef<typeof import('@vueuse/core')['useSwipe']>
+    readonly useTasks: UnwrapRef<typeof import('./resources/ts/composables/useTasks')['useTasks']>
     readonly useTemplateRef: UnwrapRef<typeof import('vue')['useTemplateRef']>
     readonly useTemplateRefsList: UnwrapRef<typeof import('@vueuse/core')['useTemplateRefsList']>
     readonly useTextDirection: UnwrapRef<typeof import('@vueuse/core')['useTextDirection']>

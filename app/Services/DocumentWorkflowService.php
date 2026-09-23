@@ -916,6 +916,7 @@ class DocumentWorkflowService
             throw new InvalidArgumentException('Document figé : instruction impossible.');
         }
         $instruction = Instruction::query()->create([
+            'reference' => app(NumberingService::class)->nextNumber(\App\Enums\NumberingSequenceCode::Instruction),
             'document_id' => $document->id,
             'issuer_id' => $issuer->id,
             'assignee_id' => $assignee->id,
@@ -923,8 +924,20 @@ class DocumentWorkflowService
             'title' => $data['title'] ?? 'Instruction DG',
             'body' => $data['body'] ?? $comment->body,
             'priority' => $data['priority'] ?? 'importante',
+            'source_kind' => \App\Enums\TaskSource::Parapheur->value,
+            'source_type' => Document::class,
+            'source_id' => $document->id,
             'status' => 'a_faire',
             'due_date' => $data['due_date'] ?? null,
+        ]);
+
+        app(\App\Services\Tasks\InstructionService::class)->addExecutionTask($issuer, $instruction, [
+            'title' => $instruction->title,
+            'description' => $instruction->body,
+            'assignee_id' => $assignee->id,
+            'structure_id' => $instruction->structure_id,
+            'priority' => $instruction->priority?->value ?? 'importante',
+            'due_at' => $instruction->due_date?->endOfDay(),
         ]);
 
         $comment->update(['is_instruction_source' => true]);

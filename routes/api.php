@@ -58,6 +58,8 @@ use App\Http\Controllers\Api\DelegationController;
 use App\Http\Controllers\Api\DocumentController;
 use App\Http\Controllers\Api\DocumentTypeController;
 use App\Http\Controllers\Api\InstructionController;
+use App\Http\Controllers\Api\MyWorkController;
+use App\Http\Controllers\Api\TaskController;
 use App\Http\Controllers\Api\MeetingAgendaController;
 use App\Http\Controllers\Api\MeetingController;
 use App\Http\Controllers\Api\MeetingDecisionController;
@@ -233,8 +235,43 @@ Route::middleware(['auth:sanctum', 'password.changed'])->group(function () {
     Route::post('/parapheur/documents/{document}/onlyoffice/restore/{versionNumber}', [OnlyOfficeController::class, 'restore'])
         ->whereNumber('versionNumber');
 
+    Route::get('/my-work', [MyWorkController::class, 'index']);
+
+    Route::get('/tasks/dashboard', [TaskController::class, 'dashboard']);
+    Route::get('/tasks', [TaskController::class, 'index']);
+    Route::post('/tasks', [TaskController::class, 'store']);
+    Route::get('/tasks/{task}', [TaskController::class, 'show']);
+    Route::put('/tasks/{task}', [TaskController::class, 'update']);
+    Route::post('/tasks/{task}/publish', [TaskController::class, 'publish']);
+    Route::post('/tasks/{task}/assign', [TaskController::class, 'assign']);
+    Route::post('/tasks/{task}/reassign', [TaskController::class, 'reassign']);
+    Route::post('/tasks/{task}/take-charge', [TaskController::class, 'takeCharge']);
+    Route::post('/tasks/{task}/start', [TaskController::class, 'start']);
+    Route::post('/tasks/{task}/wait', [TaskController::class, 'wait']);
+    Route::post('/tasks/{task}/complete', [TaskController::class, 'complete']);
+    Route::post('/tasks/{task}/validate', [TaskController::class, 'validateTask']);
+    Route::post('/tasks/{task}/return', [TaskController::class, 'returnTask']);
+    Route::post('/tasks/{task}/cancel', [TaskController::class, 'cancel']);
+    Route::post('/tasks/{task}/comments', [TaskController::class, 'comments']);
+    Route::post('/tasks/{task}/subtasks', [TaskController::class, 'subtasks']);
+    Route::post('/tasks/{task}/attachments', [TaskController::class, 'attachments']);
+    Route::get('/tasks/{task}/attachments/{attachment}/download', [TaskController::class, 'downloadAttachment']);
+    Route::get('/tasks/{task}/history', [TaskController::class, 'history']);
+    Route::get('/tasks/{task}/dependencies', [TaskController::class, 'dependencies']);
+    Route::post('/tasks/{task}/dependencies', [TaskController::class, 'addDependency']);
+    Route::delete('/tasks/{task}/dependencies/{dependency}', [TaskController::class, 'removeDependency']);
+    Route::get('/tasks/{task}/documents', [TaskController::class, 'documents']);
+    Route::post('/tasks/{task}/documents/link', [TaskController::class, 'linkDocument']);
+    Route::post('/tasks/{task}/documents/office', [TaskController::class, 'createOfficeDocument']);
+    Route::post('/tasks/{task}/documents/from-template', [TaskController::class, 'createFromTemplate']);
+    Route::post('/tasks/{task}/documents/{taskDocument}/submit-ged', [TaskController::class, 'submitDocumentToGed']);
+    Route::delete('/tasks/{task}/documents/{taskDocument}', [TaskController::class, 'unlinkDocument']);
+
     Route::get('/instructions', [InstructionController::class, 'index']);
+    Route::post('/instructions', [InstructionController::class, 'store']);
+    Route::get('/instructions/{instruction}', [InstructionController::class, 'show']);
     Route::patch('/instructions/{instruction}/status', [InstructionController::class, 'updateStatus']);
+    Route::post('/instructions/{instruction}/tasks', [InstructionController::class, 'addTask']);
 
     Route::get('/delegations', [DelegationController::class, 'index']);
     Route::post('/delegations', [DelegationController::class, 'store']);

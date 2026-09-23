@@ -22,6 +22,8 @@ class NumberingService
         'AR' => ['correspondence_acknowledgements', 'number'],
         'TCK' => ['tickets', 'number'],
         'PRB' => ['problems', 'number'],
+        'TSK' => ['tasks', 'reference'],
+        'INS' => ['instructions', 'reference'],
     ];
 
     /**

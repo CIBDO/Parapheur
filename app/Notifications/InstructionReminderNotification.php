@@ -23,7 +23,7 @@ class InstructionReminderNotification extends Notification
     {
         $url = $this->instruction->document_id
             ? url('/parapheur/'.$this->instruction->document_id)
-            : url('/parapheur/instructions');
+            : url('/taches/instructions');
 
         $due = optional($this->instruction->due_date)->format('d/m/Y') ?: 'non renseignée';
 
@@ -49,7 +49,7 @@ class InstructionReminderNotification extends Notification
             'document_id' => $this->instruction->document_id,
             'url' => $this->instruction->document_id
                 ? '/parapheur/'.$this->instruction->document_id
-                : '/parapheur/instructions',
+                : '/taches/instructions',
         ];
     }
 }

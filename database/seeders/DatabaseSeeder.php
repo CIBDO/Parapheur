@@ -31,6 +31,28 @@ class DatabaseSeeder extends Seeder
             'dashboard.dg',
             'dashboard.direction',
             'instructions.manage',
+            'task.view',
+            'task.create',
+            'task.update',
+            'task.assign',
+            'task.reassign',
+            'task.take_charge',
+            'task.comment',
+            'task.complete',
+            'task.validate',
+            'task.return',
+            'task.cancel',
+            'task.view_team',
+            'task.view_all',
+            'task.view_reports',
+            'task.manage',
+            'task.audit.view',
+            'instruction.view',
+            'instruction.create',
+            'instruction.assign',
+            'instruction.update',
+            'instruction.close',
+            'instruction.cancel',
             'ged.view',
             'ged.search',
             'ged.create',
@@ -200,6 +222,19 @@ class DatabaseSeeder extends Seeder
             'problem.close', 'knowledge.create', 'knowledge.review', 'knowledge.publish',
         ]);
 
+        $taskBasic = [
+            'task.view', 'task.create', 'task.update', 'task.take_charge', 'task.comment',
+            'task.complete', 'instruction.view',
+        ];
+        $taskLead = array_merge($taskBasic, [
+            'task.assign', 'task.reassign', 'task.validate', 'task.return', 'task.cancel',
+            'task.view_team', 'task.view_reports',
+            'instruction.create', 'instruction.assign', 'instruction.update', 'instruction.close',
+        ]);
+        $taskAdmin = array_merge($taskLead, [
+            'task.view_all', 'task.manage', 'task.audit.view', 'instructions.manage', 'instruction.cancel',
+        ]);
+
         $appointmentManage = [
             'appointments.view',
             'appointments.create',
@@ -231,7 +266,8 @@ class DatabaseSeeder extends Seeder
                 $workspaceManage,
                 $appointmentManage,
                 $mailAdmin,
-                $ticketAdmin
+                $ticketAdmin,
+                $taskAdmin
             ),
             'DGA' => array_merge(
                 ['documents.create', 'documents.act', 'documents.vise', 'documents.validate', 'dashboard.dg', 'instructions.manage', 'meetings.manage', 'reporting.view'],
@@ -239,14 +275,16 @@ class DatabaseSeeder extends Seeder
                 $workspaceManage,
                 ['appointments.view', 'appointments.create', 'appointments.view_calendar', 'appointments.validate', 'appointments.manage_notes'],
                 $mailManage,
-                $ticketLead
+                $ticketLead,
+                $taskAdmin
             ),
             'Conseiller' => array_merge(
                 ['documents.create', 'documents.act', 'reporting.view', 'meetings.view', 'appointments.view', 'appointments.create', 'appointments.view_calendar'],
                 $gedBasic,
                 $workspaceBasic,
                 $mailBasic,
-                $ticketBasic
+                $ticketBasic,
+                $taskBasic
             ),
             'Secrétariat DG' => array_merge(
                 ['documents.create', 'documents.act', 'meetings.manage', 'meetings.view', 'meetings.create', 'meetings.take_official_notes', 'meetings.generate_minutes', 'reporting.view'],
@@ -254,42 +292,48 @@ class DatabaseSeeder extends Seeder
                 $workspaceManage,
                 $appointmentManage,
                 $mailAdmin,
-                $ticketLead
+                $ticketLead,
+                $taskLead
             ),
             'Directeur' => array_merge(
                 ['documents.create', 'documents.act', 'documents.vise', 'documents.validate', 'dashboard.direction', 'reporting.view', 'meetings.manage', 'meetings.view', 'appointments.view', 'appointments.create', 'appointments.view_calendar'],
                 $gedManage,
                 $workspaceBasic,
                 $mailManage,
-                $ticketLead
+                $ticketLead,
+                $taskLead
             ),
             'Chef de division' => array_merge(
                 ['documents.create', 'documents.act', 'meetings.view', 'appointments.view', 'appointments.create'],
                 $gedBasic,
                 $workspaceBasic,
                 $mailBasic,
-                $ticketAgent
+                $ticketAgent,
+                $taskLead
             ),
             'Chef de section' => array_merge(
                 ['documents.create', 'documents.act', 'meetings.view', 'appointments.view', 'appointments.create'],
                 $gedBasic,
                 $workspaceBasic,
                 $mailBasic,
-                $ticketAgent
+                $ticketAgent,
+                $taskBasic
             ),
             'Agent' => array_merge(
                 ['documents.create', 'documents.act', 'meetings.view', 'appointments.view', 'appointments.create'],
                 $gedBasic,
                 $workspaceBasic,
                 $mailBasic,
-                $ticketAgent
+                $ticketAgent,
+                $taskBasic
             ),
             'Lecteur' => array_merge(
                 ['meetings.view', 'appointments.view', 'appointments.view_calendar'],
                 ['ged.view', 'ged.search', 'ged.download'],
                 ['workspace.access', 'library.access'],
                 ['mail.view'],
-                ['ticket.view', 'knowledge.view']
+                ['ticket.view', 'knowledge.view'],
+                ['task.view', 'instruction.view']
             ),
         ];
 

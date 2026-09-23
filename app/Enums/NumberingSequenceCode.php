@@ -12,6 +12,8 @@ enum NumberingSequenceCode: string
     case Acknowledgement = 'AR';
     case Ticket = 'TCK';
     case Problem = 'PRB';
+    case Task = 'TSK';
+    case Instruction = 'INS';
 
     public function label(): string
     {
@@ -24,6 +26,8 @@ enum NumberingSequenceCode: string
             self::Acknowledgement => 'Accusé de réception',
             self::Ticket => 'Ticket',
             self::Problem => 'Problème',
+            self::Task => 'Tâche',
+            self::Instruction => 'Instruction',
         };
     }
 

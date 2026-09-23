@@ -122,9 +122,28 @@ class User extends Authenticatable
             $rules[] = ['action' => 'read', 'subject' => 'DashboardDirection'];
         }
 
-        if ($this->can('instructions.manage')) {
+        if ($this->can('instructions.manage') || $this->can('instruction.view') || $this->can('instruction.create')) {
             $rules[] = ['action' => 'manage', 'subject' => 'Instruction'];
             $rules[] = ['action' => 'read', 'subject' => 'Instruction'];
+            $rules[] = ['action' => 'create', 'subject' => 'Instruction'];
+        }
+
+        if ($this->can('task.view') || $this->can('task.view_all') || $this->can('task.view_team') || $this->can('task.manage')) {
+            $rules[] = ['action' => 'read', 'subject' => 'Task'];
+            $rules[] = ['action' => 'read', 'subject' => 'MyWork'];
+        }
+
+        if ($this->can('task.create') || $this->can('task.manage')) {
+            $rules[] = ['action' => 'create', 'subject' => 'Task'];
+        }
+
+        if ($this->can('task.update') || $this->can('task.assign') || $this->can('task.take_charge') || $this->can('task.manage')) {
+            $rules[] = ['action' => 'update', 'subject' => 'Task'];
+            $rules[] = ['action' => 'manage', 'subject' => 'Task'];
+        }
+
+        if ($this->can('task.validate') || $this->can('task.manage')) {
+            $rules[] = ['action' => 'validate', 'subject' => 'Task'];
         }
 
         if ($this->can('meetings.view') || $this->can('meetings.manage') || $this->can('meetings.create')) {

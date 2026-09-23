@@ -11,6 +11,8 @@ export type Subjects =
   | 'DashboardDg'
   | 'DashboardDirection'
   | 'Instruction'
+  | 'Task'
+  | 'MyWork'
   | 'Meeting'
   | 'MeetingType'
   | 'MeetingTemplate'

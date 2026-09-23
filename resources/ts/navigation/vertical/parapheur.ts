@@ -1,6 +1,63 @@
 export default [
   { heading: 'E-Tresor' },
   {
+    title: 'Mon Travail',
+    icon: { icon: 'tabler-layout-dashboard' },
+    to: 'mon-travail',
+    action: 'read',
+    subject: 'MyWork',
+  },
+  {
+    title: 'Tâches & Instructions',
+    icon: { icon: 'tabler-checkbox' },
+    action: 'read',
+    subject: 'Task',
+    children: [
+      {
+        title: 'Mes tâches',
+        icon: { icon: 'tabler-user-check' },
+        to: 'taches',
+        action: 'read',
+        subject: 'Task',
+      },
+      {
+        title: 'Imputées par moi',
+        icon: { icon: 'tabler-send' },
+        to: { name: 'taches', query: { view: 'assigned' } },
+        action: 'read',
+        subject: 'Task',
+      },
+      {
+        title: 'À valider',
+        icon: { icon: 'tabler-checks' },
+        to: { name: 'taches', query: { view: 'validate' } },
+        action: 'validate',
+        subject: 'Task',
+      },
+      {
+        title: 'En retard',
+        icon: { icon: 'tabler-alert-triangle' },
+        to: { name: 'taches', query: { view: 'overdue' } },
+        action: 'read',
+        subject: 'Task',
+      },
+      {
+        title: 'Instructions',
+        icon: { icon: 'tabler-list-check' },
+        to: 'taches-instructions',
+        action: 'read',
+        subject: 'Instruction',
+      },
+      {
+        title: 'Nouvelle tâche',
+        icon: { icon: 'tabler-plus' },
+        to: 'taches-nouvelle',
+        action: 'create',
+        subject: 'Task',
+      },
+    ],
+  },
+  {
     title: 'Mon parapheur',
     icon: { icon: 'tabler-briefcase' },
     to: 'parapheur',
@@ -27,13 +84,6 @@ export default [
     to: 'parapheur-admin',
     action: 'manage',
     subject: 'all',
-  },
-  {
-    title: 'Instructions',
-    icon: { icon: 'tabler-list-check' },
-    to: 'parapheur-instructions',
-    action: 'manage',
-    subject: 'Instruction',
   },
   {
     title: 'Réunions',

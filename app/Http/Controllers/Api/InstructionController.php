@@ -4,66 +4,88 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Instruction;
+use App\Services\Tasks\InstructionService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
 class InstructionController extends Controller
 {
+    public function __construct(
+        private readonly InstructionService $instructions,
+    ) {}
+
     public function index(Request $request): JsonResponse
     {
-        $query = Instruction::query()->with(['assignee', 'issuer', 'document', 'structure']);
+        $this->authorize('viewAny', Instruction::class);
 
-        if ($request->filled('status')) {
-            $query->where('status', $request->string('status'));
-        }
+        return response()->json($this->instructions->list($request->user(), $request->all()));
+    }
 
-        if ($request->boolean('mine')) {
-            $query->where('assignee_id', $request->user()->id);
-        }
+    public function store(Request $request): JsonResponse
+    {
+        $this->authorize('create', Instruction::class);
 
-        return response()->json($query->orderByDesc('created_at')->paginate(20));
+        $data = $request->validate([
+            'title' => ['required', 'string', 'max:255'],
+            'body' => ['nullable', 'string'],
+            'assignee_id' => ['required', 'exists:users,id'],
+            'structure_id' => ['nullable', 'exists:structures,id'],
+            'priority' => ['nullable', 'string'],
+            'confidentiality' => ['nullable', 'string'],
+            'due_date' => ['nullable', 'date'],
+            'create_execution_task' => ['nullable', 'boolean'],
+            'source_kind' => ['nullable', 'string'],
+        ]);
+
+        $instruction = $this->instructions->create($request->user(), $data);
+
+        return response()->json($instruction, 201);
+    }
+
+    public function show(Request $request, Instruction $instruction): JsonResponse
+    {
+        $this->authorize('view', $instruction);
+
+        return response()->json($instruction->load([
+            'assignee:id,name',
+            'issuer:id,name',
+            'structure:id,code,name',
+            'document:id,reference',
+            'tasks.assignee:id,name',
+            'updates.user:id,name',
+            'recipients',
+        ]));
     }
 
     public function updateStatus(Request $request, Instruction $instruction): JsonResponse
     {
+        $this->authorize('update', $instruction);
+
         $data = $request->validate([
-            'status' => ['required', Rule::in(['a_faire', 'en_cours', 'executee', 'cloturee'])],
+            'status' => ['required', Rule::in(['brouillon', 'a_faire', 'en_cours', 'executee', 'cloturee', 'annulee'])],
             'body' => ['nullable', 'string'],
         ]);
 
-        $instruction->status = $data['status'];
-        if ($data['status'] === 'executee') {
-            $instruction->completed_at = now();
-        }
-        if ($data['status'] === 'cloturee') {
-            $instruction->closed_at = now();
-        }
-        $instruction->save();
+        return response()->json(
+            $this->instructions->updateStatus($request->user(), $instruction, $data['status'], $data['body'] ?? null)
+        );
+    }
 
-        if ($instruction->meeting_decision_id && $data['status'] === 'executee') {
-            $instruction->meetingDecision?->update([
-                'status' => 'executee',
-                'executed_at' => now(),
-                'execution_declared_by' => $request->user()->id,
-            ]);
-        }
-        if ($instruction->meeting_decision_id && $data['status'] === 'cloturee') {
-            $instruction->meetingDecision?->update([
-                'status' => 'cloturee',
-                'execution_validated_by' => $request->user()->id,
-                'execution_validated_at' => now(),
-            ]);
-        }
+    public function addTask(Request $request, Instruction $instruction): JsonResponse
+    {
+        $this->authorize('assign', $instruction);
 
-        if (! empty($data['body'])) {
-            $instruction->updates()->create([
-                'user_id' => $request->user()->id,
-                'status' => $data['status'],
-                'body' => $data['body'],
-            ]);
-        }
+        $data = $request->validate([
+            'title' => ['required', 'string', 'max:255'],
+            'description' => ['nullable', 'string'],
+            'assignee_id' => ['required', 'exists:users,id'],
+            'due_at' => ['nullable', 'date'],
+            'priority' => ['nullable', 'string'],
+        ]);
 
-        return response()->json($instruction->fresh(['updates.user', 'assignee']));
+        $task = $this->instructions->addExecutionTask($request->user(), $instruction, $data);
+
+        return response()->json($task, 201);
     }
 }

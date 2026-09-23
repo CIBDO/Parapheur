@@ -12,6 +12,7 @@ class TicketTask extends Model
         'created_by',
         'assignee_id',
         'instruction_id',
+        'task_id',
         'title',
         'content',
         'status',
@@ -53,5 +54,10 @@ class TicketTask extends Model
     public function instruction(): BelongsTo
     {
         return $this->belongsTo(Instruction::class);
+    }
+
+    public function task(): BelongsTo
+    {
+        return $this->belongsTo(Task::class);
     }
 }

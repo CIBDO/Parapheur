@@ -22,6 +22,7 @@ use App\Models\Instruction;
 use App\Models\Meeting;
 use App\Models\User;
 use App\Notifications\AppointmentNotification;
+use App\Services\NumberingService;
 use Carbon\Carbon;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
@@ -521,17 +522,29 @@ class AppointmentService
                 'created_by' => $actor->id,
             ]);
 
-            if ($kind === AppointmentFollowupKind::Instruction) {
+            if ($kind === AppointmentFollowupKind::Instruction && ! empty($data['assignee_id'])) {
                 $instruction = Instruction::query()->create([
+                    'reference' => app(NumberingService::class)->nextNumber(\App\Enums\NumberingSequenceCode::Instruction),
                     'document_id' => $appointment->linked_document_id,
                     'issuer_id' => $actor->id,
-                    'assignee_id' => $data['assignee_id'] ?? null,
+                    'assignee_id' => $data['assignee_id'],
                     'structure_id' => $data['structure_id'] ?? $appointment->structure_id,
                     'title' => $data['title'] ?? ('Suite RDV '.$appointment->reference),
                     'body' => $data['description'] ?? $appointment->result_summary ?? $appointment->subject,
                     'priority' => $data['priority'] ?? $appointment->priority?->value ?? 'normale',
+                    'source_kind' => \App\Enums\TaskSource::Appointment->value,
+                    'source_type' => Appointment::class,
+                    'source_id' => $appointment->id,
                     'status' => 'a_faire',
                     'due_date' => $data['due_date'] ?? null,
+                ]);
+                app(\App\Services\Tasks\InstructionService::class)->addExecutionTask($actor, $instruction, [
+                    'title' => $instruction->title,
+                    'description' => $instruction->body,
+                    'assignee_id' => $instruction->assignee_id,
+                    'structure_id' => $instruction->structure_id,
+                    'priority' => $instruction->priority?->value ?? 'normale',
+                    'due_at' => $instruction->due_date?->endOfDay(),
                 ]);
                 $followup->update(['instruction_id' => $instruction->id]);
                 $this->audit->log('appointment.instruction_created', $appointment, ['instruction_id' => $instruction->id]);

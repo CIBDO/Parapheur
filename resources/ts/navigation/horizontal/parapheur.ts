@@ -1,5 +1,38 @@
 export default [
   {
+    title: 'Mon Travail',
+    icon: { icon: 'tabler-layout-dashboard' },
+    to: 'mon-travail',
+    action: 'read',
+    subject: 'MyWork',
+  },
+  {
+    title: 'Tâches',
+    icon: { icon: 'tabler-checkbox' },
+    action: 'read',
+    subject: 'Task',
+    children: [
+      {
+        title: 'Mes tâches',
+        to: 'taches',
+        action: 'read',
+        subject: 'Task',
+      },
+      {
+        title: 'Instructions',
+        to: 'taches-instructions',
+        action: 'read',
+        subject: 'Instruction',
+      },
+      {
+        title: 'Nouvelle tâche',
+        to: 'taches-nouvelle',
+        action: 'create',
+        subject: 'Task',
+      },
+    ],
+  },
+  {
     title: 'Parapheur',
     icon: { icon: 'tabler-briefcase' },
     children: [
@@ -16,13 +49,6 @@ export default [
         to: 'parapheur-nouveau',
         action: 'create',
         subject: 'Document',
-      },
-      {
-        title: 'Instructions',
-        icon: { icon: 'tabler-list-check' },
-        to: 'parapheur-instructions',
-        action: 'manage',
-        subject: 'Instruction',
       },
     ],
   },

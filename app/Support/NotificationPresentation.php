@@ -33,6 +33,15 @@ final class NotificationPresentation
 
         return match (true) {
             str_contains($url, '/espace/collaboratifs') || isset($data['workspace_id']) => 'tabler-users-group',
+            str_contains($url, '/taches') || isset($data['task_id']) => match ($event) {
+                'assigned', 'reassigned' => 'tabler-user-check',
+                'taken_charge' => 'tabler-hand-click',
+                'completed', 'validated' => 'tabler-circle-check',
+                'returned', 'cancelled' => 'tabler-arrow-back-up',
+                'comment' => 'tabler-message',
+                'reminder', 'validation_requested' => 'tabler-bell-ringing',
+                default => 'tabler-checkbox',
+            },
             str_contains($url, '/ticketing') || isset($data['ticket_id']) => match ($event) {
                 'created' => 'tabler-ticket',
                 'assigned', 'transferred' => 'tabler-user-check',

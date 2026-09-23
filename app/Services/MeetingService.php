@@ -441,6 +441,7 @@ class MeetingService
     public function createInstructionFromDecision(User $actor, MeetingDecision $decision, array $data = []): Instruction
     {
         $instruction = Instruction::query()->create([
+            'reference' => app(NumberingService::class)->nextNumber(\App\Enums\NumberingSequenceCode::Instruction),
             'meeting_decision_id' => $decision->id,
             'issuer_id' => $actor->id,
             'assignee_id' => $data['assignee_id'] ?? $decision->assignee_id,
@@ -448,9 +449,23 @@ class MeetingService
             'title' => $data['title'] ?? $decision->title,
             'body' => $data['body'] ?? $decision->body ?? $decision->title,
             'priority' => $data['priority'] ?? $decision->priority?->value ?? 'normale',
+            'source_kind' => \App\Enums\TaskSource::Decision->value,
+            'source_type' => MeetingDecision::class,
+            'source_id' => $decision->id,
             'status' => 'a_faire',
             'due_date' => $data['due_date'] ?? $decision->due_date,
         ]);
+
+        if ($instruction->assignee_id) {
+            app(\App\Services\Tasks\InstructionService::class)->addExecutionTask($actor, $instruction, [
+                'title' => $instruction->title,
+                'description' => $instruction->body,
+                'assignee_id' => $instruction->assignee_id,
+                'structure_id' => $instruction->structure_id,
+                'priority' => $instruction->priority?->value ?? 'normale',
+                'due_at' => $instruction->due_date?->endOfDay(),
+            ]);
+        }
 
         $this->audit->log('instruction.created', $instruction, ['from' => 'meeting_decision']);
 

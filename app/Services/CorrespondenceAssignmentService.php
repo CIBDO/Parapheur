@@ -57,14 +57,30 @@ class CorrespondenceAssignmentService
                 // Créer une Instruction si du texte d'instruction est fourni
                 if (! empty($assignmentData['instruction_text']) && $toUserId) {
                     $instruction = Instruction::query()->create([
+                        'reference' => app(NumberingService::class)->nextNumber(\App\Enums\NumberingSequenceCode::Instruction),
                         'issuer_id' => $fromUser->id,
                         'assignee_id' => $toUserId,
                         'structure_id' => $toStructureId,
                         'title' => 'Instruction pour courrier : '.$correspondence->subject,
                         'body' => $assignmentData['instruction_text'],
                         'priority' => $correspondence->priority?->value ?? 'normale',
+                        'source_kind' => \App\Enums\TaskSource::Courrier->value,
+                        'source_type' => Correspondence::class,
+                        'source_id' => $correspondence->id,
                         'status' => 'a_faire',
                         'due_date' => $assignmentData['due_date'] ?? null,
+                    ]);
+
+                    app(\App\Services\Tasks\InstructionService::class)->addExecutionTask($fromUser, $instruction, [
+                        'title' => $instruction->title,
+                        'description' => $instruction->body,
+                        'assignee_id' => $toUserId,
+                        'structure_id' => $toStructureId,
+                        'priority' => $instruction->priority?->value ?? 'normale',
+                        'due_at' => $instruction->due_date?->endOfDay(),
+                        'source_kind' => \App\Enums\TaskSource::Courrier->value,
+                        'source_type' => Correspondence::class,
+                        'source_id' => $correspondence->id,
                     ]);
 
                     $assignment->instruction_id = $instruction->id;
