@@ -22,6 +22,7 @@ const loading = ref(true)
 const acting = ref(false)
 const instruction = ref<any>(null)
 const showAddTask = ref(false)
+const activeTab = ref('tasks')
 const users = ref<{ id: number; name: string }[]>([])
 const taskForm = ref({
   title: '',
@@ -32,6 +33,23 @@ const taskForm = ref({
 })
 
 const id = computed(() => String(route.params.id))
+
+const isOverdue = computed(() => {
+  if (!instruction.value?.due_date || ['executee', 'cloturee', 'annulee'].includes(instruction.value.status))
+    return false
+
+  return instruction.value.is_overdue || new Date(instruction.value.due_date) < new Date()
+})
+
+const tasksCount = computed(() => (instruction.value?.tasks || []).length)
+const updatesCount = computed(() => (instruction.value?.updates || []).length)
+
+const statusActions = [
+  { value: 'a_faire', label: 'À faire', icon: 'tabler-clipboard-list', color: 'secondary' },
+  { value: 'en_cours', label: 'En cours', icon: 'tabler-player-play', color: 'info' },
+  { value: 'executee', label: 'Exécutée', icon: 'tabler-circle-check', color: 'success' },
+  { value: 'cloturee', label: 'Clôturer', icon: 'tabler-lock', color: 'primary' },
+] as const
 
 const load = async () => {
   loading.value = true
@@ -75,6 +93,7 @@ const addTask = async () => {
     showAddTask.value = false
     taskForm.value = { title: '', description: '', assignee_id: null, due_at: '', priority: 'normale' }
     await load()
+    activeTab.value = 'tasks'
   }
   finally {
     acting.value = false
@@ -87,7 +106,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div>
+  <div class="instruction-detail">
     <ParapheurPageHeader
       :title="instruction?.title || 'Instruction'"
       :subtitle="instruction?.reference || 'Fiche instruction'"
@@ -96,8 +115,17 @@ onMounted(async () => {
       <template #actions>
         <VBtn
           variant="tonal"
+          color="primary"
+          prepend-icon="tabler-refresh"
+          :loading="loading"
+          @click="load"
+        >
+          Actualiser
+        </VBtn>
+        <VBtn
+          variant="tonal"
           prepend-icon="tabler-arrow-left"
-          @click="router.push('/taches/instructions')"
+          @click="router.push({ name: 'taches-instructions' })"
         >
           Retour
         </VBtn>
@@ -112,28 +140,36 @@ onMounted(async () => {
     </ParapheurPageHeader>
 
     <div
-      v-if="loading"
-      class="text-center py-10"
+      v-if="loading && !instruction"
+      class="text-center py-12"
     >
       <VProgressCircular indeterminate />
     </div>
 
     <template v-else-if="instruction">
-      <VRow>
+      <VAlert
+        v-if="isOverdue"
+        type="error"
+        variant="tonal"
+        class="mb-4"
+        density="comfortable"
+        icon="tabler-alert-triangle"
+      >
+        Échéance dépassée — {{ formatTaskDue(instruction.due_date) }}
+      </VAlert>
+
+      <VRow dense>
         <VCol
           cols="12"
-          md="8"
+          lg="8"
         >
           <VCard class="mb-4">
-            <VCardItem>
-              <VCardTitle>Synthèse</VCardTitle>
-            </VCardItem>
-            <VDivider />
-            <VCardText>
+            <VCardText class="pa-5">
               <div class="d-flex flex-wrap gap-2 mb-4">
                 <VChip
                   size="small"
-                  color="primary"
+                  :color="isOverdue ? 'error' : 'primary'"
+                  variant="flat"
                 >
                   {{ instructionStatusLabels[instruction.status] || instruction.status }}
                 </VChip>
@@ -145,124 +181,370 @@ onMounted(async () => {
                   {{ taskPriorityLabels[instruction.priority] || instruction.priority }}
                 </VChip>
                 <VChip
-                  v-if="instruction.is_overdue || (instruction.due_date && new Date(instruction.due_date) < new Date())"
+                  v-if="instruction.due_date"
+                  size="small"
+                  :color="isOverdue ? 'error' : 'default'"
+                  variant="tonal"
+                  prepend-icon="tabler-calendar-event"
+                >
+                  {{ formatTaskDue(instruction.due_date) }}
+                </VChip>
+                <VChip
+                  v-if="isOverdue"
                   size="small"
                   color="error"
+                  variant="tonal"
                 >
                   En retard
                 </VChip>
               </div>
-              <p class="text-body-1 whitespace-pre-wrap">
-                {{ instruction.body || 'Pas de contenu détaillé.' }}
-              </p>
+
+              <div class="text-body-1 text-high-emphasis mb-1">
+                Contenu
+              </div>
+              <div
+                class="text-body-2"
+                :class="{ 'text-medium-emphasis': !instruction.body }"
+                style="white-space: pre-wrap"
+              >
+                {{ instruction.body || 'Aucun contenu détaillé.' }}
+              </div>
+            </VCardText>
+
+            <VDivider />
+
+            <VCardText class="d-flex flex-wrap gap-2 py-3">
+              <VBtn
+                v-for="s in statusActions"
+                :key="s.value"
+                size="small"
+                :variant="instruction.status === s.value ? 'flat' : 'tonal'"
+                :color="instruction.status === s.value ? s.color : 'default'"
+                :prepend-icon="s.icon"
+                :loading="acting"
+                :disabled="acting || instruction.status === s.value"
+                @click="setStatus(s.value)"
+              >
+                {{ s.label }}
+              </VBtn>
             </VCardText>
           </VCard>
 
-          <VCard class="mb-4">
-            <VCardItem>
-              <VCardTitle>Tâches d’exécution</VCardTitle>
-            </VCardItem>
-            <VDivider />
-            <VList lines="two">
-              <VListItem
-                v-for="t in (instruction.tasks || [])"
-                :key="t.id"
-                :title="t.title"
-                :subtitle="t.reference"
-                @click="router.push(`/taches/${t.id}`)"
-              >
-                <template #append>
-                  <div class="text-end">
-                    <VChip
-                      size="small"
-                      :color="taskStatusColor(t.status)"
-                      class="mb-1"
-                    >
-                      {{ taskStatusLabels[t.status] || t.status }}
-                    </VChip>
-                    <div class="text-caption">
-                      {{ t.assignee?.name || '—' }} · {{ formatTaskDue(t.due_at) }}
-                    </div>
-                  </div>
-                </template>
-              </VListItem>
-              <VListItem v-if="!(instruction.tasks || []).length">
-                <VListItemTitle class="text-medium-emphasis">
-                  Aucune tâche liée
-                </VListItemTitle>
-              </VListItem>
-            </VList>
-          </VCard>
-
           <VCard>
-            <VCardItem>
-              <VCardTitle>Historique</VCardTitle>
-            </VCardItem>
+            <VTabs
+              v-model="activeTab"
+              density="comfortable"
+              color="primary"
+              class="px-2"
+            >
+              <VTab value="tasks">
+                <VIcon
+                  start
+                  icon="tabler-checkbox"
+                />
+                Tâches d’exécution
+                <VChip
+                  v-if="tasksCount"
+                  class="ms-2"
+                  size="x-small"
+                  color="primary"
+                  variant="tonal"
+                >
+                  {{ tasksCount }}
+                </VChip>
+              </VTab>
+              <VTab value="updates">
+                <VIcon
+                  start
+                  icon="tabler-history"
+                />
+                Historique
+                <VChip
+                  v-if="updatesCount"
+                  class="ms-2"
+                  size="x-small"
+                  color="primary"
+                  variant="tonal"
+                >
+                  {{ updatesCount }}
+                </VChip>
+              </VTab>
+            </VTabs>
+
             <VDivider />
-            <VList>
-              <VListItem
-                v-for="u in (instruction.updates || [])"
-                :key="u.id"
-                :title="u.body || u.status || 'Mise à jour'"
-                :subtitle="`${u.user?.name || 'Système'} · ${u.created_at ? new Date(u.created_at).toLocaleString('fr-FR') : ''}`"
-              />
-              <VListItem v-if="!(instruction.updates || []).length">
-                <VListItemTitle class="text-medium-emphasis">
-                  Aucune mise à jour
-                </VListItemTitle>
-              </VListItem>
-            </VList>
+
+            <VWindow v-model="activeTab">
+              <VWindowItem value="tasks">
+                <div
+                  v-if="!(instruction.tasks || []).length"
+                  class="text-center py-10 text-medium-emphasis"
+                >
+                  <VIcon
+                    icon="tabler-clipboard-off"
+                    size="40"
+                    class="mb-2"
+                  />
+                  <div class="mb-1">
+                    Aucune tâche liée
+                  </div>
+                  <div class="text-caption mb-4">
+                    Créez une tâche d’exécution pour suivre le travail demandé.
+                  </div>
+                  <VBtn
+                    size="small"
+                    color="primary"
+                    prepend-icon="tabler-plus"
+                    @click="showAddTask = true"
+                  >
+                    Ajouter une tâche
+                  </VBtn>
+                </div>
+
+                <VList
+                  v-else
+                  lines="two"
+                >
+                  <VListItem
+                    v-for="t in (instruction.tasks || [])"
+                    :key="t.id"
+                    class="cursor-pointer"
+                    @click="router.push(`/taches/${t.id}`)"
+                  >
+                    <template #prepend>
+                      <VAvatar
+                        :color="taskStatusColor(t.status)"
+                        variant="tonal"
+                        rounded
+                        size="40"
+                      >
+                        <VIcon
+                          icon="tabler-checkbox"
+                          size="20"
+                        />
+                      </VAvatar>
+                    </template>
+                    <VListItemTitle class="font-weight-medium">
+                      {{ t.title }}
+                    </VListItemTitle>
+                    <VListItemSubtitle>
+                      {{ t.reference || `#${t.id}` }}
+                      · {{ t.assignee?.name || 'Non affectée' }}
+                      · {{ formatTaskDue(t.due_at) }}
+                    </VListItemSubtitle>
+                    <template #append>
+                      <VChip
+                        size="small"
+                        :color="taskStatusColor(t.status)"
+                        variant="tonal"
+                      >
+                        {{ taskStatusLabels[t.status] || t.status }}
+                      </VChip>
+                    </template>
+                  </VListItem>
+                </VList>
+
+                <template v-if="(instruction.tasks || []).length">
+                  <VDivider />
+                  <VCardText class="d-flex justify-end">
+                    <VBtn
+                      size="small"
+                      color="primary"
+                      prepend-icon="tabler-plus"
+                      @click="showAddTask = true"
+                    >
+                      Ajouter une tâche
+                    </VBtn>
+                  </VCardText>
+                </template>
+              </VWindowItem>
+
+              <VWindowItem value="updates">
+                <div
+                  v-if="!(instruction.updates || []).length"
+                  class="text-center py-10 text-medium-emphasis"
+                >
+                  <VIcon
+                    icon="tabler-clock-off"
+                    size="40"
+                    class="mb-2"
+                  />
+                  <div>Aucune mise à jour</div>
+                </div>
+                <VTimeline
+                  v-else
+                  density="compact"
+                  side="end"
+                  class="pa-5"
+                >
+                  <VTimelineItem
+                    v-for="u in (instruction.updates || [])"
+                    :key="u.id"
+                    size="x-small"
+                    dot-color="primary"
+                  >
+                    <div class="text-body-2 font-weight-medium">
+                      {{ u.body || instructionStatusLabels[u.status] || u.status || 'Mise à jour' }}
+                    </div>
+                    <div class="text-caption text-medium-emphasis">
+                      {{ u.user?.name || 'Système' }}
+                      <span v-if="u.created_at">
+                        · {{ new Date(u.created_at).toLocaleString('fr-FR') }}
+                      </span>
+                    </div>
+                  </VTimelineItem>
+                </VTimeline>
+              </VWindowItem>
+            </VWindow>
           </VCard>
         </VCol>
 
         <VCol
           cols="12"
-          md="4"
+          lg="4"
         >
           <VCard class="mb-4">
-            <VCardItem><VCardTitle>Acteurs</VCardTitle></VCardItem>
+            <VCardItem>
+              <template #prepend>
+                <VAvatar
+                  color="info"
+                  variant="tonal"
+                  rounded
+                  size="36"
+                >
+                  <VIcon
+                    icon="tabler-users"
+                    size="20"
+                  />
+                </VAvatar>
+              </template>
+              <VCardTitle class="text-h6">
+                Acteurs
+              </VCardTitle>
+              <VCardSubtitle>
+                Émetteur et destinataire
+              </VCardSubtitle>
+            </VCardItem>
+            <VDivider />
+            <VList density="comfortable">
+              <VListItem>
+                <template #prepend>
+                  <VIcon
+                    icon="tabler-user-up"
+                    size="20"
+                    class="me-2 text-medium-emphasis"
+                  />
+                </template>
+                <VListItemTitle class="text-caption text-medium-emphasis">
+                  Émetteur
+                </VListItemTitle>
+                <VListItemSubtitle class="text-body-2 text-high-emphasis">
+                  {{ instruction.issuer?.name || '—' }}
+                </VListItemSubtitle>
+              </VListItem>
+              <VListItem>
+                <template #prepend>
+                  <VIcon
+                    icon="tabler-user-check"
+                    size="20"
+                    class="me-2 text-medium-emphasis"
+                  />
+                </template>
+                <VListItemTitle class="text-caption text-medium-emphasis">
+                  Destinataire
+                </VListItemTitle>
+                <VListItemSubtitle class="text-body-2 text-high-emphasis">
+                  {{ instruction.assignee?.name || '—' }}
+                </VListItemSubtitle>
+              </VListItem>
+              <VListItem>
+                <template #prepend>
+                  <VIcon
+                    icon="tabler-building"
+                    size="20"
+                    class="me-2 text-medium-emphasis"
+                  />
+                </template>
+                <VListItemTitle class="text-caption text-medium-emphasis">
+                  Structure
+                </VListItemTitle>
+                <VListItemSubtitle class="text-body-2 text-high-emphasis">
+                  {{ instruction.structure?.name || '—' }}
+                </VListItemSubtitle>
+              </VListItem>
+              <VListItem>
+                <template #prepend>
+                  <VIcon
+                    icon="tabler-calendar-event"
+                    size="20"
+                    class="me-2 text-medium-emphasis"
+                  />
+                </template>
+                <VListItemTitle class="text-caption text-medium-emphasis">
+                  Échéance
+                </VListItemTitle>
+                <VListItemSubtitle
+                  class="text-body-2"
+                  :class="isOverdue ? 'text-error' : 'text-high-emphasis'"
+                >
+                  {{ formatTaskDue(instruction.due_date) }}
+                </VListItemSubtitle>
+              </VListItem>
+            </VList>
+          </VCard>
+
+          <VCard class="mb-4">
+            <VCardItem>
+              <template #prepend>
+                <VAvatar
+                  color="primary"
+                  variant="tonal"
+                  rounded
+                  size="36"
+                >
+                  <VIcon
+                    icon="tabler-flag"
+                    size="20"
+                  />
+                </VAvatar>
+              </template>
+              <VCardTitle class="text-h6">
+                Statut actuel
+              </VCardTitle>
+            </VCardItem>
             <VDivider />
             <VCardText>
-              <div class="mb-2">
-                <div class="text-caption text-medium-emphasis">
-                  Émetteur
-                </div>
-                <div>{{ instruction.issuer?.name || '—' }}</div>
-              </div>
-              <div class="mb-2">
-                <div class="text-caption text-medium-emphasis">
-                  Destinataire
-                </div>
-                <div>{{ instruction.assignee?.name || '—' }}</div>
-              </div>
-              <div class="mb-2">
-                <div class="text-caption text-medium-emphasis">
-                  Structure
-                </div>
-                <div>{{ instruction.structure?.name || '—' }}</div>
-              </div>
-              <div>
-                <div class="text-caption text-medium-emphasis">
-                  Échéance
-                </div>
-                <div>{{ formatTaskDue(instruction.due_date) }}</div>
+              <VChip
+                :color="isOverdue ? 'error' : 'primary'"
+                variant="tonal"
+                class="mb-3"
+              >
+                {{ instructionStatusLabels[instruction.status] || instruction.status }}
+              </VChip>
+              <div class="text-caption text-medium-emphasis">
+                Utilisez la barre d’actions de la fiche pour faire évoluer le statut.
               </div>
             </VCardText>
           </VCard>
 
           <VCard>
-            <VCardItem><VCardTitle>Statut</VCardTitle></VCardItem>
-            <VDivider />
-            <VCardText class="d-flex flex-column gap-2">
-              <VBtn
-                v-for="s in ['a_faire', 'en_cours', 'executee', 'cloturee']"
-                :key="s"
-                variant="tonal"
-                :disabled="acting || instruction.status === s"
-                @click="setStatus(s)"
-              >
-                {{ instructionStatusLabels[s] }}
-              </VBtn>
+            <VCardText class="d-flex justify-space-between py-3">
+              <div class="text-center flex-grow-1">
+                <div class="text-h6">
+                  {{ tasksCount }}
+                </div>
+                <div class="text-caption text-medium-emphasis">
+                  Tâches
+                </div>
+              </div>
+              <VDivider vertical />
+              <div class="text-center flex-grow-1">
+                <div class="text-h6">
+                  {{ updatesCount }}
+                </div>
+                <div class="text-caption text-medium-emphasis">
+                  Mises à jour
+                </div>
+              </div>
             </VCardText>
           </VCard>
         </VCol>
@@ -275,22 +557,40 @@ onMounted(async () => {
     >
       <VCard>
         <VCardItem>
+          <template #prepend>
+            <VAvatar
+              color="primary"
+              variant="tonal"
+              rounded
+              size="40"
+            >
+              <VIcon
+                icon="tabler-plus"
+                size="22"
+              />
+            </VAvatar>
+          </template>
           <VCardTitle>Nouvelle tâche d’exécution</VCardTitle>
+          <VCardSubtitle>
+            Rattachée à cette instruction
+          </VCardSubtitle>
         </VCardItem>
+        <VDivider />
         <VCardText>
           <AppTextField
             v-model="taskForm.title"
-            label="Objet"
+            label="Objet *"
             class="mb-3"
           />
           <AppTextarea
             v-model="taskForm.description"
             label="Description"
+            rows="3"
             class="mb-3"
           />
           <AppSelect
             v-model="taskForm.assignee_id"
-            label="Responsable"
+            label="Responsable *"
             :items="users.map(u => ({ title: u.name, value: u.id }))"
             class="mb-3"
           />
@@ -306,10 +606,10 @@ onMounted(async () => {
             type="date"
           />
         </VCardText>
-        <VCardActions>
+        <VCardActions class="pa-4">
           <VSpacer />
           <VBtn
-            variant="text"
+            variant="tonal"
             @click="showAddTask = false"
           >
             Annuler
