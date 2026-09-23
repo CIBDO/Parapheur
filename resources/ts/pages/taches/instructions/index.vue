@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import ParapheurPageHeader from '@/components/parapheur/ParapheurPageHeader.vue'
+import UserAutocomplete from '@/components/common/UserAutocomplete.vue'
 import {
   formatTaskDue,
   instructionStatusLabels,
@@ -279,13 +280,11 @@ onMounted(async () => {
             label="Contenu"
             rows="3"
           />
-          <AppSelect
+          <UserAutocomplete
             v-model="form.assignee_id"
             class="mb-3"
             label="Destinataire *"
             :items="users"
-            item-title="name"
-            item-value="id"
           />
           <AppTextField
             v-model="form.due_date"

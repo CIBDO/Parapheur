@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import OnlyOfficeEditor from '@/components/parapheur/OnlyOfficeEditor.vue'
+import UserAutocomplete from '@/components/common/UserAutocomplete.vue'
 
 const route = useRoute('parapheur-id')
 const ability = useAbility()
@@ -1329,12 +1330,10 @@ const circuitSteps = computed(() => {
               label="Mode"
               class="mb-3"
             />
-            <AppSelect
+            <UserAutocomplete
               v-if="transmitForm.intent === 'reassign' || transmitForm.mode === 'libre'"
               v-model="transmitForm.to_user_id"
               :items="users"
-              item-title="name"
-              item-value="id"
               label="Destinataire"
               class="mb-3"
             />
@@ -1419,11 +1418,9 @@ const circuitSteps = computed(() => {
               label="Instruction"
               class="mb-3"
             />
-            <AppSelect
+            <UserAutocomplete
               v-model="instructionForm.assignee_id"
               :items="users"
-              item-title="name"
-              item-value="id"
               label="Responsable"
               class="mb-3"
             />

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import ParapheurPageHeader from '@/components/parapheur/ParapheurPageHeader.vue'
+import UserAutocomplete from '@/components/common/UserAutocomplete.vue'
 import { formatDateFr } from '@/utils/parapheurUi'
 
 definePage({
@@ -130,12 +131,11 @@ onMounted(load)
             cols="12"
             md="4"
           >
-            <AppSelect
+            <UserAutocomplete
               v-model="form.delegate_id"
               :items="users"
-              item-title="name"
-              item-value="id"
               label="Bénéficiaire *"
+              placeholder="Rechercher un agent…"
             />
           </VCol>
           <VCol

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import ParapheurPageHeader from '@/components/parapheur/ParapheurPageHeader.vue'
+import UserAutocomplete from '@/components/common/UserAutocomplete.vue'
 
 definePage({
   meta: {
@@ -77,12 +78,11 @@ onMounted(load)
             cols="12"
             md="3"
           >
-            <VSelect
+            <UserAutocomplete
               v-model="form.user_id"
               :items="users"
-              item-title="name"
-              item-value="id"
               label="Directeur / agent"
+              placeholder="Rechercher…"
             />
           </VCol>
           <VCol

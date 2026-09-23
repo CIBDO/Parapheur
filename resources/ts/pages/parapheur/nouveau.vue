@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import ParapheurPageHeader from '@/components/parapheur/ParapheurPageHeader.vue'
+import UserAutocomplete from '@/components/common/UserAutocomplete.vue'
 import {
   confidentialityOptions,
   expectedActionOptions,
@@ -396,18 +397,15 @@ const submit = async () => {
               cols="12"
               md="6"
             >
-              <AppSelect
+              <UserAutocomplete
                 v-model="form.transmit_to_ids"
                 :items="users"
-                item-title="name"
-                item-value="id"
                 label="Transmettre à"
+                placeholder="Rechercher un destinataire…"
                 hint="Plusieurs destinataires possibles (traitement en parallèle)"
                 persistent-hint
                 multiple
                 chips
-                closable-chips
-                clearable
               />
             </VCol>
             <VCol

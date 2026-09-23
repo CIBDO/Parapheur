@@ -24,6 +24,7 @@ import {
   detailRouteName,
 } from '@/utils/courrierUi'
 import OnlyOfficeEditor from '@/components/parapheur/OnlyOfficeEditor.vue'
+import UserAutocomplete from '@/components/common/UserAutocomplete.vue'
 import { $api } from '@/utils/api'
 
 interface Props {
@@ -2142,13 +2143,12 @@ async function archiveCorrespondence() {
     >
       <VCard :title="`Affecter — ${formatCorrespondenceNumber(correspondence)}`">
         <VCardText>
-          <AppSelect
+          <UserAutocomplete
             v-model="assignForm.to_user_id"
             class="mb-3"
             :items="users"
-            item-title="name"
-            item-value="id"
             label="Agent destinataire *"
+            placeholder="Rechercher un agent…"
           />
           <AppTextField
             v-model="assignForm.due_date"

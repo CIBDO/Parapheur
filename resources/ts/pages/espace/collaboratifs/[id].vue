@@ -377,6 +377,8 @@ onMounted(load)
             v-model="addForm.user_id"
             :items="userItems"
             label="Utilisateur"
+            placeholder="Rechercher par nom…"
+            no-data-text="Aucun résultat"
             class="mb-3"
           />
           <VSelect

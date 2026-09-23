@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import UserAutocomplete from '@/components/common/UserAutocomplete.vue'
 import { useCorrespondence } from '@/composables/useCorrespondence'
 import { $api } from '@/utils/api'
 import { listItems } from '@/utils/listItems'
@@ -118,13 +119,12 @@ async function confirmAssign() {
     >
       <VCard :title="`Affecter — ${selected ? formatCorrespondenceNumber(selected) : ''}`">
         <VCardText>
-          <AppSelect
+          <UserAutocomplete
             v-model="form.to_user_id"
             class="mb-3"
             :items="users"
-            item-title="name"
-            item-value="id"
             label="Agent destinataire *"
+            placeholder="Rechercher un agent…"
           />
           <AppTextField
             v-model="form.due_date"

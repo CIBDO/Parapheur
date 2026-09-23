@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import ParapheurPageHeader from '@/components/parapheur/ParapheurPageHeader.vue'
 import OnlyOfficeEditor from '@/components/parapheur/OnlyOfficeEditor.vue'
+import UserAutocomplete from '@/components/common/UserAutocomplete.vue'
 import { formatDateFr, formatDateTimeFr } from '@/utils/parapheurUi'
 import {
   attendanceLabels,
@@ -596,12 +597,11 @@ const statusLabel = computed(() => meetingStatusLabels[meeting.value?.status] ||
             </VBtnToggle>
 
             <div v-if="participantType === 'interne'">
-              <AppSelect
+              <UserAutocomplete
                 v-model="participantUserId"
                 :items="users"
-                item-title="name"
-                item-value="id"
                 label="Utilisateur E-Tresor"
+                placeholder="Rechercher un agent…"
                 class="mb-3"
               />
             </div>
@@ -915,11 +915,9 @@ const statusLabel = computed(() => meetingStatusLabels[meeting.value?.status] ||
               label="Description"
               class="mb-2"
             />
-            <AppSelect
+            <UserAutocomplete
               v-model="decisionForm.assignee_id"
               :items="users"
-              item-title="name"
-              item-value="id"
               label="Responsable"
               class="mb-2"
             />

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import UserAutocomplete from '@/components/common/UserAutocomplete.vue'
 import { workspaceShareAbilityLabels } from '@/utils/workspaceUi'
 
 const props = defineProps<{
@@ -78,10 +79,12 @@ async function submit() {
         >
           {{ errorMsg }}
         </VAlert>
-        <VSelect
+        <UserAutocomplete
           v-model="form.grantee_user_id"
-          :items="users.map((u: any) => ({ title: u.name || u.email, value: u.id }))"
+          :items="users"
+          :item-title="(u: any) => u.name || u.email"
           label="Utilisateur"
+          placeholder="Rechercher un utilisateur…"
           class="mb-3"
         />
         <VSelect

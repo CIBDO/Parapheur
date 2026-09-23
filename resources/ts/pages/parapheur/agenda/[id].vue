@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import ParapheurPageHeader from '@/components/parapheur/ParapheurPageHeader.vue'
+import UserAutocomplete from '@/components/common/UserAutocomplete.vue'
 import { appointmentStatusColor, appointmentStatusLabel, formatAppointmentSlot } from '@/utils/appointmentsUi'
 
 definePage({
@@ -621,13 +622,10 @@ onMounted(async () => {
                 rows="3"
                 class="mb-3"
               />
-              <VSelect
+              <UserAutocomplete
                 v-model="followupForm.assignee_id"
                 :items="users"
-                item-title="name"
-                item-value="id"
                 label="Responsable"
-                clearable
                 class="mb-3"
               />
               <VTextField
@@ -788,13 +786,11 @@ onMounted(async () => {
     >
       <VCard title="Réorienter la demande">
         <VCardText>
-          <VSelect
+          <UserAutocomplete
             v-model="redirectForm.redirected_to_user_id"
             :items="users"
-            item-title="name"
-            item-value="id"
             label="Vers un responsable"
-            clearable
+            placeholder="Rechercher…"
             class="mb-3"
           />
           <VSelect

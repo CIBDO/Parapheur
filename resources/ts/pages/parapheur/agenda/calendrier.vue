@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import ParapheurPageHeader from '@/components/parapheur/ParapheurPageHeader.vue'
+import UserAutocomplete from '@/components/common/UserAutocomplete.vue'
 import { calendarEventColor } from '@/utils/appointmentsUi'
 
 definePage({
@@ -297,15 +298,13 @@ onMounted(async () => {
             cols="12"
             md="3"
           >
-            <VSelect
+            <UserAutocomplete
               v-model="filters.director_id"
               :items="users"
-              item-title="name"
-              item-value="id"
               density="compact"
               hide-details
               label="Directeur"
-              clearable
+              placeholder="Rechercher…"
             />
           </VCol>
           <VCol

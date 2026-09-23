@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import UserAutocomplete from '@/components/common/UserAutocomplete.vue'
 import { useTasks } from '@/composables/useTasks'
 import { taskPriorityLabels } from '@/utils/tasksUi'
 
@@ -125,14 +126,11 @@ const submit = async () => {
             required
             autofocus
           />
-          <AppSelect
+          <UserAutocomplete
             v-model="form.assignee_id"
             class="mb-4"
             label="Responsable"
             :items="users"
-            item-title="name"
-            item-value="id"
-            clearable
           />
           <AppSelect
             v-model="form.priority"
@@ -162,13 +160,11 @@ const submit = async () => {
           />
 
           <template v-if="showAdvanced">
-            <AppSelect
+            <UserAutocomplete
               v-model="form.contributor_ids"
               class="mb-4"
               label="Contributeurs"
               :items="users"
-              item-title="name"
-              item-value="id"
               multiple
               chips
             />

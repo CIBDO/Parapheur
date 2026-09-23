@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import ParapheurPageHeader from '@/components/parapheur/ParapheurPageHeader.vue'
+import UserAutocomplete from '@/components/common/UserAutocomplete.vue'
 import { formatBytes } from '@/utils/workspaceUi'
 
 definePage({
@@ -283,11 +284,13 @@ onMounted(load)
             cols="12"
             md="4"
           >
-            <VSelect
+            <UserAutocomplete
               v-if="overrideForm.scope_type === 'user'"
               v-model="overrideForm.scope_id"
-              :items="users.map((u: any) => ({ title: u.name || u.email, value: u.id }))"
+              :items="users"
+              :item-title="(u: any) => u.name || u.email"
               label="Utilisateur"
+              placeholder="Rechercher…"
             />
             <VSelect
               v-else-if="overrideForm.scope_type === 'structure'"

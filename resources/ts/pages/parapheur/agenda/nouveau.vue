@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import ParapheurPageHeader from '@/components/parapheur/ParapheurPageHeader.vue'
+import UserAutocomplete from '@/components/common/UserAutocomplete.vue'
 
 definePage({
   meta: {
@@ -305,12 +306,11 @@ onMounted(loadMeta)
           </VCol>
         </VRow>
 
-        <VSelect
+        <UserAutocomplete
           v-model="form.participant_ids"
           :items="users"
-          item-title="name"
-          item-value="id"
           label="Participants internes DGTCP"
+          placeholder="Rechercher un agent…"
           multiple
           chips
           class="mt-4"

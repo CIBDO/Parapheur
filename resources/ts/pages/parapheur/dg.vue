@@ -2,6 +2,7 @@
 import { useTheme } from 'vuetify'
 import { hexToRgb } from '@layouts/utils'
 import ParapheurPageHeader from '@/components/parapheur/ParapheurPageHeader.vue'
+import UserAutocomplete from '@/components/common/UserAutocomplete.vue'
 
 definePage({
   meta: {
@@ -788,11 +789,9 @@ onMounted(async () => {
             label="Instruction"
             class="mb-3"
           />
-          <AppSelect
+          <UserAutocomplete
             v-model="instructForm.assignee_id"
             :items="users"
-            item-title="name"
-            item-value="id"
             label="Responsable"
             class="mb-3"
           />

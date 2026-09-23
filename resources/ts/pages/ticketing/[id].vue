@@ -15,6 +15,7 @@ import {
   ticketStatusColor,
   ticketStatusLabel,
 } from '@/utils/ticketingUi'
+import UserAutocomplete from '@/components/common/UserAutocomplete.vue'
 
 definePage({
   meta: {
@@ -1114,13 +1115,15 @@ function timelineLabel(event: any) {
                     {{ a.user?.name || a.user_id }}
                   </div>
                   <VDivider class="my-4" />
-                  <AppSelect
+                  <UserAutocomplete
                     v-model="observerIds"
                     :items="userItems"
+                    item-title="title"
+                    item-value="value"
                     label="Observateurs"
+                    placeholder="Rechercher…"
                     multiple
                     chips
-                    clearable
                     class="mb-3"
                     hide-details
                   />
@@ -1694,11 +1697,13 @@ function timelineLabel(event: any) {
             clearable
             class="mb-3"
           />
-          <AppSelect
+          <UserAutocomplete
             v-model="assignForm.assignee_id"
             :items="assignAgentItems"
+            item-title="title"
+            item-value="value"
             label="Agent"
-            clearable
+            placeholder="Rechercher un agent…"
             :disabled="!assignForm.support_team_id"
             :hint="assignForm.support_team_id && !assignAgentItems.length ? 'Aucun membre dans cette équipe.' : undefined"
             :persistent-hint="Boolean(assignForm.support_team_id && !assignAgentItems.length)"
@@ -1742,11 +1747,13 @@ function timelineLabel(event: any) {
             clearable
             class="mb-3"
           />
-          <AppSelect
+          <UserAutocomplete
             v-model="transferForm.assignee_id"
             :items="transferAgentItems"
+            item-title="title"
+            item-value="value"
             label="Agent cible"
-            clearable
+            placeholder="Rechercher un agent…"
             :disabled="!transferForm.support_team_id"
             :hint="transferForm.support_team_id && !transferAgentItems.length ? 'Aucun membre dans cette équipe.' : undefined"
             :persistent-hint="Boolean(transferForm.support_team_id && !transferAgentItems.length)"
@@ -1878,11 +1885,13 @@ function timelineLabel(event: any) {
             clearable
             class="mb-3"
           />
-          <AppSelect
+          <UserAutocomplete
             v-model="escalateForm.to_user_id"
             :items="escalateAgentItems"
+            item-title="title"
+            item-value="value"
             label="Agent cible"
-            clearable
+            placeholder="Rechercher un agent…"
             :disabled="!escalateForm.to_team_id"
             :hint="escalateForm.to_team_id && !escalateAgentItems.length ? 'Aucun membre dans cette équipe.' : undefined"
             :persistent-hint="Boolean(escalateForm.to_team_id && !escalateAgentItems.length)"

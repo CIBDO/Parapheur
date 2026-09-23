@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import OnlyOfficeEditor from '@/components/parapheur/OnlyOfficeEditor.vue'
 import ParapheurPageHeader from '@/components/parapheur/ParapheurPageHeader.vue'
+import UserAutocomplete from '@/components/common/UserAutocomplete.vue'
 import {
   attachmentKindLabels,
   linkRelationLabels,
@@ -362,12 +363,11 @@ const canOnlyOffice = computed(() =>
                   <VCardTitle>Partage interne</VCardTitle>
                 </VCardItem>
                 <VCardText>
-                  <AppSelect
+                  <UserAutocomplete
                     v-model="shareForm.user_id"
                     :items="users"
-                    item-title="name"
-                    item-value="id"
                     label="Utilisateur"
+                    placeholder="Rechercher…"
                     class="mb-2"
                   />
                   <VBtn

@@ -5,6 +5,7 @@ import { $api } from '@/utils/api'
 import { useTicketing } from '@/composables/useTicketing'
 import { listItems } from '@/utils/listItems'
 import { formatTicketNumber, teamAgentSelectItems } from '@/utils/ticketingUi'
+import UserAutocomplete from '@/components/common/UserAutocomplete.vue'
 
 definePage({
   meta: {
@@ -390,11 +391,13 @@ async function submit() {
             cols="12"
             md="6"
           >
-            <AppSelect
+            <UserAutocomplete
               v-model="form.assignee_id"
               :items="agentItems"
+              item-title="title"
+              item-value="value"
               label="Agent"
-              clearable
+              placeholder="Rechercher un agent…"
               :disabled="!form.support_team_id"
               :hint="form.support_team_id && !agentItems.length ? 'Aucun membre dans cette équipe — ajoutez-en via Admin ticketing.' : undefined"
               :persistent-hint="Boolean(form.support_team_id && !agentItems.length)"
@@ -441,14 +444,15 @@ async function submit() {
                 cols="12"
                 md="6"
               >
-                <AppSelect
+                <UserAutocomplete
                   v-model="form.requester_id"
                   :items="userItems"
+                  item-title="title"
+                  item-value="value"
                   label="Pour le compte de"
-                  placeholder="Moi-même (laissez vide)"
+                  placeholder="Rechercher un collègue…"
                   hint="Laissez vide si c’est pour vous. Choisissez un collègue seulement si vous créez pour quelqu’un d’autre."
                   persistent-hint
-                  clearable
                   hide-details="auto"
                 />
               </VCol>
@@ -456,13 +460,15 @@ async function submit() {
                 cols="12"
                 md="6"
               >
-                <AppSelect
+                <UserAutocomplete
                   v-model="form.observer_ids"
                   :items="userItems"
+                  item-title="title"
+                  item-value="value"
                   label="Observateurs"
+                  placeholder="Rechercher…"
                   multiple
                   chips
-                  clearable
                   hide-details="auto"
                 />
               </VCol>

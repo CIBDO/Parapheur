@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import ParapheurPageHeader from '@/components/parapheur/ParapheurPageHeader.vue'
+import UserAutocomplete from '@/components/common/UserAutocomplete.vue'
 import { confidentialityOptions, priorityOptions } from '@/utils/parapheurUi'
 
 definePage({
@@ -308,24 +309,22 @@ const submit = async () => {
           cols="12"
           md="4"
         >
-          <AppSelect
+          <UserAutocomplete
             v-model="form.chair_id"
             :items="users"
-            item-title="name"
-            item-value="id"
             label="Président"
+            placeholder="Rechercher…"
           />
         </VCol>
         <VCol
           cols="12"
           md="4"
         >
-          <AppSelect
+          <UserAutocomplete
             v-model="form.secretary_id"
             :items="users"
-            item-title="name"
-            item-value="id"
             label="Secrétaire de séance"
+            placeholder="Rechercher…"
           />
         </VCol>
         <VCol
@@ -364,15 +363,13 @@ const submit = async () => {
       <div class="text-subtitle-2 mb-2">
         Internes (utilisateurs E-Tresor)
       </div>
-      <AppSelect
+      <UserAutocomplete
         v-model="form.participant_ids"
         :items="users"
-        item-title="name"
-        item-value="id"
         label="Sélectionner des agents"
+        placeholder="Rechercher un agent…"
         multiple
         chips
-        closable-chips
         class="mb-6"
       />
 

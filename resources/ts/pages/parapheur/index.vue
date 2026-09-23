@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import ParapheurPageHeader from '@/components/parapheur/ParapheurPageHeader.vue'
+import UserAutocomplete from '@/components/common/UserAutocomplete.vue'
 import {
   actionLabels,
   confidentialityOptions,
@@ -422,13 +423,11 @@ onMounted(async () => {
                 cols="12"
                 md="3"
               >
-                <AppSelect
+                <UserAutocomplete
                   v-model="filters.author_id"
                   :items="authors"
-                  item-title="name"
-                  item-value="id"
                   label="Auteur"
-                  clearable
+                  placeholder="Rechercher un auteur…"
                   hide-details
                 />
               </VCol>

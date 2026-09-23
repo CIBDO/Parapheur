@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { $api } from '@/utils/api'
+import UserAutocomplete from '@/components/common/UserAutocomplete.vue'
 import { useTicketing } from '@/composables/useTicketing'
 import { listItems } from '@/utils/listItems'
 
@@ -587,10 +588,11 @@ const dialogTitle = computed(() => {
             </VBtn>
           </div>
           <VDivider class="my-4" />
-          <AppSelect
+          <UserAutocomplete
             v-model="memberForm.user_id"
-            :items="users.map(u => ({ value: u.id, title: u.name }))"
+            :items="users"
             label="Utilisateur *"
+            placeholder="Rechercher un agent…"
             class="mb-3"
           />
           <AppSelect

@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import UserAutocomplete from '@/components/common/UserAutocomplete.vue'
+
 const props = defineProps<{
   modelValue: boolean
   workspaceId: number
@@ -224,10 +226,12 @@ async function attachInstruction() {
               label="Objet"
               class="mb-3"
             />
-            <VSelect
+            <UserAutocomplete
               v-model="parapheur.recipient_ids"
-              :items="users.map((u: any) => ({ title: u.name || u.email, value: u.id }))"
+              :items="users"
+              :item-title="(u: any) => u.name || u.email"
               label="Destinataires"
+              placeholder="Rechercher…"
               multiple
               chips
               class="mb-3"
