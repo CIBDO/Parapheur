@@ -3,17 +3,8 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { $api } from '@/utils/api'
 import { useTicketing } from '@/composables/useTicketing'
-import {
-  formatTicketDateTime,
-  formatTicketNumber,
-  listItems,
-  slaBadge,
-  ticketPriorityColor,
-  ticketPriorityLabel,
-  ticketStatusColor,
-  ticketStatusLabel,
-  ticketStatusLabels,
-} from '@/utils/ticketingUi'
+import { listItems } from '@/utils/listItems'
+import { formatTicketDateTime, formatTicketNumber, slaBadge, ticketPriorityColor, ticketPriorityLabel, ticketStatusColor, ticketStatusLabel, ticketStatusLabels } from '@/utils/ticketingUi'
 
 definePage({
   meta: {

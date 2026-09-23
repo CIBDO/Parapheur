@@ -226,14 +226,6 @@ function matchDirection(direction?: string | null) {
   return 'courrier-entrants-id'
 }
 
-export function listItems<T = any>(payload: any): T[] {
-  if (Array.isArray(payload))
-    return payload
-  if (Array.isArray(payload?.data))
-    return payload.data
-  return []
-}
-
 export const partyRoleLabels: Record<string, string> = {
   from: 'Expéditeur',
   to: 'Destinataire',

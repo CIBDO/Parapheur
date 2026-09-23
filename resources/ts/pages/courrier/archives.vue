@@ -1,13 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted } from 'vue'
 import { useCorrespondence } from '@/composables/useCorrespondence'
-import {
-  correspondenceStatusColors,
-  detailRouteName,
-  formatCorrespondenceNumber,
-  listItems,
-  statusLabel,
-} from '@/utils/courrierUi'
+import { listItems } from '@/utils/listItems'
+import { correspondenceStatusColors, detailRouteName, formatCorrespondenceNumber, statusLabel } from '@/utils/courrierUi'
 
 definePage({
   meta: { layout: 'default', action: 'read', subject: 'Courrier' },

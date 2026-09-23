@@ -57,6 +57,26 @@ class TaskNotificationService
         ]));
     }
 
+    /**
+     * @param  list<int>  $userIds
+     */
+    public function notifyMentions(Task $task, User $author, string $body, array $userIds): void
+    {
+        $users = User::query()
+            ->whereIn('id', $userIds)
+            ->where('id', '!=', $author->id)
+            ->get();
+
+        if ($users->isEmpty()) {
+            return;
+        }
+
+        Notification::send($users, new TaskStatusNotification($task, 'mention', [
+            'comment_preview' => mb_substr($body, 0, 160),
+            'author_name' => $author->name,
+        ]));
+    }
+
     public function notifyReminder(Task $task, string $kind): void
     {
         $assignee = $task->assignee;

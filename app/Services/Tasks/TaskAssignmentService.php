@@ -3,6 +3,7 @@
 namespace App\Services\Tasks;
 
 use App\Enums\TaskStatus;
+use App\Events\TaskAssigned;
 use App\Models\Task;
 use App\Models\User;
 use App\Services\AuditLogger;
@@ -51,6 +52,7 @@ class TaskAssignmentService
                 'assignee_id' => $assigneeId,
             ]);
             $this->notifications->notifyAssigned($task);
+            event(new TaskAssigned($task, $actor, $previous));
 
             return $task->fresh(['assignee', 'creator']);
         });

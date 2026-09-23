@@ -10,19 +10,25 @@ use Illuminate\Support\Facades\DB;
 
 class TaskReminderService
 {
-    /**
-     * @var array<string, int>
-     */
-    public const OFFSETS = [
-        'j_minus_3' => -3,
-        'j_minus_1' => -1,
-        'j_day' => 0,
-        'j_plus_1' => 1,
-    ];
-
     public function __construct(
         private readonly TaskNotificationService $notifications,
     ) {}
+
+    /**
+     * @return array<string, int>
+     */
+    public function offsets(): array
+    {
+        /** @var array<string, int> $offsets */
+        $offsets = config('tasks.reminders.offsets', [
+            'j_minus_3' => -3,
+            'j_minus_1' => -1,
+            'j_day' => 0,
+            'j_plus_1' => 1,
+        ]);
+
+        return $offsets;
+    }
 
     public function scheduleFor(Task $task): void
     {
@@ -32,8 +38,11 @@ class TaskReminderService
             return;
         }
 
-        foreach (self::OFFSETS as $kind => $days) {
-            $remindAt = $task->due_at->copy()->startOfDay()->addDays($days)->setTime(8, 0);
+        $hour = (int) config('tasks.reminders.hour', 8);
+        $minute = (int) config('tasks.reminders.minute', 0);
+
+        foreach ($this->offsets() as $kind => $days) {
+            $remindAt = $task->due_at->copy()->startOfDay()->addDays((int) $days)->setTime($hour, $minute);
 
             TaskReminder::query()->updateOrCreate(
                 ['task_id' => $task->id, 'kind' => $kind],

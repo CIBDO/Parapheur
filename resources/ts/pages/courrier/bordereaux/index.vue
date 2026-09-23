@@ -2,15 +2,8 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { $api } from '@/utils/api'
-import {
-  formatCorrespondenceNumber,
-  formatCourrierDate,
-  getTransmissionSlipNatureLabel,
-  getTransmissionSlipStatusColor,
-  getTransmissionSlipStatusLabel,
-  listItems,
-  transmissionSlipNatureLabels,
-} from '@/utils/courrierUi'
+import { listItems } from '@/utils/listItems'
+import { formatCorrespondenceNumber, formatCourrierDate, getTransmissionSlipNatureLabel, getTransmissionSlipStatusColor, getTransmissionSlipStatusLabel, transmissionSlipNatureLabels } from '@/utils/courrierUi'
 
 definePage({
   meta: { layout: 'default', action: 'read', subject: 'Courrier' },

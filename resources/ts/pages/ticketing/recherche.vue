@@ -2,17 +2,8 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useTicketing } from '@/composables/useTicketing'
-import {
-  formatTicketDateTime,
-  formatTicketNumber,
-  listItems,
-  slaBadge,
-  ticketPriorityColor,
-  ticketPriorityLabel,
-  ticketStatusColor,
-  ticketStatusLabel,
-  ticketKanbanColumnOrder,
-} from '@/utils/ticketingUi'
+import { listItems } from '@/utils/listItems'
+import { formatTicketDateTime, formatTicketNumber, slaBadge, ticketPriorityColor, ticketPriorityLabel, ticketStatusColor, ticketStatusLabel, ticketKanbanColumnOrder } from '@/utils/ticketingUi'
 
 definePage({
   meta: { layout: 'default', action: 'read', subject: 'Ticketing', navActiveLink: 'ticketing' },

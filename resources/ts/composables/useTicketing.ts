@@ -1,6 +1,6 @@
 import { ref } from 'vue'
 import { $api } from '@/utils/api'
-import { listItems } from '@/utils/ticketingUi'
+import { listItems } from '@/utils/listItems'
 
 export interface Ticket {
   id: number

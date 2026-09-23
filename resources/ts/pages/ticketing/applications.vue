@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { $api } from '@/utils/api'
-import { listItems } from '@/utils/ticketingUi'
+import { listItems } from '@/utils/listItems'
 
 definePage({
   meta: { layout: 'default', action: 'manage', subject: 'TicketingAdmin' },

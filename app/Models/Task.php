@@ -166,6 +166,16 @@ class Task extends Model
         return $this->hasMany(TaskDocument::class);
     }
 
+    public function escalations(): HasMany
+    {
+        return $this->hasMany(TaskEscalation::class)->orderByDesc('escalated_at');
+    }
+
+    public function delegations(): HasMany
+    {
+        return $this->hasMany(TaskDelegation::class);
+    }
+
     public function documents(): BelongsToMany
     {
         return $this->belongsToMany(Document::class, 'task_documents')

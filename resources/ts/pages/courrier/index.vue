@@ -3,21 +3,8 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { $api } from '@/utils/api'
 import { useCorrespondence } from '@/composables/useCorrespondence'
-import {
-  correspondenceDirectionLabels,
-  correspondencePriorityColors,
-  correspondencePriorityLabels,
-  correspondenceStatusColors,
-  correspondenceStatusLabels,
-  detailRouteName,
-  formatCorrespondenceNumber,
-  formatCourrierDate,
-  formatCourrierDateTime,
-  listItems,
-  partiesByRole,
-  partyDisplayName,
-  statusLabel,
-} from '@/utils/courrierUi'
+import { listItems } from '@/utils/listItems'
+import { correspondenceDirectionLabels, correspondencePriorityColors, correspondencePriorityLabels, correspondenceStatusColors, correspondenceStatusLabels, detailRouteName, formatCorrespondenceNumber, formatCourrierDate, formatCourrierDateTime, partiesByRole, partyDisplayName, statusLabel } from '@/utils/courrierUi'
 
 definePage({
   meta: {

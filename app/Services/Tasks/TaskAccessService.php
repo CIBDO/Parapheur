@@ -71,14 +71,22 @@ class TaskAccessService
             return false;
         }
 
-        return (int) $task->assignee_id === (int) $user->id
-            || $task->contributors()->where('users.id', $user->id)->exists();
+        if ((int) $task->assignee_id === (int) $user->id
+            || $task->contributors()->where('users.id', $user->id)->exists()) {
+            return true;
+        }
+
+        return $this->hasActiveDelegation($user, $task, 'take_charge');
     }
 
     public function canComment(User $user, Task $task): bool
     {
-        return $this->canView($user, $task)
-            && ($user->can('task.comment') || $this->isAdmin($user) || $this->isDirectParticipant($user, $task));
+        if ($this->canView($user, $task)
+            && ($user->can('task.comment') || $this->isAdmin($user) || $this->isDirectParticipant($user, $task))) {
+            return true;
+        }
+
+        return $this->hasActiveDelegation($user, $task, 'comment');
     }
 
     public function canComplete(User $user, Task $task): bool
@@ -87,8 +95,11 @@ class TaskAccessService
             return false;
         }
 
-        return (int) $task->assignee_id === (int) $user->id
-            || $this->isAdmin($user);
+        if ((int) $task->assignee_id === (int) $user->id || $this->isAdmin($user)) {
+            return true;
+        }
+
+        return $this->hasActiveDelegation($user, $task, 'complete');
     }
 
     public function canValidate(User $user, Task $task): bool
@@ -98,10 +109,21 @@ class TaskAccessService
         }
 
         if ($task->validator_id) {
-            return (int) $task->validator_id === (int) $user->id || $this->isAdmin($user);
+            if ((int) $task->validator_id === (int) $user->id || $this->isAdmin($user)) {
+                return true;
+            }
+
+            return $this->hasActiveDelegation($user, $task, 'validate');
         }
 
-        return (int) $task->created_by === (int) $user->id || $this->isAdmin($user);
+        return (int) $task->created_by === (int) $user->id
+            || $this->isAdmin($user)
+            || $this->hasActiveDelegation($user, $task, 'validate');
+    }
+
+    public function hasActiveDelegation(User $user, Task $task, string $action): bool
+    {
+        return app(TaskDelegationService::class)->resolveFor($user, $task, $action) !== null;
     }
 
     public function canCancel(User $user, Task $task): bool

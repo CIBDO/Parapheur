@@ -2,12 +2,8 @@
 import { computed, onMounted, ref } from 'vue'
 import { useCorrespondence } from '@/composables/useCorrespondence'
 import { $api } from '@/utils/api'
-import {
-  correspondenceStatusColors,
-  formatCorrespondenceNumber,
-  listItems,
-  statusLabel,
-} from '@/utils/courrierUi'
+import { listItems } from '@/utils/listItems'
+import { correspondenceStatusColors, formatCorrespondenceNumber, statusLabel } from '@/utils/courrierUi'
 
 definePage({
   name: 'courrier-a-affecter',

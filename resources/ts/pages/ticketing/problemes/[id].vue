@@ -2,7 +2,8 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { $api } from '@/utils/api'
-import { formatTicketDateTime, formatTicketNumber, listItems } from '@/utils/ticketingUi'
+import { listItems } from '@/utils/listItems'
+import { formatTicketDateTime, formatTicketNumber } from '@/utils/ticketingUi'
 import { useTicketing } from '@/composables/useTicketing'
 
 definePage({

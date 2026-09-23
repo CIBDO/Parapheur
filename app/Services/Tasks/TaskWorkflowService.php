@@ -3,6 +3,7 @@
 namespace App\Services\Tasks;
 
 use App\Enums\TaskStatus;
+use App\Events\TaskCompleted;
 use App\Models\Task;
 use App\Models\TaskCompletion;
 use App\Models\User;
@@ -32,7 +33,7 @@ class TaskWorkflowService
             abort(422, 'Un responsable est requis pour publier la tâche.');
         }
 
-        return $this->apply($actor, $task, TaskStatus::Imputee, 'published', 'Tâche imputée');
+        return $this->apply($actor, $task, TaskStatus::Imputee, 'published', 'Tâche imputée', 10);
     }
 
     public function takeCharge(User $actor, Task $task, ?string $comment = null): Task
@@ -47,10 +48,30 @@ class TaskWorkflowService
             $task->status = TaskStatus::PriseEnCharge;
             $task->taken_charge_by = $actor->id;
             $task->taken_charge_at = now();
+            if ((int) $task->progress < 25) {
+                $task->progress = 25;
+            }
             $task->save();
 
-            $this->tasks->recordHistory($task, $actor, 'taken_charge', $from->value, TaskStatus::PriseEnCharge->value, $comment);
-            $this->audit->log('task.taken_charge', $task, ['actor_id' => $actor->id]);
+            $delegationNote = app(TaskDelegationService::class)->actingAsLabel($actor, $task, 'take_charge');
+            $historyComment = $comment;
+            if ($delegationNote) {
+                $historyComment = trim(($comment ? $comment.' — ' : '').$delegationNote);
+            }
+
+            $this->tasks->recordHistory(
+                $task,
+                $actor,
+                'taken_charge',
+                $from->value,
+                TaskStatus::PriseEnCharge->value,
+                $historyComment,
+                $delegationNote ? ['by_delegation' => true] : []
+            );
+            $this->audit->log('task.taken_charge', $task, [
+                'actor_id' => $actor->id,
+                'by_delegation' => (bool) $delegationNote,
+            ]);
             $this->notifications->notifyStatus($task, 'taken_charge');
 
             return $task->fresh(['assignee', 'creator']);
@@ -63,7 +84,7 @@ class TaskWorkflowService
             abort(403);
         }
 
-        return $this->apply($actor, $task, TaskStatus::EnCours, 'started', 'Travail démarré');
+        return $this->apply($actor, $task, TaskStatus::EnCours, 'started', 'Travail démarré', 40);
     }
 
     public function setWaiting(User $actor, Task $task, ?string $comment = null): Task
@@ -115,6 +136,7 @@ class TaskWorkflowService
             $this->audit->log('task.completed', $task, ['actor_id' => $actor->id]);
             $this->notifications->notifyStatus($task, 'completed');
             $this->notifications->notifyValidationRequested($task);
+            event(new TaskCompleted($task, $actor));
 
             return $task->fresh(['assignee', 'creator', 'completions']);
         });
@@ -142,12 +164,15 @@ class TaskWorkflowService
         });
     }
 
-    private function apply(User $actor, Task $task, TaskStatus $to, string $event, string $comment): Task
+    private function apply(User $actor, Task $task, TaskStatus $to, string $event, string $comment, ?int $minProgress = null): Task
     {
-        return DB::transaction(function () use ($actor, $task, $to, $event, $comment) {
+        return DB::transaction(function () use ($actor, $task, $to, $event, $comment, $minProgress) {
             $from = $task->status;
             $this->stateMachine->assertCanTransition($from, $to);
             $task->status = $to;
+            if ($minProgress !== null && (int) $task->progress < $minProgress) {
+                $task->progress = $minProgress;
+            }
             $task->save();
 
             $this->tasks->recordHistory($task, $actor, $event, $from->value, $to->value, $comment);

@@ -18,6 +18,11 @@ Schedule::command('parapheur:remind-task-deadlines')
     ->withoutOverlapping()
     ->appendOutputTo(storage_path('logs/task-reminders.log'));
 
+Schedule::command('parapheur:escalate-tasks')
+    ->hourly()
+    ->withoutOverlapping()
+    ->appendOutputTo(storage_path('logs/task-escalations.log'));
+
 Schedule::command('parapheur:remind-meetings')
     ->hourly()
     ->withoutOverlapping()

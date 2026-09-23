@@ -136,6 +136,8 @@ onMounted(async () => {
           <tr
             v-for="item in instructions"
             :key="item.id"
+            style="cursor: pointer"
+            @click="router.push(`/taches/instructions/${item.id}`)"
           >
             <td>{{ item.reference || `#${item.id}` }}</td>
             <td>{{ item.title }}</td>
@@ -159,37 +161,99 @@ onMounted(async () => {
             <td :class="{ 'text-error': isLate(item) }">
               {{ formatTaskDue(item.due_date) }}
             </td>
-            <td>
-              <div class="d-flex gap-1 flex-wrap">
+            <td @click.stop>
+              <div class="d-flex align-center gap-1 flex-nowrap">
                 <VBtn
                   v-if="item.status === 'a_faire'"
+                  icon
                   size="x-small"
+                  variant="tonal"
+                  color="info"
                   @click="setStatus(item.id, 'en_cours')"
                 >
-                  En cours
+                  <VIcon
+                    icon="tabler-player-play"
+                    size="18"
+                  />
+                  <VTooltip
+                    activator="parent"
+                    location="top"
+                  >
+                    Passer en cours
+                  </VTooltip>
                 </VBtn>
                 <VBtn
                   v-if="['a_faire', 'en_cours'].includes(item.status)"
+                  icon
                   size="x-small"
+                  variant="tonal"
                   color="success"
                   @click="setStatus(item.id, 'executee')"
                 >
-                  Exécutée
+                  <VIcon
+                    icon="tabler-circle-check"
+                    size="18"
+                  />
+                  <VTooltip
+                    activator="parent"
+                    location="top"
+                  >
+                    Marquer exécutée
+                  </VTooltip>
                 </VBtn>
                 <VBtn
                   v-if="item.status === 'executee'"
+                  icon
                   size="x-small"
+                  variant="tonal"
                   color="primary"
                   @click="setStatus(item.id, 'cloturee')"
                 >
-                  Clôturer
+                  <VIcon
+                    icon="tabler-lock"
+                    size="18"
+                  />
+                  <VTooltip
+                    activator="parent"
+                    location="top"
+                  >
+                    Clôturer
+                  </VTooltip>
                 </VBtn>
                 <VBtn
+                  icon
                   size="x-small"
                   variant="tonal"
+                  @click="router.push(`/taches/instructions/${item.id}`)"
+                >
+                  <VIcon
+                    icon="tabler-eye"
+                    size="18"
+                  />
+                  <VTooltip
+                    activator="parent"
+                    location="top"
+                  >
+                    Ouvrir
+                  </VTooltip>
+                </VBtn>
+                <VBtn
+                  icon
+                  size="x-small"
+                  variant="tonal"
+                  color="secondary"
                   @click="router.push({ path: '/taches', query: { instruction_id: item.id } })"
                 >
-                  Tâches
+                  <VIcon
+                    icon="tabler-checkbox"
+                    size="18"
+                  />
+                  <VTooltip
+                    activator="parent"
+                    location="top"
+                  >
+                    Voir les tâches
+                  </VTooltip>
                 </VBtn>
               </div>
             </td>

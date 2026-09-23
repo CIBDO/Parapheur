@@ -2,7 +2,7 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { $api } from '@/utils/api'
 import { useTicketing } from '@/composables/useTicketing'
-import { listItems } from '@/utils/ticketingUi'
+import { listItems } from '@/utils/listItems'
 
 definePage({
   meta: { layout: 'default', action: 'manage', subject: 'TicketingAdmin' },

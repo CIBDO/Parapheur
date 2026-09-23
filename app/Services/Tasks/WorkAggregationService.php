@@ -123,6 +123,74 @@ class WorkAggregationService
         } catch (\Throwable) {
         }
 
+        try {
+            if (class_exists(\App\Models\Document::class)) {
+                $docs = \App\Models\Document::query()
+                    ->where(function ($q) use ($user) {
+                        $q->where('current_assignee_id', $user->id)
+                            ->orWhere('created_by', $user->id);
+                    })
+                    ->whereIn('status', ['en_circuit', 'a_viser', 'a_valider', 'en_attente'])
+                    ->count();
+                if ($docs > 0) {
+                    $items[] = [
+                        'type' => 'parapheur',
+                        'label' => $docs.' document(s) à traiter',
+                        'count' => $docs,
+                        'url' => '/parapheur',
+                    ];
+                }
+            }
+        } catch (\Throwable) {
+        }
+
+        try {
+            if (class_exists(\App\Models\Meeting::class)) {
+                $meetings = \App\Models\Meeting::query()
+                    ->whereDate('meeting_date', '>=', now()->toDateString())
+                    ->whereDate('meeting_date', '<=', now()->addDays(7)->toDateString())
+                    ->where(function ($q) use ($user) {
+                        $q->where('chair_id', $user->id)
+                            ->orWhere('secretary_id', $user->id)
+                            ->orWhere('organizer_id', $user->id)
+                            ->orWhereHas('participants', fn ($p) => $p->where('user_id', $user->id));
+                    })
+                    ->count();
+                if ($meetings > 0) {
+                    $items[] = [
+                        'type' => 'meeting',
+                        'label' => $meetings.' réunion(s) à venir',
+                        'count' => $meetings,
+                        'url' => '/parapheur/reunions',
+                    ];
+                }
+            }
+        } catch (\Throwable) {
+        }
+
+        try {
+            if (class_exists(\App\Models\Appointment::class)) {
+                $rdv = \App\Models\Appointment::query()
+                    ->whereDate('starts_at', '>=', now()->toDateString())
+                    ->whereDate('starts_at', '<=', now()->addDays(3)->toDateString())
+                    ->where(function ($q) use ($user) {
+                        $q->where('organizer_id', $user->id)
+                            ->orWhere('host_id', $user->id)
+                            ->orWhereHas('participants', fn ($p) => $p->where('user_id', $user->id));
+                    })
+                    ->count();
+                if ($rdv > 0) {
+                    $items[] = [
+                        'type' => 'appointment',
+                        'label' => $rdv.' rendez-vous à venir',
+                        'count' => $rdv,
+                        'url' => '/parapheur/agenda',
+                    ];
+                }
+            }
+        } catch (\Throwable) {
+        }
+
         return $items;
     }
 
@@ -160,7 +228,7 @@ class WorkAggregationService
             'priority' => $instruction->priority?->value,
             'due_at' => optional($instruction->due_date)?->toDateString(),
             'is_overdue' => $instruction->isOverdue(),
-            'url' => '/taches/instructions',
+            'url' => '/taches/instructions/'.$instruction->id,
         ];
     }
 }

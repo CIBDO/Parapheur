@@ -141,15 +141,6 @@ export function formatTicketDateTime(date?: string | null) {
   return d.toLocaleString('fr-FR')
 }
 
-export function listItems<T = any>(payload: any): T[] {
-  if (Array.isArray(payload))
-    return payload
-  if (Array.isArray(payload?.data))
-    return payload.data
-
-  return []
-}
-
 /** Libellés FR pour les rôles d’acteurs ticket. */
 export function ticketActorRoleLabel(role: string | null | undefined): string {
   const map: Record<string, string> = {

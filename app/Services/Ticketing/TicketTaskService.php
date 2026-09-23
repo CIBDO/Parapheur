@@ -2,10 +2,12 @@
 
 namespace App\Services\Ticketing;
 
+use App\Enums\TaskSource;
 use App\Models\Ticket;
 use App\Models\TicketTask;
 use App\Models\User;
 use App\Services\AuditLogger;
+use App\Services\Tasks\TaskService;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
@@ -13,6 +15,7 @@ class TicketTaskService
 {
     public function __construct(
         private readonly AuditLogger $audit,
+        private readonly TaskService $tasks,
     ) {}
 
     /**
@@ -20,7 +23,7 @@ class TicketTaskService
      */
     public function list(Ticket $ticket, bool $includePrivate = true): array
     {
-        $q = $ticket->tasks()->with(['creator:id,name', 'assignee:id,name']);
+        $q = $ticket->tasks()->with(['creator:id,name', 'assignee:id,name', 'task:id,reference,status,title']);
         if (! $includePrivate) {
             $q->where('is_private', false);
         }
@@ -34,11 +37,29 @@ class TicketTaskService
     public function create(Ticket $ticket, User $actor, array $data): TicketTask
     {
         return DB::transaction(function () use ($ticket, $actor, $data) {
+            $linkedTaskId = null;
+
+            if (config('tasks.ticket_bridge.create_transversal_task', true)) {
+                $linked = $this->tasks->create($actor, [
+                    'title' => $data['title'],
+                    'description' => $data['content'] ?? null,
+                    'assignee_id' => $data['assignee_id'] ?? null,
+                    'due_at' => $data['planned_end_at'] ?? null,
+                    'starts_at' => $data['planned_start_at'] ?? null,
+                    'source_kind' => TaskSource::Ticket->value,
+                    'source_type' => Ticket::class,
+                    'source_id' => $ticket->id,
+                    'as_draft' => empty($data['assignee_id']),
+                ]);
+                $linkedTaskId = $linked->id;
+            }
+
             $task = TicketTask::query()->create([
                 'ticket_id' => $ticket->id,
                 'created_by' => $actor->id,
                 'assignee_id' => $data['assignee_id'] ?? null,
                 'instruction_id' => $data['instruction_id'] ?? null,
+                'task_id' => $linkedTaskId,
                 'title' => $data['title'],
                 'content' => $data['content'] ?? null,
                 'status' => $data['status'] ?? 'todo',
@@ -52,9 +73,10 @@ class TicketTaskService
             $this->audit->log('ticket.task_created', $ticket, [
                 'actor_id' => $actor->id,
                 'task_id' => $task->id,
+                'linked_task_id' => $linkedTaskId,
             ]);
 
-            return $task->fresh(['creator', 'assignee']);
+            return $task->fresh(['creator', 'assignee', 'task']);
         });
     }
 
@@ -85,7 +107,7 @@ class TicketTaskService
                 'task_id' => $task->id,
             ]);
 
-            return $task->fresh(['creator', 'assignee']);
+            return $task->fresh(['creator', 'assignee', 'task']);
         });
     }
 

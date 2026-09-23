@@ -142,7 +142,7 @@ declare global {
   const labelOf: typeof import('./resources/ts/utils/parapheurUi')['labelOf']
   const lengthValidator: typeof import('./resources/ts/@core/utils/validators')['lengthValidator']
   const linkRelationLabels: typeof import('./resources/ts/utils/gedUi')['linkRelationLabels']
-  const listItems: typeof import('./resources/ts/utils/ticketingUi')['listItems']
+  const listItems: typeof import('./resources/ts/utils/listItems')['listItems']
   const logicAnd: typeof import('@vueuse/math')['logicAnd']
   const logicNot: typeof import('@vueuse/math')['logicNot']
   const logicOr: typeof import('@vueuse/math')['logicOr']
@@ -231,8 +231,14 @@ declare global {
   const storeToRefs: typeof import('pinia')['storeToRefs']
   const syncRef: typeof import('@vueuse/core')['syncRef']
   const syncRefs: typeof import('@vueuse/core')['syncRefs']
+  const taskDisplayProgress: typeof import('./resources/ts/utils/tasksUi')['taskDisplayProgress']
+  const taskKanbanColumnOrder: typeof import('./resources/ts/utils/tasksUi')['taskKanbanColumnOrder']
   const taskPriorityColor: typeof import('./resources/ts/utils/tasksUi')['taskPriorityColor']
   const taskPriorityLabels: typeof import('./resources/ts/utils/tasksUi')['taskPriorityLabels']
+  const taskProgressBaseline: typeof import('./resources/ts/utils/tasksUi')['taskProgressBaseline']
+  const taskProgressColor: typeof import('./resources/ts/utils/tasksUi')['taskProgressColor']
+  const taskProgressEditable: typeof import('./resources/ts/utils/tasksUi')['taskProgressEditable']
+  const taskSourceLabels: typeof import('./resources/ts/utils/tasksUi')['taskSourceLabels']
   const taskStatusColor: typeof import('./resources/ts/utils/tasksUi')['taskStatusColor']
   const taskStatusLabels: typeof import('./resources/ts/utils/tasksUi')['taskStatusLabels']
   const teamAgentSelectItems: typeof import('./resources/ts/utils/ticketingUi')['teamAgentSelectItems']
@@ -553,6 +559,7 @@ declare module 'vue' {
     readonly defineComponent: UnwrapRef<typeof import('vue')['defineComponent']>
     readonly definePage: UnwrapRef<typeof import('unplugin-vue-router/runtime')['definePage']>
     readonly defineStore: UnwrapRef<typeof import('pinia')['defineStore']>
+    readonly detailRouteName: UnwrapRef<typeof import('./resources/ts/utils/courrierUi')['detailRouteName']>
     readonly directionLabel: UnwrapRef<typeof import('./resources/ts/utils/courrierUi')['directionLabel']>
     readonly documentKindLabels: UnwrapRef<typeof import('./resources/ts/utils/meetingsUi')['documentKindLabels']>
     readonly documentTemplateKindLabels: UnwrapRef<typeof import('./resources/ts/utils/courrierUi')['documentTemplateKindLabels']>
@@ -613,8 +620,7 @@ declare module 'vue' {
     readonly labelOf: UnwrapRef<typeof import('./resources/ts/utils/parapheurUi')['labelOf']>
     readonly lengthValidator: UnwrapRef<typeof import('./resources/ts/@core/utils/validators')['lengthValidator']>
     readonly linkRelationLabels: UnwrapRef<typeof import('./resources/ts/utils/gedUi')['linkRelationLabels']>
-    readonly listItems: UnwrapRef<typeof import('./resources/ts/utils/courrierUi')['listItems']>
-    readonly listItems: UnwrapRef<typeof import('./resources/ts/utils/ticketingUi')['listItems']>
+    readonly listItems: UnwrapRef<typeof import('./resources/ts/utils/listItems')['listItems']>
     readonly logicAnd: UnwrapRef<typeof import('@vueuse/math')['logicAnd']>
     readonly logicNot: UnwrapRef<typeof import('@vueuse/math')['logicNot']>
     readonly logicOr: UnwrapRef<typeof import('@vueuse/math')['logicOr']>
@@ -703,8 +709,14 @@ declare module 'vue' {
     readonly storeToRefs: UnwrapRef<typeof import('pinia')['storeToRefs']>
     readonly syncRef: UnwrapRef<typeof import('@vueuse/core')['syncRef']>
     readonly syncRefs: UnwrapRef<typeof import('@vueuse/core')['syncRefs']>
+    readonly taskDisplayProgress: UnwrapRef<typeof import('./resources/ts/utils/tasksUi')['taskDisplayProgress']>
+    readonly taskKanbanColumnOrder: UnwrapRef<typeof import('./resources/ts/utils/tasksUi')['taskKanbanColumnOrder']>
     readonly taskPriorityColor: UnwrapRef<typeof import('./resources/ts/utils/tasksUi')['taskPriorityColor']>
     readonly taskPriorityLabels: UnwrapRef<typeof import('./resources/ts/utils/tasksUi')['taskPriorityLabels']>
+    readonly taskProgressBaseline: UnwrapRef<typeof import('./resources/ts/utils/tasksUi')['taskProgressBaseline']>
+    readonly taskProgressColor: UnwrapRef<typeof import('./resources/ts/utils/tasksUi')['taskProgressColor']>
+    readonly taskProgressEditable: UnwrapRef<typeof import('./resources/ts/utils/tasksUi')['taskProgressEditable']>
+    readonly taskSourceLabels: UnwrapRef<typeof import('./resources/ts/utils/tasksUi')['taskSourceLabels']>
     readonly taskStatusColor: UnwrapRef<typeof import('./resources/ts/utils/tasksUi')['taskStatusColor']>
     readonly taskStatusLabels: UnwrapRef<typeof import('./resources/ts/utils/tasksUi')['taskStatusLabels']>
     readonly teamAgentSelectItems: UnwrapRef<typeof import('./resources/ts/utils/ticketingUi')['teamAgentSelectItems']>

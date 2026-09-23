@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { $api } from '@/utils/api'
-import { getTemplateKindLabel, listItems } from '@/utils/courrierUi'
+import { listItems } from '@/utils/listItems'
+import { getTemplateKindLabel } from '@/utils/courrierUi'
 
 definePage({
   meta: { layout: 'default', action: 'read', subject: 'DocumentTemplate' },

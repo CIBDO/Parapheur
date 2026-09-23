@@ -11,7 +11,15 @@ class TaskComment extends Model
         'task_id',
         'user_id',
         'body',
+        'mentions',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'mentions' => 'array',
+        ];
+    }
 
     public function task(): BelongsTo
     {

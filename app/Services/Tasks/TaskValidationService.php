@@ -3,6 +3,8 @@
 namespace App\Services\Tasks;
 
 use App\Enums\TaskStatus;
+use App\Events\TaskReturned;
+use App\Events\TaskValidated;
 use App\Models\Task;
 use App\Models\TaskValidation;
 use App\Models\User;
@@ -45,6 +47,7 @@ class TaskValidationService
             $this->tasks->recordHistory($task, $actor, 'validated', $from->value, TaskStatus::Validee->value, $comment);
             $this->audit->log('task.validated', $task, ['actor_id' => $actor->id]);
             $this->notifications->notifyStatus($task, 'validated');
+            event(new TaskValidated($task, $actor));
 
             return $task->fresh(['assignee', 'creator', 'validations']);
         });
@@ -85,6 +88,7 @@ class TaskValidationService
             $this->tasks->recordHistory($task, $actor, 'returned', $from->value, TaskStatus::Retournee->value, $data['motif']);
             $this->audit->log('task.returned', $task, ['actor_id' => $actor->id, 'motif' => $data['motif']]);
             $this->notifications->notifyStatus($task, 'returned');
+            event(new TaskReturned($task, $actor, $data['motif']));
 
             return $task->fresh(['assignee', 'creator', 'validations']);
         });

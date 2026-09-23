@@ -2,7 +2,8 @@
 import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { $api } from '@/utils/api'
-import { formatTicketDateTime, listItems } from '@/utils/ticketingUi'
+import { listItems } from '@/utils/listItems'
+import { formatTicketDateTime } from '@/utils/ticketingUi'
 
 definePage({
   meta: { layout: 'default', action: 'read', subject: 'Ticketing', navActiveLink: 'ticketing' },

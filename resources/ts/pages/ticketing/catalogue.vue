@@ -2,7 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useTicketing } from '@/composables/useTicketing'
-import { listItems } from '@/utils/ticketingUi'
+import { listItems } from '@/utils/listItems'
 
 definePage({
   meta: { layout: 'default', action: 'read', subject: 'Ticketing' },

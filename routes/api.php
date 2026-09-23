@@ -238,6 +238,16 @@ Route::middleware(['auth:sanctum', 'password.changed'])->group(function () {
     Route::get('/my-work', [MyWorkController::class, 'index']);
 
     Route::get('/tasks/dashboard', [TaskController::class, 'dashboard']);
+    Route::get('/tasks/kanban', [TaskController::class, 'kanban']);
+    Route::get('/tasks/calendar', [TaskController::class, 'calendar']);
+    Route::get('/tasks/reports/overview', [TaskController::class, 'reportOverview']);
+    Route::get('/tasks/reports/by-structure', [TaskController::class, 'reportByStructure']);
+    Route::get('/tasks/reports/by-priority', [TaskController::class, 'reportByPriority']);
+    Route::get('/tasks/reports/by-source', [TaskController::class, 'reportBySource']);
+    Route::get('/tasks/reports/workload', [TaskController::class, 'reportWorkload']);
+    Route::get('/tasks/delegations', [TaskController::class, 'listDelegations']);
+    Route::post('/tasks/delegations', [TaskController::class, 'createDelegation']);
+    Route::delete('/tasks/delegations/{delegation}', [TaskController::class, 'revokeDelegation']);
     Route::get('/tasks', [TaskController::class, 'index']);
     Route::post('/tasks', [TaskController::class, 'store']);
     Route::get('/tasks/{task}', [TaskController::class, 'show']);
@@ -245,6 +255,8 @@ Route::middleware(['auth:sanctum', 'password.changed'])->group(function () {
     Route::post('/tasks/{task}/publish', [TaskController::class, 'publish']);
     Route::post('/tasks/{task}/assign', [TaskController::class, 'assign']);
     Route::post('/tasks/{task}/reassign', [TaskController::class, 'reassign']);
+    Route::post('/tasks/{task}/delegate', [TaskController::class, 'delegate']);
+    Route::post('/tasks/{task}/escalate', [TaskController::class, 'escalate']);
     Route::post('/tasks/{task}/take-charge', [TaskController::class, 'takeCharge']);
     Route::post('/tasks/{task}/start', [TaskController::class, 'start']);
     Route::post('/tasks/{task}/wait', [TaskController::class, 'wait']);
@@ -257,6 +269,7 @@ Route::middleware(['auth:sanctum', 'password.changed'])->group(function () {
     Route::post('/tasks/{task}/attachments', [TaskController::class, 'attachments']);
     Route::get('/tasks/{task}/attachments/{attachment}/download', [TaskController::class, 'downloadAttachment']);
     Route::get('/tasks/{task}/history', [TaskController::class, 'history']);
+    Route::get('/tasks/{task}/audit', [TaskController::class, 'audit']);
     Route::get('/tasks/{task}/dependencies', [TaskController::class, 'dependencies']);
     Route::post('/tasks/{task}/dependencies', [TaskController::class, 'addDependency']);
     Route::delete('/tasks/{task}/dependencies/{dependency}', [TaskController::class, 'removeDependency']);

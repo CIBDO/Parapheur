@@ -3,14 +3,21 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\StoreTaskRequest;
+use App\Http\Requests\UpdateTaskRequest;
+use App\Http\Resources\TaskResource;
 use App\Models\Task;
 use App\Models\TaskAttachment;
+use App\Models\TaskDelegation;
 use App\Models\TaskDependency;
 use App\Models\TaskDocument;
 use App\Services\PrivateDocumentStorage;
 use App\Services\Tasks\TaskAssignmentService;
+use App\Services\Tasks\TaskDelegationService;
 use App\Services\Tasks\TaskDependencyService;
 use App\Services\Tasks\TaskDocumentService;
+use App\Services\Tasks\TaskEscalationService;
+use App\Services\Tasks\TaskReportService;
 use App\Services\Tasks\TaskService;
 use App\Services\Tasks\TaskValidationService;
 use App\Services\Tasks\TaskWorkflowService;
@@ -29,6 +36,9 @@ class TaskController extends Controller
         private readonly TaskValidationService $validations,
         private readonly TaskDependencyService $dependencies,
         private readonly TaskDocumentService $taskDocuments,
+        private readonly TaskDelegationService $delegations,
+        private readonly TaskEscalationService $escalations,
+        private readonly TaskReportService $reports,
         private readonly PrivateDocumentStorage $storage,
     ) {}
 
@@ -46,64 +56,116 @@ class TaskController extends Controller
         return response()->json($this->tasks->dashboard($request->user()));
     }
 
-    public function store(Request $request): JsonResponse
+    public function kanban(Request $request): JsonResponse
     {
-        $this->authorize('create', Task::class);
+        $this->authorize('viewAny', Task::class);
 
+        return response()->json([
+            'columns' => $this->tasks->kanban($request->user(), $request->all()),
+        ]);
+    }
+
+    public function calendar(Request $request): JsonResponse
+    {
+        $this->authorize('viewAny', Task::class);
         $data = $request->validate([
-            'title' => ['required', 'string', 'max:255'],
-            'description' => ['nullable', 'string'],
-            'assignee_id' => ['nullable', 'exists:users,id'],
-            'structure_id' => ['nullable', 'exists:structures,id'],
-            'validator_id' => ['nullable', 'exists:users,id'],
-            'priority' => ['nullable', 'string'],
-            'confidentiality' => ['nullable', 'string'],
-            'due_at' => ['nullable', 'date'],
-            'starts_at' => ['nullable', 'date'],
-            'progress' => ['nullable', 'integer', 'min:0', 'max:100'],
-            'instruction_id' => ['nullable', 'exists:instructions,id'],
-            'parent_id' => ['nullable', 'exists:tasks,id'],
-            'contributor_ids' => ['nullable', 'array'],
-            'contributor_ids.*' => ['integer', 'exists:users,id'],
-            'as_draft' => ['nullable', 'boolean'],
-            'is_personal' => ['nullable', 'boolean'],
-            'source_kind' => ['nullable', 'string'],
-            'tags' => ['nullable', 'array'],
+            'from' => ['required', 'date'],
+            'to' => ['required', 'date', 'after_or_equal:from'],
         ]);
 
-        $task = $this->tasks->create($request->user(), $data);
+        return response()->json([
+            'events' => $this->tasks->calendar($request->user(), $data['from'], $data['to']),
+        ]);
+    }
 
-        return response()->json($task, 201);
+    public function reportOverview(Request $request): JsonResponse
+    {
+        abort_unless(
+            $request->user()->can('task.view_reports')
+            || $request->user()->can('task.manage')
+            || $request->user()->can('admin.access'),
+            403
+        );
+
+        return response()->json($this->reports->overview(
+            $request->user(),
+            (int) $request->integer('days', 30)
+        ));
+    }
+
+    public function reportByStructure(Request $request): JsonResponse
+    {
+        abort_unless(
+            $request->user()->can('task.view_reports')
+            || $request->user()->can('task.manage')
+            || $request->user()->can('admin.access'),
+            403
+        );
+
+        return response()->json($this->reports->byStructure(
+            $request->user(),
+            (int) $request->integer('days', 30)
+        ));
+    }
+
+    public function reportByPriority(Request $request): JsonResponse
+    {
+        abort_unless(
+            $request->user()->can('task.view_reports')
+            || $request->user()->can('task.manage')
+            || $request->user()->can('admin.access'),
+            403
+        );
+
+        return response()->json($this->reports->byPriority($request->user()));
+    }
+
+    public function reportBySource(Request $request): JsonResponse
+    {
+        abort_unless(
+            $request->user()->can('task.view_reports')
+            || $request->user()->can('task.manage')
+            || $request->user()->can('admin.access'),
+            403
+        );
+
+        return response()->json($this->reports->bySource(
+            $request->user(),
+            (int) $request->integer('days', 30)
+        ));
+    }
+
+    public function reportWorkload(Request $request): JsonResponse
+    {
+        abort_unless(
+            $request->user()->can('task.view_reports')
+            || $request->user()->can('task.manage')
+            || $request->user()->can('admin.access'),
+            403
+        );
+
+        return response()->json($this->reports->workloadByAssignee($request->user()));
+    }
+
+    public function store(StoreTaskRequest $request): JsonResponse
+    {
+        $task = $this->tasks->create($request->user(), $request->validated());
+
+        return (new TaskResource($task))->response()->setStatusCode(201);
     }
 
     public function show(Request $request, Task $task): JsonResponse
     {
         $this->authorize('view', $task);
 
-        return response()->json($this->tasks->findFor($request->user(), $task));
+        return response()->json(new TaskResource($this->tasks->findFor($request->user(), $task)));
     }
 
-    public function update(Request $request, Task $task): JsonResponse
+    public function update(UpdateTaskRequest $request, Task $task): JsonResponse
     {
-        $this->authorize('update', $task);
+        $updated = $this->tasks->update($request->user(), $task, $request->validated());
 
-        $data = $request->validate([
-            'title' => ['sometimes', 'string', 'max:255'],
-            'description' => ['nullable', 'string'],
-            'priority' => ['nullable', 'string'],
-            'confidentiality' => ['nullable', 'string'],
-            'structure_id' => ['nullable', 'exists:structures,id'],
-            'validator_id' => ['nullable', 'exists:users,id'],
-            'due_at' => ['nullable', 'date'],
-            'starts_at' => ['nullable', 'date'],
-            'progress' => ['nullable', 'integer', 'min:0', 'max:100'],
-            'contributor_ids' => ['nullable', 'array'],
-            'contributor_ids.*' => ['integer', 'exists:users,id'],
-            'tags' => ['nullable', 'array'],
-            'is_personal' => ['nullable', 'boolean'],
-        ]);
-
-        return response()->json($this->tasks->update($request->user(), $task, $data));
+        return response()->json(new TaskResource($updated));
     }
 
     public function assign(Request $request, Task $task): JsonResponse
@@ -138,6 +200,40 @@ class TaskController extends Controller
             (int) $data['assignee_id'],
             $data['motif'],
         ));
+    }
+
+    public function delegate(Request $request, Task $task): JsonResponse
+    {
+        $this->authorize('assign', $task);
+        $data = $request->validate([
+            'delegate_id' => ['required', 'exists:users,id'],
+            'starts_on' => ['nullable', 'date'],
+            'ends_on' => ['required', 'date', 'after_or_equal:starts_on'],
+            'allowed_actions' => ['nullable', 'array'],
+            'allowed_actions.*' => ['string'],
+            'reason' => ['nullable', 'string'],
+        ]);
+        $data['task_id'] = $task->id;
+
+        return response()->json($this->delegations->create($request->user(), $data), 201);
+    }
+
+    public function escalate(Request $request, Task $task): JsonResponse
+    {
+        $this->authorize('assign', $task);
+        $data = $request->validate([
+            'level' => ['nullable', 'integer', 'min:1', 'max:5'],
+            'reason' => ['nullable', 'string'],
+        ]);
+
+        $ok = $this->escalations->escalate(
+            $task,
+            $request->user(),
+            (int) ($data['level'] ?? 1),
+            $data['reason'] ?? null,
+        );
+
+        return response()->json(['ok' => $ok, 'task_id' => $task->id]);
     }
 
     public function takeCharge(Request $request, Task $task): JsonResponse
@@ -273,6 +369,47 @@ class TaskController extends Controller
         return response()->json(
             $task->histories()->with('user:id,name')->orderByDesc('created_at')->get()
         );
+    }
+
+    public function audit(Request $request, Task $task): JsonResponse
+    {
+        $this->authorize('view', $task);
+        abort_unless(
+            $request->user()->can('task.audit.view')
+            || $request->user()->can('task.manage')
+            || $request->user()->can('admin.access')
+            || (int) $task->created_by === (int) $request->user()->id,
+            403
+        );
+
+        return response()->json($this->tasks->auditTrail($task));
+    }
+
+    public function listDelegations(Request $request): JsonResponse
+    {
+        $this->authorize('viewAny', Task::class);
+
+        return response()->json($this->delegations->listForUser($request->user()));
+    }
+
+    public function createDelegation(Request $request): JsonResponse
+    {
+        $this->authorize('viewAny', Task::class);
+        $data = $request->validate([
+            'delegate_id' => ['required', 'exists:users,id'],
+            'task_id' => ['nullable', 'exists:tasks,id'],
+            'starts_on' => ['nullable', 'date'],
+            'ends_on' => ['required', 'date'],
+            'allowed_actions' => ['nullable', 'array'],
+            'reason' => ['nullable', 'string'],
+        ]);
+
+        return response()->json($this->delegations->create($request->user(), $data), 201);
+    }
+
+    public function revokeDelegation(Request $request, TaskDelegation $delegation): JsonResponse
+    {
+        return response()->json($this->delegations->revoke($request->user(), $delegation));
     }
 
     public function dependencies(Request $request, Task $task): JsonResponse

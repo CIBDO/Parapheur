@@ -2,7 +2,8 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { $api } from '@/utils/api'
-import { listItems, formatCorrespondenceNumber } from '@/utils/courrierUi'
+import { listItems } from '@/utils/listItems'
+import { formatCorrespondenceNumber } from '@/utils/courrierUi'
 
 definePage({
   meta: { layout: 'default', action: 'read', subject: 'Courrier' },

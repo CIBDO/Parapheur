@@ -7,6 +7,8 @@ use App\Enums\DocumentPriority;
 use App\Enums\NumberingSequenceCode;
 use App\Enums\TaskSource;
 use App\Enums\TaskStatus;
+use App\Events\TaskCreated;
+use App\Models\AuditLog;
 use App\Models\Task;
 use App\Models\TaskAttachment;
 use App\Models\TaskComment;
@@ -53,6 +55,15 @@ class TaskService
         if (! empty($filters['overdue'])) {
             $query->overdue();
         }
+        if (! empty($filters['team'])) {
+            if ($actor->can('task.view_team') || $actor->can('task.view_all') || $this->access->isAdmin($actor)) {
+                if ($actor->structure_id && empty($filters['structure_id'])) {
+                    $query->where('structure_id', $actor->structure_id);
+                }
+            } else {
+                $query->whereRaw('1 = 0');
+            }
+        }
         if (! empty($filters['status'])) {
             $query->where('status', $filters['status']);
         }
@@ -62,11 +73,24 @@ class TaskService
         if (! empty($filters['assignee_id'])) {
             $query->where('assignee_id', $filters['assignee_id']);
         }
+        if (! empty($filters['creator_id'])) {
+            $query->where('created_by', $filters['creator_id']);
+        }
         if (! empty($filters['structure_id'])) {
             $query->where('structure_id', $filters['structure_id']);
         }
+        if (! empty($filters['source_kind'])) {
+            $query->where('source_kind', $filters['source_kind']);
+        }
+        if (! empty($filters['confidentiality'])) {
+            $query->where('confidentiality', $filters['confidentiality']);
+        }
         if (! empty($filters['instruction_id'])) {
             $query->where('instruction_id', $filters['instruction_id']);
+        }
+        if (! empty($filters['tag'])) {
+            $tag = $filters['tag'];
+            $query->whereJsonContains('tags', $tag);
         }
         if (! empty($filters['parent_id'])) {
             $query->where('parent_id', $filters['parent_id']);
@@ -78,7 +102,10 @@ class TaskService
             $query->where(function ($builder) use ($q) {
                 $builder->where('reference', 'like', $q)
                     ->orWhere('title', 'like', $q)
-                    ->orWhere('description', 'like', $q);
+                    ->orWhere('description', 'like', $q)
+                    ->orWhereHas('assignee', fn ($a) => $a->where('name', 'like', $q))
+                    ->orWhereHas('creator', fn ($a) => $a->where('name', 'like', $q))
+                    ->orWhereHas('contributors', fn ($a) => $a->where('users.name', 'like', $q));
             });
         }
         if (! empty($filters['due_from'])) {
@@ -86,6 +113,12 @@ class TaskService
         }
         if (! empty($filters['due_to'])) {
             $query->whereDate('due_at', '<=', $filters['due_to']);
+        }
+        if (! empty($filters['created_from'])) {
+            $query->whereDate('created_at', '>=', $filters['created_from']);
+        }
+        if (! empty($filters['created_to'])) {
+            $query->whereDate('created_at', '<=', $filters['created_to']);
         }
 
         $sort = $filters['sort'] ?? 'due_at';
@@ -171,6 +204,7 @@ class TaskService
             }
 
             $this->reminders->scheduleFor($task);
+            event(new TaskCreated($task, $actor));
 
             return $task->fresh(['assignee', 'creator', 'contributors']);
         });
@@ -227,16 +261,144 @@ class TaskService
             abort(403);
         }
 
+        $mentionIds = $this->extractMentionUserIds($body);
+
         $comment = $task->comments()->create([
             'user_id' => $actor->id,
             'body' => $body,
+            'mentions' => $mentionIds ?: null,
         ]);
 
-        $this->recordHistory($task, $actor, 'commented', $task->status->value, $task->status->value, $body);
+        $this->recordHistory($task, $actor, 'commented', $task->status->value, $task->status->value, $body, [
+            'mentions' => $mentionIds,
+        ]);
         $this->notifications->notifyComment($task, $actor, $body);
-        $this->audit->log('task.commented', $task, ['actor_id' => $actor->id, 'comment_id' => $comment->id]);
+        if ($mentionIds !== []) {
+            $this->notifications->notifyMentions($task, $actor, $body, $mentionIds);
+        }
+        $this->audit->log('task.commented', $task, [
+            'actor_id' => $actor->id,
+            'comment_id' => $comment->id,
+            'mentions' => $mentionIds,
+        ]);
 
         return $comment->load('user:id,name');
+    }
+
+    /**
+     * @return list<int>
+     */
+    public function extractMentionUserIds(string $body): array
+    {
+        // Formats : @42 ou @"Nom Complet"
+        preg_match_all('/@(\d+)\b/', $body, $idMatches);
+        $ids = array_map('intval', $idMatches[1] ?? []);
+
+        preg_match_all('/@"([^"]+)"/', $body, $nameMatches);
+        foreach ($nameMatches[1] ?? [] as $name) {
+            $userId = User::query()->where('name', $name)->value('id');
+            if ($userId) {
+                $ids[] = (int) $userId;
+            }
+        }
+
+        return array_values(array_unique(array_filter($ids)));
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    public function auditTrail(Task $task): array
+    {
+        return AuditLog::query()
+            ->with('user:id,name')
+            ->where('auditable_type', Task::class)
+            ->where('auditable_id', $task->id)
+            ->orderByDesc('created_at')
+            ->limit(200)
+            ->get()
+            ->map(fn (AuditLog $log) => [
+                'id' => $log->id,
+                'action' => $log->action,
+                'user' => $log->user,
+                'ip_address' => $log->ip_address,
+                'properties' => $log->properties,
+                'created_at' => optional($log->created_at)?->toIso8601String(),
+            ])
+            ->all();
+    }
+
+    /**
+     * @return array<string, list<array<string, mixed>>>
+     */
+    public function kanban(User $actor, array $filters = []): array
+    {
+        $query = Task::query()
+            ->with(['assignee:id,name', 'structure:id,code,name'])
+            ->visibleTo($actor)
+            ->whereNull('parent_id');
+
+        if (! empty($filters['mine'])) {
+            $query->mine($actor);
+        }
+        if (! empty($filters['team']) && $actor->structure_id) {
+            $query->where('structure_id', $actor->structure_id);
+        }
+        if (! empty($filters['structure_id'])) {
+            $query->where('structure_id', $filters['structure_id']);
+        }
+        if (! empty($filters['assignee_id'])) {
+            $query->where('assignee_id', $filters['assignee_id']);
+        }
+
+        $columns = [];
+        foreach ($query->orderBy('due_at')->limit(300)->get() as $task) {
+            $status = $task->status?->value ?? 'unknown';
+            $columns[$status] ??= [];
+            $columns[$status][] = [
+                'id' => $task->id,
+                'reference' => $task->reference,
+                'title' => $task->title,
+                'status' => $status,
+                'priority' => $task->priority?->value,
+                'due_at' => optional($task->due_at)?->toIso8601String(),
+                'is_overdue' => $task->isOverdue(),
+                'assignee' => $task->assignee,
+                'progress' => $task->progress,
+            ];
+        }
+
+        return $columns;
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    public function calendar(User $actor, string $from, string $to): array
+    {
+        return Task::query()
+            ->with(['assignee:id,name'])
+            ->visibleTo($actor)
+            ->whereNull('parent_id')
+            ->whereNotNull('due_at')
+            ->whereDate('due_at', '>=', $from)
+            ->whereDate('due_at', '<=', $to)
+            ->orderBy('due_at')
+            ->limit(500)
+            ->get()
+            ->map(fn (Task $task) => [
+                'id' => $task->id,
+                'title' => $task->title,
+                'reference' => $task->reference,
+                'start' => optional($task->due_at)?->toIso8601String(),
+                'end' => optional($task->due_at)?->toIso8601String(),
+                'status' => $task->status?->value,
+                'priority' => $task->priority?->value,
+                'is_overdue' => $task->isOverdue(),
+                'url' => '/taches/'.$task->id,
+                'assignee' => $task->assignee,
+            ])
+            ->all();
     }
 
     public function addAttachment(User $actor, Task $task, UploadedFile $file, string $kind = 'attachment'): TaskAttachment

@@ -75,3 +75,68 @@ export const formatTaskDue = (due?: string | null) => {
     return due
   }
 }
+
+export const taskKanbanColumnOrder = [
+  'imputee',
+  'prise_en_charge',
+  'en_cours',
+  'en_attente',
+  'retournee',
+  'a_valider',
+  'terminee',
+  'validee',
+]
+
+export const taskSourceLabels: Record<string, string> = {
+  manual: 'Manuelle',
+  courrier: 'Courrier',
+  ticket: 'Ticket',
+  meeting: 'Réunion',
+  decision: 'Décision',
+  parapheur: 'Parapheur',
+  dossier: 'Dossier',
+  affaire: 'Affaire',
+  appointment: 'RDV',
+  instruction: 'Instruction',
+  other: 'Autre',
+}
+
+/** Avancement affiché : valeur stockée, plafonnée au minimum du statut workflow. */
+export const taskProgressBaseline: Record<string, number> = {
+  brouillon: 0,
+  imputee: 10,
+  prise_en_charge: 25,
+  en_cours: 40,
+  en_attente: 40,
+  retournee: 45,
+  terminee: 90,
+  a_valider: 90,
+  validee: 100,
+  annulee: 0,
+}
+
+export const taskDisplayProgress = (status?: string | null, progress?: number | null) => {
+  if (status === 'annulee')
+    return 0
+  const stored = Math.min(100, Math.max(0, Number(progress ?? 0)))
+  const baseline = taskProgressBaseline[status || ''] ?? 0
+  if (status === 'validee' || status === 'terminee')
+    return Math.max(stored, baseline)
+
+  return Math.max(stored, baseline)
+}
+
+export const taskProgressEditable = (status?: string | null) =>
+  ['prise_en_charge', 'en_cours', 'en_attente', 'retournee'].includes(String(status || ''))
+
+export const taskProgressColor = (value: number) => {
+  if (value >= 90)
+    return 'success'
+  if (value >= 40)
+    return 'primary'
+  if (value >= 10)
+    return 'info'
+
+  return 'secondary'
+}
+

@@ -1,15 +1,8 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { $api } from '@/utils/api'
-import {
-  correspondenceDirectionLabels,
-  correspondenceStatusColors,
-  detailRouteName,
-  formatCorrespondenceNumber,
-  formatCourrierDate,
-  listItems,
-  statusLabel,
-} from '@/utils/courrierUi'
+import { listItems } from '@/utils/listItems'
+import { correspondenceDirectionLabels, correspondenceStatusColors, detailRouteName, formatCorrespondenceNumber, formatCourrierDate, statusLabel } from '@/utils/courrierUi'
 
 definePage({
   meta: { layout: 'default', action: 'read', subject: 'Courrier' },

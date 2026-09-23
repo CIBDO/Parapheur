@@ -53,6 +53,38 @@ export const useTasks = () => {
     return await $api(`/tasks/${id}/${path}`, { method: 'POST', body })
   }
 
+  const fetchKanban = async (params: Record<string, any> = {}) => {
+    return await $api('/tasks/kanban', { query: params })
+  }
+
+  const fetchCalendar = async (from: string, to: string) => {
+    return await $api('/tasks/calendar', { query: { from, to } })
+  }
+
+  const fetchReportOverview = async (days = 30) => {
+    return await $api('/tasks/reports/overview', { query: { days } })
+  }
+
+  const fetchReportByStructure = async (days = 30) => {
+    return await $api('/tasks/reports/by-structure', { query: { days } })
+  }
+
+  const fetchReportByPriority = async () => {
+    return await $api('/tasks/reports/by-priority')
+  }
+
+  const fetchReportBySource = async (days = 30) => {
+    return await $api('/tasks/reports/by-source', { query: { days } })
+  }
+
+  const fetchReportWorkload = async () => {
+    return await $api('/tasks/reports/workload')
+  }
+
+  const fetchAudit = async (id: number | string) => {
+    return await $api(`/tasks/${id}/audit`)
+  }
+
   return {
     loading,
     items,
@@ -63,5 +95,13 @@ export const useTasks = () => {
     get,
     create,
     action,
+    fetchKanban,
+    fetchCalendar,
+    fetchReportOverview,
+    fetchReportByStructure,
+    fetchReportByPriority,
+    fetchReportBySource,
+    fetchReportWorkload,
+    fetchAudit,
   }
 }

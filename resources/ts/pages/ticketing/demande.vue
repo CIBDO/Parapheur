@@ -3,7 +3,8 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { $api } from '@/utils/api'
 import { useTicketing } from '@/composables/useTicketing'
-import { formatTicketNumber, listItems, teamAgentSelectItems } from '@/utils/ticketingUi'
+import { listItems } from '@/utils/listItems'
+import { formatTicketNumber, teamAgentSelectItems } from '@/utils/ticketingUi'
 
 definePage({
   meta: {

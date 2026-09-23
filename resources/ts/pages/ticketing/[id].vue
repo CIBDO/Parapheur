@@ -3,10 +3,10 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { $api } from '@/utils/api'
 import { useTicketing } from '@/composables/useTicketing'
+import { listItems } from '@/utils/listItems'
 import {
   formatTicketDateTime,
   formatTicketNumber,
-  listItems,
   slaBadge,
   teamAgentSelectItems,
   ticketActorRoleLabel,
