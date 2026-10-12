@@ -4,10 +4,12 @@ namespace App\Services\Tasks;
 
 use App\Enums\DocumentConfidentiality;
 use App\Enums\DocumentPriority;
+use App\Enums\InstructionKind;
 use App\Enums\InstructionStatus;
 use App\Enums\NumberingSequenceCode;
 use App\Enums\TaskSource;
 use App\Models\Instruction;
+use App\Models\InstructionRecipient;
 use App\Models\InstructionUpdate;
 use App\Models\Task;
 use App\Models\User;
@@ -15,6 +17,7 @@ use App\Services\AuditLogger;
 use App\Services\NumberingService;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class InstructionService
 {
@@ -29,11 +32,19 @@ class InstructionService
      */
     public function list(User $actor, array $filters = []): LengthAwarePaginator
     {
-        $query = Instruction::query()->with(['assignee:id,name', 'issuer:id,name', 'document:id,reference', 'structure:id,code,name']);
+        $query = Instruction::query()->with([
+            'assignee:id,name',
+            'issuer:id,name',
+            'coordinator:id,name',
+            'document:id,reference',
+            'structure:id,code,name',
+        ]);
 
         if (! $actor->can('instruction.view') && ! $actor->can('instructions.manage') && ! $actor->can('admin.access') && ! $actor->can('task.view_all')) {
             $query->where(function ($q) use ($actor) {
-                $q->where('assignee_id', $actor->id)->orWhere('issuer_id', $actor->id);
+                $q->where('assignee_id', $actor->id)
+                    ->orWhere('issuer_id', $actor->id)
+                    ->orWhere('coordinator_id', $actor->id);
             });
         }
 
@@ -42,6 +53,9 @@ class InstructionService
         }
         if (! empty($filters['issued_by_me'])) {
             $query->where('issuer_id', $actor->id);
+        }
+        if (! empty($filters['kind'])) {
+            $query->where('kind', $filters['kind']);
         }
         if (! empty($filters['status'])) {
             $query->where('status', $filters['status']);
@@ -69,12 +83,21 @@ class InstructionService
     public function create(User $actor, array $data): Instruction
     {
         return DB::transaction(function () use ($actor, $data) {
+            $kind = $data['kind'] ?? InstructionKind::Imputation->value;
+            $isDirective = $kind === InstructionKind::Directive->value;
+
+            $status = $data['status']
+                ?? ($isDirective ? InstructionStatus::Brouillon->value : InstructionStatus::AFaire->value);
+
             $instruction = Instruction::query()->create([
+                'parent_id' => $data['parent_id'] ?? null,
                 'reference' => $this->numbering->nextNumber(NumberingSequenceCode::Instruction),
+                'kind' => $kind,
                 'document_id' => $data['document_id'] ?? null,
                 'meeting_decision_id' => $data['meeting_decision_id'] ?? null,
                 'issuer_id' => $actor->id,
-                'assignee_id' => $data['assignee_id'],
+                'assignee_id' => $data['assignee_id'] ?? null,
+                'coordinator_id' => $data['coordinator_id'] ?? ($isDirective ? $actor->id : null),
                 'structure_id' => $data['structure_id'] ?? null,
                 'title' => $data['title'],
                 'body' => $data['body'] ?? $data['title'],
@@ -83,12 +106,26 @@ class InstructionService
                 'source_kind' => $data['source_kind'] ?? TaskSource::Manual->value,
                 'source_type' => $data['source_type'] ?? null,
                 'source_id' => $data['source_id'] ?? null,
-                'status' => $data['status'] ?? InstructionStatus::AFaire->value,
+                'status' => $status,
                 'due_date' => $data['due_date'] ?? null,
+                'issued_at' => $data['issued_at'] ?? ($status === InstructionStatus::Emise->value ? now() : null),
                 'is_personal' => (bool) ($data['is_personal'] ?? false),
             ]);
 
-            if (! empty($data['create_execution_task'])) {
+            foreach ($data['recipient_ids'] ?? [] as $userId) {
+                InstructionRecipient::query()->create([
+                    'instruction_id' => $instruction->id,
+                    'user_id' => $userId,
+                ]);
+            }
+            foreach ($data['recipient_structure_ids'] ?? [] as $structureId) {
+                InstructionRecipient::query()->create([
+                    'instruction_id' => $instruction->id,
+                    'structure_id' => $structureId,
+                ]);
+            }
+
+            if (! empty($data['create_execution_task']) && $instruction->assignee_id) {
                 $this->tasks->create($actor, [
                     'title' => $instruction->title,
                     'description' => $instruction->body,
@@ -104,9 +141,12 @@ class InstructionService
                 ]);
             }
 
-            $this->audit->log('instruction.created', $instruction, ['actor_id' => $actor->id]);
+            $this->audit->log('instruction.created', $instruction, [
+                'actor_id' => $actor->id,
+                'kind' => $kind,
+            ]);
 
-            return $instruction->fresh(['assignee', 'issuer', 'tasks']);
+            return $instruction->fresh(['assignee', 'issuer', 'coordinator', 'tasks', 'recipients']);
         });
     }
 
@@ -117,6 +157,7 @@ class InstructionService
      */
     public function createFromLegacy(User $actor, array $data): Instruction
     {
+        $data['kind'] = $data['kind'] ?? InstructionKind::Imputation->value;
         $data['create_execution_task'] = $data['create_execution_task'] ?? true;
 
         return $this->create($actor, $data);
@@ -124,14 +165,22 @@ class InstructionService
 
     public function updateStatus(User $actor, Instruction $instruction, string $status, ?string $body = null): Instruction
     {
-        $allowed = array_map(fn (InstructionStatus $s) => $s->value, InstructionStatus::cases());
+        $allowed = $instruction->isDirective()
+            ? InstructionStatus::directiveValues()
+            : InstructionStatus::imputationValues();
+
         if (! in_array($status, $allowed, true)) {
-            abort(422, 'Statut instruction invalide.');
+            throw ValidationException::withMessages([
+                'status' => 'Transition de statut non autorisée pour ce type d\'instruction.',
+            ]);
         }
 
         return DB::transaction(function () use ($actor, $instruction, $status, $body) {
             $instruction->status = $status;
-            if ($status === InstructionStatus::EnCours->value) {
+            if ($status === InstructionStatus::Emise->value) {
+                $instruction->issued_at = $instruction->issued_at ?? now();
+            }
+            if (in_array($status, [InstructionStatus::EnCours->value, InstructionStatus::PriseEnCharge->value], true)) {
                 $instruction->started_at = $instruction->started_at ?? now();
             }
             if ($status === InstructionStatus::Executee->value) {
@@ -175,7 +224,7 @@ class InstructionService
                 'status' => $status,
             ]);
 
-            return $instruction->fresh(['updates.user', 'assignee', 'tasks']);
+            return $instruction->fresh(['updates.user', 'assignee', 'coordinator', 'tasks']);
         });
     }
 

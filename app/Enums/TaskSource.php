@@ -14,6 +14,7 @@ enum TaskSource: string
     case Affaire = 'affaire';
     case Appointment = 'appointment';
     case Instruction = 'instruction';
+    case Production = 'production';
     case Other = 'other';
 
     public function label(): string
@@ -29,7 +30,9 @@ enum TaskSource: string
             self::Affaire => 'Affaire',
             self::Appointment => 'Rendez-vous',
             self::Instruction => 'Instruction',
+            self::Production => 'Production',
             self::Other => 'Autre',
         };
     }
 }
+

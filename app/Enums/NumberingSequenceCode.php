@@ -14,6 +14,9 @@ enum NumberingSequenceCode: string
     case Problem = 'PRB';
     case Task = 'TSK';
     case Instruction = 'INS';
+    case ProductionOccurrence = 'PRO';
+    case ProductionTransmission = 'TRP';
+    case ProductionFolder = 'DPR';
 
     public function label(): string
     {
@@ -28,8 +31,12 @@ enum NumberingSequenceCode: string
             self::Problem => 'Problème',
             self::Task => 'Tâche',
             self::Instruction => 'Instruction',
+            self::ProductionOccurrence => 'Occurrence de production',
+            self::ProductionTransmission => 'Transmission de production',
+            self::ProductionFolder => 'Dossier de production',
         };
     }
+
 
     public function prefix(): string
     {

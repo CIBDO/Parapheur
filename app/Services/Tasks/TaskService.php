@@ -176,6 +176,7 @@ class TaskService
                 'reference' => $this->numbering->nextNumber(NumberingSequenceCode::Task),
                 'parent_id' => $data['parent_id'] ?? null,
                 'instruction_id' => $data['instruction_id'] ?? null,
+                'task_type_id' => $data['task_type_id'] ?? null,
                 'created_by' => $actor->id,
                 'assignee_id' => $assigneeId,
                 'structure_id' => $data['structure_id'] ?? $actor->structure_id,

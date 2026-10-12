@@ -194,6 +194,10 @@ declare global {
   const priorityColor: typeof import('./resources/ts/utils/parapheurUi')['priorityColor']
   const priorityLabels: typeof import('./resources/ts/utils/parapheurUi')['priorityLabels']
   const priorityOptions: typeof import('./resources/ts/utils/parapheurUi')['priorityOptions']
+  const productionDelayLabels: typeof import('./resources/ts/utils/tasksUi')['productionDelayLabels']
+  const productionFrequencyLabels: typeof import('./resources/ts/utils/tasksUi')['productionFrequencyLabels']
+  const productionStatusColor: typeof import('./resources/ts/utils/tasksUi')['productionStatusColor']
+  const productionStatusLabels: typeof import('./resources/ts/utils/tasksUi')['productionStatusLabels']
   const provide: typeof import('vue')['provide']
   const provideLocal: typeof import('@vueuse/core')['provideLocal']
   const reactify: typeof import('@vueuse/core')['reactify']
@@ -670,6 +674,10 @@ declare module 'vue' {
     readonly priorityColor: UnwrapRef<typeof import('./resources/ts/utils/parapheurUi')['priorityColor']>
     readonly priorityLabels: UnwrapRef<typeof import('./resources/ts/utils/parapheurUi')['priorityLabels']>
     readonly priorityOptions: UnwrapRef<typeof import('./resources/ts/utils/parapheurUi')['priorityOptions']>
+    readonly productionDelayLabels: UnwrapRef<typeof import('./resources/ts/utils/tasksUi')['productionDelayLabels']>
+    readonly productionFrequencyLabels: UnwrapRef<typeof import('./resources/ts/utils/tasksUi')['productionFrequencyLabels']>
+    readonly productionStatusColor: UnwrapRef<typeof import('./resources/ts/utils/tasksUi')['productionStatusColor']>
+    readonly productionStatusLabels: UnwrapRef<typeof import('./resources/ts/utils/tasksUi')['productionStatusLabels']>
     readonly provide: UnwrapRef<typeof import('vue')['provide']>
     readonly provideLocal: UnwrapRef<typeof import('@vueuse/core')['provideLocal']>
     readonly reactify: UnwrapRef<typeof import('@vueuse/core')['reactify']>

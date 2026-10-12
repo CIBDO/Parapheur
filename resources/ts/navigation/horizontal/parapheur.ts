@@ -31,10 +31,48 @@ export default [
         subject: 'Instruction',
       },
       {
+        title: 'Directives',
+        to: { name: 'taches-instructions', query: { kind: 'directive' } },
+        action: 'read',
+        subject: 'Instruction',
+      },
+      {
         title: 'Rapports',
         to: 'taches-rapports',
         action: 'read',
         subject: 'Task',
+      },
+    ],
+  },
+  {
+    title: 'Productions',
+    icon: { icon: 'tabler-file-time' },
+    action: 'read',
+    subject: 'Production',
+    children: [
+      {
+        title: 'Tableau de bord',
+        to: 'productions',
+        action: 'read',
+        subject: 'Production',
+      },
+      {
+        title: 'Occurrences',
+        to: 'productions-occurrences',
+        action: 'read',
+        subject: 'Production',
+      },
+      {
+        title: 'Obligations',
+        to: 'productions-obligations',
+        action: 'manage',
+        subject: 'Production',
+      },
+      {
+        title: 'Pilotage DG',
+        to: 'productions-direction',
+        action: 'read',
+        subject: 'Production',
       },
     ],
   },

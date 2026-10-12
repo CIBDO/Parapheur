@@ -13,6 +13,7 @@ enum DocumentOrigin: string
     case Workspace = 'workspace';
     case Courrier = 'courrier';
     case Task = 'task';
+    case Production = 'production';
 
     public function label(): string
     {
@@ -26,8 +27,10 @@ enum DocumentOrigin: string
             self::Workspace => 'Espace de travail',
             self::Courrier => 'Courrier',
             self::Task => 'Tâche',
+            self::Production => 'Production',
         };
     }
+
 
     public function isWorkspaceBound(): bool
     {

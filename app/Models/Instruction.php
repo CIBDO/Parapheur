@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\DocumentConfidentiality;
 use App\Enums\DocumentPriority;
+use App\Enums\InstructionKind;
 use App\Enums\InstructionStatus;
 use App\Enums\TaskSource;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -17,11 +18,14 @@ class Instruction extends Model
     use HasFactory;
 
     protected $fillable = [
+        'parent_id',
         'reference',
+        'kind',
         'document_id',
         'meeting_decision_id',
         'issuer_id',
         'assignee_id',
+        'coordinator_id',
         'structure_id',
         'title',
         'body',
@@ -32,6 +36,7 @@ class Instruction extends Model
         'source_id',
         'status',
         'due_date',
+        'issued_at',
         'started_at',
         'completed_at',
         'closed_at',
@@ -44,11 +49,13 @@ class Instruction extends Model
     protected function casts(): array
     {
         return [
+            'kind' => InstructionKind::class,
             'priority' => DocumentPriority::class,
             'confidentiality' => DocumentConfidentiality::class,
             'source_kind' => TaskSource::class,
             'status' => InstructionStatus::class,
             'due_date' => 'date',
+            'issued_at' => 'datetime',
             'started_at' => 'datetime',
             'completed_at' => 'datetime',
             'closed_at' => 'datetime',
@@ -56,6 +63,16 @@ class Instruction extends Model
             'last_reminded_at' => 'datetime',
             'is_personal' => 'boolean',
         ];
+    }
+
+    public function parent(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'parent_id');
+    }
+
+    public function children(): HasMany
+    {
+        return $this->hasMany(self::class, 'parent_id');
     }
 
     public function document(): BelongsTo
@@ -76,6 +93,11 @@ class Instruction extends Model
     public function assignee(): BelongsTo
     {
         return $this->belongsTo(User::class, 'assignee_id');
+    }
+
+    public function coordinator(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'coordinator_id');
     }
 
     public function structure(): BelongsTo
@@ -101,6 +123,11 @@ class Instruction extends Model
     public function recipients(): HasMany
     {
         return $this->hasMany(InstructionRecipient::class);
+    }
+
+    public function isDirective(): bool
+    {
+        return $this->kind === InstructionKind::Directive;
     }
 
     public function isOverdue(): bool

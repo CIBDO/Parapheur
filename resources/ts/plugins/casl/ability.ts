@@ -13,6 +13,7 @@ export type Subjects =
   | 'Instruction'
   | 'Task'
   | 'MyWork'
+  | 'Production'
   | 'Meeting'
   | 'MeetingType'
   | 'MeetingTemplate'

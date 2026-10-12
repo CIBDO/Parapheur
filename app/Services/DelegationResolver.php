@@ -9,8 +9,28 @@ use App\Models\User;
 class DelegationResolver
 {
     /**
-     * Retourne le délégant actif pour lequel $actor agit, le cas échéant.
+     * Délégués actifs qui peuvent consulter ou recevoir à la place du délégant.
+     *
+     * @return list<User>
      */
+    public function activeDelegates(User $delegator, string $action = 'consultation'): array
+    {
+        $today = now()->toDateString();
+
+        return Delegation::query()
+            ->with('delegate')
+            ->where('delegator_id', $delegator->id)
+            ->where('is_active', true)
+            ->whereDate('starts_on', '<=', $today)
+            ->whereDate('ends_on', '>=', $today)
+            ->get()
+            ->filter(fn (Delegation $delegation) => $delegation->delegate && $this->allowsAction($delegation, $action))
+            ->map(fn (Delegation $delegation) => $delegation->delegate)
+            ->unique('id')
+            ->values()
+            ->all();
+    }
+
     public function resolveDelegator(User $actor, Document $document, string $action): ?User
     {
         $today = now()->toDateString();

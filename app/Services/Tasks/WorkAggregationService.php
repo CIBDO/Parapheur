@@ -3,8 +3,10 @@
 namespace App\Services\Tasks;
 
 use App\Enums\InstructionStatus;
+use App\Enums\ProductionOccurrenceStatus;
 use App\Enums\TaskStatus;
 use App\Models\Instruction;
+use App\Models\ProductionOccurrence;
 use App\Models\Task;
 use App\Models\User;
 
@@ -48,6 +50,23 @@ class WorkAggregationService
                 ->where('assignee_id', $user->id)
                 ->whereIn('status', InstructionStatus::openValues())
                 ->count(),
+            'productions' => ProductionOccurrence::query()
+                ->where('responsible_id', $user->id)
+                ->whereNotIn('status', [
+                    ProductionOccurrenceStatus::Transmise->value,
+                    ProductionOccurrenceStatus::Cloturee->value,
+                    ProductionOccurrenceStatus::Annulee->value,
+                ])
+                ->count(),
+            'productions_overdue' => ProductionOccurrence::query()
+                ->where('responsible_id', $user->id)
+                ->where('deadline_at', '<', now())
+                ->whereNotIn('status', [
+                    ProductionOccurrenceStatus::Transmise->value,
+                    ProductionOccurrenceStatus::Cloturee->value,
+                    ProductionOccurrenceStatus::Annulee->value,
+                ])
+                ->count(),
         ];
 
         $taskItems = (clone $myOpen)
@@ -88,8 +107,8 @@ class WorkAggregationService
         try {
             if (class_exists(\App\Models\CorrespondenceAssignment::class)) {
                 $mailCount = \App\Models\CorrespondenceAssignment::query()
-                    ->where('assignee_id', $user->id)
-                    ->whereIn('status', ['imputed', 'in_progress', 'taken_charge', 'a_traiter', 'en_cours'])
+                    ->where('to_user_id', $user->id)
+                    ->whereIn('status', ['transmis', 'recu', 'consulte', 'pris_en_charge'])
                     ->count();
                 if ($mailCount > 0) {
                     $items[] = [
@@ -99,6 +118,26 @@ class WorkAggregationService
                         'url' => '/courrier',
                     ];
                 }
+            }
+        } catch (\Throwable) {
+        }
+
+        try {
+            $prodCount = ProductionOccurrence::query()
+                ->where('responsible_id', $user->id)
+                ->whereNotIn('status', [
+                    ProductionOccurrenceStatus::Transmise->value,
+                    ProductionOccurrenceStatus::Cloturee->value,
+                    ProductionOccurrenceStatus::Annulee->value,
+                ])
+                ->count();
+            if ($prodCount > 0) {
+                $items[] = [
+                    'type' => 'production',
+                    'label' => $prodCount.' production(s) attendue(s)',
+                    'count' => $prodCount,
+                    'url' => '/productions/occurrences',
+                ];
             }
         } catch (\Throwable) {
         }

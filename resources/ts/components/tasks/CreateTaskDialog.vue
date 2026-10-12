@@ -21,6 +21,7 @@ const router = useRouter()
 const { create } = useTasks()
 
 const users = ref<{ id: number; name: string }[]>([])
+const taskTypes = ref<{ id: number; name: string }[]>([])
 const saving = ref(false)
 const showAdvanced = ref(false)
 const usersLoaded = ref(false)
@@ -34,6 +35,7 @@ const emptyForm = () => ({
   as_draft: false,
   contributor_ids: [] as number[],
   confidentiality: 'normal',
+  task_type_id: null as number | null,
 })
 
 const form = ref(emptyForm())
@@ -46,8 +48,12 @@ const resetForm = () => {
 const loadUsers = async () => {
   if (usersLoaded.value)
     return
-  const res = await $api('/meta/users')
+  const [res, types] = await Promise.all([
+    $api('/meta/users'),
+    $api('/task-types'),
+  ])
   users.value = res.data ?? res
+  taskTypes.value = types.data ?? types
   usersLoaded.value = true
 }
 
@@ -167,6 +173,15 @@ const submit = async () => {
               :items="users"
               multiple
               chips
+            />
+            <AppSelect
+              v-model="form.task_type_id"
+              class="mb-4"
+              label="Type de tâche"
+              :items="taskTypes"
+              item-title="name"
+              item-value="id"
+              clearable
             />
             <AppSelect
               v-model="form.confidentiality"

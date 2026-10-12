@@ -18,14 +18,17 @@ definePage({
 const router = useRouter()
 const instructions = ref<any[]>([])
 const loading = ref(false)
+const route = useRoute()
 const filterLate = ref(false)
 const showCreate = ref(false)
 const users = ref<{ id: number; name: string }[]>([])
 const creating = ref(false)
+const kindFilter = computed(() => String(route.query.kind || ''))
 
 const form = ref({
   title: '',
   body: '',
+  kind: 'imputation',
   assignee_id: null as number | null,
   priority: 'normale',
   due_date: '',
@@ -35,13 +38,20 @@ const form = ref({
 const load = async () => {
   loading.value = true
   try {
-    const res = await $api('/instructions', { query: { overdue: filterLate.value ? 1 : undefined } })
+    const res = await $api('/instructions', {
+      query: {
+        overdue: filterLate.value ? 1 : undefined,
+        kind: kindFilter.value || undefined,
+      },
+    })
     instructions.value = res.data ?? res
   }
   finally {
     loading.value = false
   }
 }
+
+watch(kindFilter, load)
 
 const loadUsers = async () => {
   const res = await $api('/meta/users')
@@ -67,7 +77,15 @@ const create = async () => {
       },
     })
     showCreate.value = false
-    form.value = { title: '', body: '', assignee_id: null, priority: 'normale', due_date: '', create_execution_task: true }
+    form.value = {
+      title: '',
+      body: '',
+      kind: kindFilter.value === 'directive' ? 'directive' : 'imputation',
+      assignee_id: null,
+      priority: 'normale',
+      due_date: '',
+      create_execution_task: true,
+    }
     await load()
   }
   finally {
@@ -89,9 +107,9 @@ onMounted(async () => {
 <template>
   <div>
     <ParapheurPageHeader
-      title="Instructions"
-      subtitle="Directives hiérarchiques et tâches d’exécution associées"
-      icon="tabler-list-check"
+      :title="kindFilter === 'directive' ? 'Directives' : 'Instructions'"
+      :subtitle="kindFilter === 'directive' ? 'Orientations institutionnelles décomposables en tâches' : 'Imputations et tâches d’exécution associées'"
+      :icon="kindFilter === 'directive' ? 'tabler-speakerphone' : 'tabler-list-check'"
     >
       <template #actions>
         <VSwitch
@@ -105,9 +123,9 @@ onMounted(async () => {
         <VBtn
           color="primary"
           prepend-icon="tabler-plus"
-          @click="showCreate = true"
+          @click="showCreate = true; form.kind = kindFilter === 'directive' ? 'directive' : 'imputation'"
         >
-          Nouvelle instruction
+          {{ kindFilter === 'directive' ? 'Nouvelle directive' : 'Nouvelle instruction' }}
         </VBtn>
         <VBtn
           variant="tonal"
@@ -267,8 +285,17 @@ onMounted(async () => {
       v-model="showCreate"
       max-width="560"
     >
-      <VCard title="Nouvelle instruction">
+      <VCard :title="form.kind === 'directive' ? 'Nouvelle directive' : 'Nouvelle instruction'">
         <VCardText>
+          <VSelect
+            v-model="form.kind"
+            class="mb-3"
+            label="Type"
+            :items="[
+              { title: 'Imputation', value: 'imputation' },
+              { title: 'Directive', value: 'directive' },
+            ]"
+          />
           <AppTextField
             v-model="form.title"
             class="mb-3"

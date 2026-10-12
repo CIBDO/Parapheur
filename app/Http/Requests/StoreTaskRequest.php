@@ -42,6 +42,7 @@ class StoreTaskRequest extends FormRequest
             'source_id' => ['nullable', 'integer'],
             'tags' => ['nullable', 'array'],
             'tags.*' => ['string', 'max:50'],
+            'task_type_id' => ['nullable', 'exists:task_types,id'],
         ];
     }
 }

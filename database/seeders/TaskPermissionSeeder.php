@@ -18,7 +18,7 @@ class TaskPermissionSeeder extends Seeder
             'task.take_charge', 'task.comment', 'task.complete', 'task.validate', 'task.return',
             'task.cancel', 'task.view_team', 'task.view_all', 'task.view_reports', 'task.manage',
             'task.audit.view', 'instruction.view', 'instruction.create', 'instruction.assign',
-            'instruction.update', 'instruction.close', 'instruction.cancel',
+            'instruction.update', 'instruction.close', 'instruction.cancel', 'instructions.manage',
         ];
 
         foreach ($permissions as $permission) {

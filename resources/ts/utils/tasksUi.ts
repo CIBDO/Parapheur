@@ -55,10 +55,77 @@ export const taskPriorityColor = (priority?: string | null) => {
 export const instructionStatusLabels: Record<string, string> = {
   brouillon: 'Brouillon',
   a_faire: 'À faire',
+  emise: 'Émise',
+  prise_en_charge: 'Prise en charge',
   en_cours: 'En cours',
+  en_attente: 'En attente',
   executee: 'Exécutée',
+  en_validation: 'En validation',
   cloturee: 'Clôturée',
   annulee: 'Annulée',
+}
+
+export const productionStatusLabels: Record<string, string> = {
+  a_produire: 'À produire',
+  en_preparation: 'En préparation',
+  deposee: 'Déposée',
+  a_completer: 'À compléter',
+  soumise_validation: 'Soumise à validation',
+  en_validation: 'En validation',
+  rejetee: 'Rejetée',
+  validee: 'Validée',
+  prete_a_transmettre: 'Prête à transmettre',
+  transmise: 'Transmise',
+  cloturee: 'Clôturée',
+  annulee: 'Annulée',
+}
+
+export const productionFrequencyLabels: Record<string, string> = {
+  once: 'Ponctuelle',
+  daily: 'Quotidienne',
+  business_days: 'Jours ouvrables',
+  weekly: 'Hebdomadaire',
+  weekdays: 'Jours de la semaine',
+  biweekly: 'Toutes les deux semaines',
+  semimonthly: 'Deux fois par mois',
+  monthly: 'Mensuelle',
+  quarterly: 'Trimestrielle',
+  semiannual: 'Semestrielle',
+  annual: 'Annuelle',
+  specific_dates: 'Dates spécifiques',
+  custom: 'Personnalisée',
+}
+
+export const productionDelayLabels: Record<string, string> = {
+  non_deposee: 'Non déposée',
+  deposee_en_retard: 'Déposée en retard',
+  validee_en_retard: 'Validée en retard',
+  transmise_en_retard: 'Transmise en retard',
+  non_transmise: 'Non transmise',
+}
+
+export const productionStatusColor = (status?: string | null) => {
+  switch (status) {
+    case 'transmise':
+    case 'validee':
+    case 'cloturee':
+      return 'success'
+    case 'en_validation':
+    case 'soumise_validation':
+    case 'prete_a_transmettre':
+      return 'primary'
+    case 'deposee':
+    case 'en_preparation':
+      return 'info'
+    case 'rejetee':
+    case 'annulee':
+      return 'error'
+    case 'a_completer':
+    case 'a_produire':
+      return 'warning'
+    default:
+      return 'secondary'
+  }
 }
 
 export const formatTaskDue = (due?: string | null) => {

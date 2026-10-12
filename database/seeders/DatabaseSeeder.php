@@ -512,6 +512,10 @@ class DatabaseSeeder extends Seeder
         $this->call(MeetingSeeder::class);
         $this->call(AppointmentSeeder::class);
         $this->call(TicketingSeeder::class);
+        $this->call(TaskPermissionSeeder::class);
+        $this->call(TaskTypeSeeder::class);
+        $this->call(ProductionPermissionSeeder::class);
+        $this->call(ProductionObligationSeeder::class);
     }
 
     private function seedDemoDocuments(): void

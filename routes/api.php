@@ -59,7 +59,12 @@ use App\Http\Controllers\Api\DocumentController;
 use App\Http\Controllers\Api\DocumentTypeController;
 use App\Http\Controllers\Api\InstructionController;
 use App\Http\Controllers\Api\MyWorkController;
+use App\Http\Controllers\Api\ProductionDashboardController;
+use App\Http\Controllers\Api\ProductionFolderController;
+use App\Http\Controllers\Api\ProductionObligationController;
+use App\Http\Controllers\Api\ProductionOccurrenceController;
 use App\Http\Controllers\Api\TaskController;
+use App\Http\Controllers\Api\TaskTypeController;
 use App\Http\Controllers\Api\MeetingAgendaController;
 use App\Http\Controllers\Api\MeetingController;
 use App\Http\Controllers\Api\MeetingDecisionController;
@@ -285,6 +290,41 @@ Route::middleware(['auth:sanctum', 'password.changed'])->group(function () {
     Route::get('/instructions/{instruction}', [InstructionController::class, 'show']);
     Route::patch('/instructions/{instruction}/status', [InstructionController::class, 'updateStatus']);
     Route::post('/instructions/{instruction}/tasks', [InstructionController::class, 'addTask']);
+
+    Route::get('/task-types', [TaskTypeController::class, 'index']);
+    Route::post('/task-types', [TaskTypeController::class, 'store']);
+    Route::put('/task-types/{taskType}', [TaskTypeController::class, 'update']);
+
+    Route::get('/productions/dashboard/my-work', [ProductionDashboardController::class, 'myWork']);
+    Route::get('/productions/dashboard/structure', [ProductionDashboardController::class, 'structure']);
+    Route::get('/productions/dashboard/direction', [ProductionDashboardController::class, 'direction']);
+
+    Route::get('/productions/calendars', [ProductionObligationController::class, 'calendars']);
+    Route::get('/productions/obligations', [ProductionObligationController::class, 'index']);
+    Route::post('/productions/obligations', [ProductionObligationController::class, 'store']);
+    Route::get('/productions/obligations/{obligation}', [ProductionObligationController::class, 'show']);
+    Route::put('/productions/obligations/{obligation}', [ProductionObligationController::class, 'update']);
+    Route::post('/productions/obligations/{obligation}/active', [ProductionObligationController::class, 'setActive']);
+    Route::post('/productions/obligations/{obligation}/suspend', [ProductionObligationController::class, 'suspend']);
+
+    Route::get('/productions/occurrences', [ProductionOccurrenceController::class, 'index']);
+    Route::get('/productions/occurrences/{occurrence}', [ProductionOccurrenceController::class, 'show']);
+    Route::post('/productions/occurrences/{occurrence}/deposit', [ProductionOccurrenceController::class, 'deposit']);
+    Route::post('/productions/occurrences/{occurrence}/office', [ProductionOccurrenceController::class, 'createOffice']);
+    Route::post('/productions/occurrences/{occurrence}/files/{file}/submit-ged', [ProductionOccurrenceController::class, 'submitGed']);
+    Route::post('/productions/occurrences/{occurrence}/submit-parapheur', [ProductionOccurrenceController::class, 'submitParapheur']);
+    Route::post('/productions/occurrences/{occurrence}/files/{file}/replace', [ProductionOccurrenceController::class, 'replaceFile']);
+    Route::delete('/productions/occurrences/{occurrence}/files/{file}', [ProductionOccurrenceController::class, 'removeFile']);
+    Route::post('/productions/occurrences/{occurrence}/submit', [ProductionOccurrenceController::class, 'submit']);
+    Route::post('/productions/occurrences/{occurrence}/decide', [ProductionOccurrenceController::class, 'decide']);
+    Route::post('/productions/occurrences/{occurrence}/transmit', [ProductionOccurrenceController::class, 'transmit']);
+    Route::post('/productions/occurrences/{occurrence}/justify-delay', [ProductionOccurrenceController::class, 'justifyDelay']);
+    Route::patch('/productions/occurrences/{occurrence}/status', [ProductionOccurrenceController::class, 'updateStatus']);
+
+    Route::get('/productions/folders', [ProductionFolderController::class, 'index']);
+    Route::post('/productions/folders', [ProductionFolderController::class, 'store']);
+    Route::get('/productions/folders/{folder}', [ProductionFolderController::class, 'show']);
+    Route::post('/productions/folders/{folder}/attach', [ProductionFolderController::class, 'attach']);
 
     Route::get('/delegations', [DelegationController::class, 'index']);
     Route::post('/delegations', [DelegationController::class, 'store']);

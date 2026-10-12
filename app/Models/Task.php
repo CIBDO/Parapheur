@@ -20,6 +20,7 @@ class Task extends Model
         'reference',
         'parent_id',
         'instruction_id',
+        'task_type_id',
         'created_by',
         'assignee_id',
         'structure_id',
@@ -93,6 +94,12 @@ class Task extends Model
     {
         return $this->belongsTo(Instruction::class);
     }
+
+    public function taskType(): BelongsTo
+    {
+        return $this->belongsTo(TaskType::class);
+    }
+
 
     public function parent(): BelongsTo
     {

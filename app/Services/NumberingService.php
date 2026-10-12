@@ -24,6 +24,9 @@ class NumberingService
         'PRB' => ['problems', 'number'],
         'TSK' => ['tasks', 'reference'],
         'INS' => ['instructions', 'reference'],
+        'PRO' => ['production_occurrences', 'reference'],
+        'TRP' => ['production_transmissions', 'reference'],
+        'DPR' => ['production_folders', 'reference'],
     ];
 
     /**

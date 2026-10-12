@@ -10,6 +10,8 @@ use App\Models\Correspondence;
 use App\Models\Document;
 use App\Models\DocumentTemplate;
 use App\Models\Instruction;
+use App\Models\ProductionObligation;
+use App\Models\ProductionOccurrence;
 use App\Models\Task;
 use App\Models\Ticket;
 use App\Models\TransmissionSlip;
@@ -20,6 +22,8 @@ use App\Policies\CorrespondencePolicy;
 use App\Policies\DocumentPolicy;
 use App\Policies\DocumentTemplatePolicy;
 use App\Policies\InstructionPolicy;
+use App\Policies\ProductionObligationPolicy;
+use App\Policies\ProductionOccurrencePolicy;
 use App\Policies\TaskPolicy;
 use App\Policies\TicketPolicy;
 use App\Policies\TransmissionSlipPolicy;
@@ -74,6 +78,8 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(Ticket::class, TicketPolicy::class);
         Gate::policy(Task::class, TaskPolicy::class);
         Gate::policy(Instruction::class, InstructionPolicy::class);
+        Gate::policy(ProductionObligation::class, ProductionObligationPolicy::class);
+        Gate::policy(ProductionOccurrence::class, ProductionOccurrencePolicy::class);
 
         if (config('onlyoffice.enabled')) {
             try {
