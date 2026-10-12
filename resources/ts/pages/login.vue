@@ -191,7 +191,7 @@ onMounted(() => {
               Connexion
             </h2>
             <p class="text-body-2 text-medium-emphasis mb-6 text-center">
-              Accédez à votre parapheur électronique
+              Accédez à votre espace électronique
             </p>
 
             <VForm
@@ -246,7 +246,7 @@ onMounted(() => {
                 color="primary"
                 :loading="isSubmitting"
               >
-                Ouvrir mon parapheur
+                Ouvrir mon espace
               </VBtn>
             </VForm>
           </div>

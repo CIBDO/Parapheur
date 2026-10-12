@@ -588,7 +588,7 @@ onMounted(async () => {
               v-else
               cols="12"
             >
-              <VAlert
+              <!-- <VAlert
                 type="info"
                 variant="tonal"
                 density="compact"
@@ -596,7 +596,7 @@ onMounted(async () => {
               >
                 Un mot de passe temporaire sera généré et envoyé automatiquement à l’adresse e-mail saisie.
                 L’utilisateur devra le changer à sa première connexion.
-              </VAlert>
+              </VAlert> -->
             </VCol>
             <VCol
               cols="12"
