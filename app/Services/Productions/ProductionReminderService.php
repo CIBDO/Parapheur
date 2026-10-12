@@ -68,7 +68,10 @@ class ProductionReminderService
                             $user->notify(new ProductionReminderNotification(
                                 $occurrence,
                                 'reminder',
-                                (bool) $rule->escalate
+                                (bool) $rule->escalate,
+                                in_array($rule->target, ['producer', 'deputy', 'validator', 'hierarchy', 'recipient'], true)
+                                    ? $rule->target
+                                    : 'producer',
                             ));
                         }
 

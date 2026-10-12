@@ -201,7 +201,7 @@ class TaskService
             $this->audit->log('task.created', $task, ['actor_id' => $actor->id]);
 
             if ($status === TaskStatus::Imputee && $task->assignee_id) {
-                $this->notifications->notifyAssigned($task);
+                $this->notifications->notifyAssigned($task, $actor);
             }
 
             $this->reminders->scheduleFor($task);

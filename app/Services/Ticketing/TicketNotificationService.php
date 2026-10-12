@@ -41,6 +41,7 @@ class TicketNotificationService
                     event: $event,
                     message: $message,
                     actorName: $actor?->name,
+                    profile: $this->profileFor($ticket, $user),
                 ));
             } catch (\Throwable $e) {
                 report($e);
@@ -210,5 +211,18 @@ class TicketNotificationService
         }
 
         return User::query()->whereIn('id', $uniqueIds)->get();
+    }
+
+    private function profileFor(Ticket $ticket, User $user): string
+    {
+        if ((int) $user->id === (int) $ticket->requester_id) {
+            return 'requester';
+        }
+
+        if ((int) $user->id === (int) $ticket->assignee_id) {
+            return 'assignee';
+        }
+
+        return 'informed';
     }
 }

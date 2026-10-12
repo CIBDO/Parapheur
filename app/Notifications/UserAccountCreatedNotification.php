@@ -28,7 +28,7 @@ class UserAccountCreatedNotification extends Notification
 
         return (new MailMessage)
             ->subject("[{$appName}] Vos identifiants de connexion")
-            ->greeting(NotificationPresentation::greeting((string) ($notifiable->name ?? '')))
+            ->greeting(NotificationPresentation::greeting($notifiable))
             ->line('Un compte a été créé pour vous sur le Bureau Numérique de la Direction Générale du Trésor et de la Comptabilité Publique (DGTCP).')
             ->line('Voici vos informations de connexion :')
             ->line('**Adresse e-mail :** '.$notifiable->email)

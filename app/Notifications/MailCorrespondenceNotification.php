@@ -30,7 +30,7 @@ class MailCorrespondenceNotification extends Notification
 
         return (new MailMessage)
             ->subject(NotificationPresentation::mailSubject('Courrier', $this->title()))
-            ->greeting(NotificationPresentation::greeting((string) ($notifiable->name ?? '')))
+            ->greeting(NotificationPresentation::greeting($notifiable))
             ->line($this->body())
             ->line('Référence : '.$this->reference())
             ->line('Objet : '.$this->correspondence->subject)

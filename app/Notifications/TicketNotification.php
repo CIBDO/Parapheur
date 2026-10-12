@@ -17,6 +17,7 @@ class TicketNotification extends Notification
         public string $event,
         public string $message = '',
         public ?string $actorName = null,
+        public ?string $profile = null,
     ) {}
 
     public function via(object $notifiable): array
@@ -47,7 +48,7 @@ class TicketNotification extends Notification
 
         return (new MailMessage)
             ->subject(NotificationPresentation::mailSubject('Centre de services', $this->title()))
-            ->greeting(NotificationPresentation::greeting((string) ($notifiable->name ?? '')))
+            ->greeting(NotificationPresentation::greeting($notifiable))
             ->line($this->body())
             ->line('Référence : '.$this->ticket->number)
             ->line('Objet : '.$this->ticket->title)
@@ -68,6 +69,7 @@ class TicketNotification extends Notification
             'ticket_title' => $this->ticket->title,
             'status' => $this->ticket->status?->value,
             'actor' => $this->actorName,
+            'profile' => $this->profile,
             'url' => $this->frontendPath(),
         ];
     }
@@ -116,11 +118,26 @@ class TicketNotification extends Notification
                 $number,
                 $object
             ),
-            'assigned' => sprintf(
-                'Le ticket %s vous a été confié%s. Merci d’en assurer le traitement dans les meilleurs délais.',
-                $number,
-                $by
-            ),
+            'assigned' => match ($this->profile) {
+                'requester' => sprintf(
+                    'Votre demande %s (« %s ») a été prise en compte et confiée pour traitement%s. Vous serez informé de la suite.',
+                    $number,
+                    $object,
+                    $by
+                ),
+                'informed' => sprintf(
+                    'Le ticket %s (« %s ») a été affecté%s. Cette information vous est communiquée au titre du suivi.',
+                    $number,
+                    $object,
+                    $by
+                ),
+                default => sprintf(
+                    'Le ticket %s (« %s ») vous a été confié%s, en votre qualité d’agent chargé du traitement. Merci d’en assurer le suivi dans les meilleurs délais.',
+                    $number,
+                    $object,
+                    $by
+                ),
+            },
             'transferred' => sprintf(
                 'Le ticket %s a été transféré vers votre périmètre%s.%s',
                 $number,

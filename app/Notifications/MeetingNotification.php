@@ -17,6 +17,7 @@ class MeetingNotification extends Notification
         public string $event,
         public string $message = '',
         public ?string $actorName = null,
+        public string $profile = 'participant',
     ) {}
 
     public function via(object $notifiable): array
@@ -31,11 +32,10 @@ class MeetingNotification extends Notification
     public function toMail(object $notifiable): MailMessage
     {
         $url = url('/parapheur/reunions/'.$this->meeting->id);
-        $name = $notifiable->name ?? 'Madame, Monsieur';
 
         return (new MailMessage)
             ->subject(NotificationPresentation::mailSubject('Réunions', $this->title()))
-            ->greeting(NotificationPresentation::greeting((string) $name))
+            ->greeting(NotificationPresentation::greeting($notifiable))
             ->line($this->body())
             ->line('Réunion : '.$this->meeting->displayTitle())
             ->line('Référence : '.($this->meeting->reference ?: '#'.$this->meeting->id))
@@ -56,6 +56,7 @@ class MeetingNotification extends Notification
             'reference' => $this->meeting->reference,
             'object' => $this->meeting->displayTitle(),
             'actor' => $this->actorName,
+            'profile' => $this->profile,
             'url' => '/parapheur/reunions/'.$this->meeting->id,
         ];
     }
@@ -104,13 +105,29 @@ class MeetingNotification extends Notification
                 $title,
                 $by
             ),
-            'invitation' => sprintf(
-                'Vous êtes convoqué(e) à la réunion « %s »%s.%s%s Merci de confirmer votre participation.',
-                $title,
-                $by,
-                $when !== '' ? ' Date : '.$when.'.' : '',
-                $location ? ' Lieu : '.$location.'.' : ''
-            ),
+            'invitation' => match ($this->profile) {
+                'chair' => sprintf(
+                    'Vous êtes convoqué(e) à présider la réunion « %s »%s.%s%s Merci de confirmer votre participation.',
+                    $title,
+                    $by,
+                    $when !== '' ? ' Date : '.$when.'.' : '',
+                    $location ? ' Lieu : '.$location.'.' : ''
+                ),
+                'secretary' => sprintf(
+                    'Vous êtes désigné(e) pour le secrétariat de la réunion « %s »%s.%s%s Merci de confirmer votre participation.',
+                    $title,
+                    $by,
+                    $when !== '' ? ' Date : '.$when.'.' : '',
+                    $location ? ' Lieu : '.$location.'.' : ''
+                ),
+                default => sprintf(
+                    'Vous êtes convoqué(e), en qualité de participant, à la réunion « %s »%s.%s%s Merci de confirmer votre participation.',
+                    $title,
+                    $by,
+                    $when !== '' ? ' Date : '.$when.'.' : '',
+                    $location ? ' Lieu : '.$location.'.' : ''
+                ),
+            },
             'place_changed' => sprintf(
                 'Le lieu de la réunion « %s » a été modifié%s.%s',
                 $title,

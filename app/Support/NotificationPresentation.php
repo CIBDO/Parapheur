@@ -9,11 +9,69 @@ final class NotificationPresentation
 {
     public const FOOTER = 'Message automatique du Bureau Numérique — Direction Générale du Trésor et de la Comptabilité Publique (DGTCP). Merci de ne pas répondre directement à cet e-mail.';
 
-    public static function greeting(string $name): string
+    public static function greeting(object|string $notifiable): string
     {
-        $name = trim($name);
+        if (is_string($notifiable)) {
+            $name = trim($notifiable);
+
+            return $name !== '' ? 'Bonjour '.$name.',' : 'Bonjour,';
+        }
+
+        $quality = self::quality($notifiable);
+        if ($quality !== null) {
+            return $quality.',';
+        }
+
+        $name = trim((string) ($notifiable->name ?? ''));
 
         return $name !== '' ? 'Bonjour '.$name.',' : 'Bonjour,';
+    }
+
+    /**
+     * Formule d'appel selon la fonction, lorsque la civilité est connue.
+     * Sans civilité, on conserve le nom pour ne pas présumer du genre.
+     */
+    public static function quality(object $notifiable): ?string
+    {
+        if (! method_exists($notifiable, 'hasRole')) {
+            return null;
+        }
+
+        $feminine = self::isFeminine($notifiable);
+        $masculine = self::isMasculine($notifiable);
+        if (! $feminine && ! $masculine) {
+            return null;
+        }
+
+        $pair = match (true) {
+            $notifiable->hasRole('Directeur Général') => ['Monsieur le Directeur Général', 'Madame la Directrice Générale'],
+            $notifiable->hasRole('DGA') => ['Monsieur le Directeur Général Adjoint', 'Madame la Directrice Générale Adjointe'],
+            $notifiable->hasRole('Directeur') => ['Monsieur le Directeur', 'Madame la Directrice'],
+            $notifiable->hasRole('Chef de division') => ['Monsieur le Chef de division', 'Madame la Cheffe de division'],
+            $notifiable->hasRole('Chef de section') => ['Monsieur le Chef de section', 'Madame la Cheffe de section'],
+            $notifiable->hasRole('Secrétariat DG') => ['Monsieur', 'Madame'],
+            default => null,
+        };
+
+        if ($pair === null) {
+            return null;
+        }
+
+        return $feminine ? $pair[1] : $pair[0];
+    }
+
+    private static function isFeminine(object $notifiable): bool
+    {
+        $title = mb_strtolower(trim((string) ($notifiable->title ?? '')));
+
+        return in_array($title, ['mme', 'mme.', 'madame', 'mlle', 'mlle.', 'mademoiselle'], true);
+    }
+
+    private static function isMasculine(object $notifiable): bool
+    {
+        $title = mb_strtolower(trim((string) ($notifiable->title ?? '')));
+
+        return in_array($title, ['m', 'm.', 'mr', 'monsieur'], true);
     }
 
     public static function mailSubject(string $domain, string $title): string

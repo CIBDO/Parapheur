@@ -185,7 +185,11 @@ class ProductionTransmissionService
                 continue;
             }
             try {
-                $recipient->user->notify(new ProductionTransmissionNotification($occurrence, $transmission));
+                $recipient->user->notify(new ProductionTransmissionNotification(
+                    $occurrence,
+                    $transmission,
+                    str_starts_with((string) $recipient->resolution_source, 'delegation:') ? 'delegate' : 'recipient',
+                ));
                 $recipient->delivery_status = 'notified';
                 $recipient->notified_at = now();
                 $recipient->save();

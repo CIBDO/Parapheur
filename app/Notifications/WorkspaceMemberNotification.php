@@ -30,7 +30,7 @@ class WorkspaceMemberNotification extends Notification
 
         return (new MailMessage)
             ->subject(NotificationPresentation::mailSubject('Espace collaboratif', $this->title()))
-            ->greeting(NotificationPresentation::greeting((string) ($notifiable->name ?? '')))
+            ->greeting(NotificationPresentation::greeting($notifiable))
             ->line($this->body())
             ->line('Espace : '.$this->workspace->name)
             ->line('Rôle : '.$this->roleLabel)

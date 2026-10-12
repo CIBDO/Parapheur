@@ -544,16 +544,18 @@ class MeetingService
                 $user->notify(new MeetingNotification(
                     $meeting,
                     'invitation',
-                    'Vous êtes convoqué(e) à la réunion « '.$meeting->displayTitle().' ».',
-                    $actor->name
+                    '',
+                    $actor->name,
+                    $this->meetingProfile($participant->role)
                 ));
             } elseif ($participant->email) {
                 \Illuminate\Support\Facades\Notification::route('mail', $participant->email)
                     ->notify(new MeetingNotification(
                         $meeting,
                         'invitation',
-                        'Vous êtes convoqué(e) à la réunion « '.$meeting->displayTitle().' ».',
-                        $actor->name
+                        '',
+                        $actor->name,
+                        $this->meetingProfile($participant->role)
                     ));
             }
             $participant->invitation_status = 'convoque';
@@ -1213,12 +1215,29 @@ class MeetingService
         return $document->fresh(['type', 'latestVersion']);
     }
 
+    private function meetingProfile(?string $role): string
+    {
+        $value = mb_strtolower(trim((string) $role));
+
+        return match (true) {
+            in_array($value, ['chair', 'president', 'président', 'présidente', 'presidente'], true) => 'chair',
+            str_contains($value, 'secr') || str_contains($value, 'rapport') => 'secretary',
+            default => 'participant',
+        };
+    }
+
     private function notifyParticipants(Meeting $meeting, string $event, string $message, ?User $actor = null): void
     {
         $meeting->loadMissing('participants.user');
         foreach ($meeting->participants as $participant) {
             if ($participant->user) {
-                $participant->user->notify(new MeetingNotification($meeting, $event, $message, $actor?->name));
+                $participant->user->notify(new MeetingNotification(
+                    $meeting,
+                    $event,
+                    $message,
+                    $actor?->name,
+                    $this->meetingProfile($participant->role)
+                ));
             }
         }
     }

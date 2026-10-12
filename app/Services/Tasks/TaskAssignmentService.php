@@ -51,7 +51,7 @@ class TaskAssignmentService
                 'previous_assignee_id' => $previous,
                 'assignee_id' => $assigneeId,
             ]);
-            $this->notifications->notifyAssigned($task);
+            $this->notifications->notifyAssigned($task, $actor, (bool) $previous);
             event(new TaskAssigned($task, $actor, $previous));
 
             return $task->fresh(['assignee', 'creator']);

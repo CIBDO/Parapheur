@@ -31,11 +31,9 @@ class AppointmentNotification extends Notification
     public function toMail(object $notifiable): MailMessage
     {
         $url = url('/parapheur/agenda/'.$this->appointment->id);
-        $name = $notifiable->name ?? 'Madame, Monsieur';
-
         return (new MailMessage)
             ->subject(NotificationPresentation::mailSubject('Agenda', $this->title()))
-            ->greeting(NotificationPresentation::greeting((string) $name))
+            ->greeting(NotificationPresentation::greeting($notifiable))
             ->line($this->body())
             ->line('Rendez-vous : '.$this->appointment->displaySubject())
             ->line('Référence : '.($this->appointment->reference ?: '#'.$this->appointment->id))

@@ -13,6 +13,7 @@ use App\Models\InstructionRecipient;
 use App\Models\InstructionUpdate;
 use App\Models\Task;
 use App\Models\User;
+use App\Notifications\InstructionAssignedNotification;
 use App\Services\AuditLogger;
 use App\Services\NumberingService;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
@@ -146,7 +147,10 @@ class InstructionService
                 'kind' => $kind,
             ]);
 
-            return $instruction->fresh(['assignee', 'issuer', 'coordinator', 'tasks', 'recipients']);
+            $fresh = $instruction->fresh(['assignee', 'issuer', 'coordinator', 'tasks', 'recipients.user']);
+            $this->notifyAssignment($fresh, $actor);
+
+            return $fresh;
         });
     }
 
@@ -176,6 +180,9 @@ class InstructionService
         }
 
         return DB::transaction(function () use ($actor, $instruction, $status, $body) {
+            $previous = $instruction->status instanceof InstructionStatus
+                ? $instruction->status->value
+                : (string) $instruction->status;
             $instruction->status = $status;
             if ($status === InstructionStatus::Emise->value) {
                 $instruction->issued_at = $instruction->issued_at ?? now();
@@ -224,8 +231,45 @@ class InstructionService
                 'status' => $status,
             ]);
 
-            return $instruction->fresh(['updates.user', 'assignee', 'coordinator', 'tasks']);
+            $fresh = $instruction->fresh(['updates.user', 'assignee', 'coordinator', 'tasks', 'recipients.user']);
+            if ($status === InstructionStatus::Emise->value && $previous !== InstructionStatus::Emise->value) {
+                $this->notifyAssignment($fresh, $actor);
+            }
+
+            return $fresh;
         });
+    }
+
+    private function notifyAssignment(Instruction $instruction, User $actor): void
+    {
+        $status = $instruction->status instanceof InstructionStatus
+            ? $instruction->status->value
+            : (string) $instruction->status;
+
+        if ($status === InstructionStatus::Brouillon->value) {
+            return;
+        }
+
+        $instruction->loadMissing(['assignee', 'coordinator', 'recipients.user']);
+        $skip = [(int) $actor->id];
+
+        if ($instruction->assignee && ! in_array((int) $instruction->assignee->id, $skip, true)) {
+            $instruction->assignee->notify(new InstructionAssignedNotification($instruction, 'assignee', $actor->name));
+            $skip[] = (int) $instruction->assignee->id;
+        }
+
+        if ($instruction->coordinator && ! in_array((int) $instruction->coordinator->id, $skip, true)) {
+            $instruction->coordinator->notify(new InstructionAssignedNotification($instruction, 'coordinator', $actor->name));
+            $skip[] = (int) $instruction->coordinator->id;
+        }
+
+        foreach ($instruction->recipients as $recipient) {
+            if (! $recipient->user || in_array((int) $recipient->user->id, $skip, true)) {
+                continue;
+            }
+            $recipient->user->notify(new InstructionAssignedNotification($instruction, 'recipient', $actor->name));
+            $skip[] = (int) $recipient->user->id;
+        }
     }
 
     /**

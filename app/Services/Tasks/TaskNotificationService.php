@@ -10,14 +10,14 @@ use Illuminate\Support\Facades\Notification;
 
 class TaskNotificationService
 {
-    public function notifyAssigned(Task $task): void
+    public function notifyAssigned(Task $task, ?User $actor = null, bool $reassigned = false): void
     {
         $assignee = $task->assignee;
-        if (! $assignee) {
+        if (! $assignee || ($actor && (int) $assignee->id === (int) $actor->id)) {
             return;
         }
 
-        $assignee->notify(new TaskAssignedNotification($task));
+        $assignee->notify(new TaskAssignedNotification($task, $actor?->name, $reassigned));
     }
 
     public function notifyStatus(Task $task, string $event): void
