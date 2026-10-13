@@ -5,6 +5,8 @@ namespace App\Providers;
 use App\Contracts\DocumentPreviewDriver;
 use App\Contracts\IdentityProvider;
 use App\Contracts\Search\SearchEngineInterface;
+use App\Models\Announcement;
+use App\Models\AnnouncementCategory;
 use App\Models\Appointment;
 use App\Models\Correspondence;
 use App\Models\Document;
@@ -17,6 +19,8 @@ use App\Models\Ticket;
 use App\Models\TransmissionSlip;
 use App\Models\User;
 use App\Models\Workspace;
+use App\Policies\AnnouncementCategoryPolicy;
+use App\Policies\AnnouncementPolicy;
 use App\Policies\AppointmentPolicy;
 use App\Policies\CorrespondencePolicy;
 use App\Policies\DocumentPolicy;
@@ -69,6 +73,8 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        Gate::policy(Announcement::class, AnnouncementPolicy::class);
+        Gate::policy(AnnouncementCategory::class, AnnouncementCategoryPolicy::class);
         Gate::policy(Appointment::class, AppointmentPolicy::class);
         Gate::policy(Document::class, DocumentPolicy::class);
         Gate::policy(Workspace::class, WorkspacePolicy::class);

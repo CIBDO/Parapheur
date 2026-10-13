@@ -140,6 +140,7 @@ final class NotificationPresentation
                 'rescheduled', 'slot_proposed' => 'tabler-calendar-time',
                 default => 'tabler-calendar-event',
             },
+            str_contains($url, '/annonces') || isset($data['announcement_id']) => 'tabler-speakerphone',
             str_contains($url, '/parapheur') || isset($data['document_id']) => match ($event) {
                 'returned' => 'tabler-arrow-back-up',
                 'validated', 'vised' => 'tabler-stamp',
@@ -163,6 +164,11 @@ final class NotificationPresentation
         }
 
         $event = (string) ($data['event'] ?? '');
+        $importance = (string) ($data['importance'] ?? '');
+
+        if (in_array($importance, ['urgent', 'critical'], true)) {
+            return 'error';
+        }
 
         return match ($event) {
             'sla_breach', 'ola_breach', 'rejected', 'approval_refused', 'cancelled', 'decision_late' => 'error',
@@ -187,6 +193,7 @@ final class NotificationPresentation
             str_contains($url, '/courrier') || isset($data['correspondence_id']) => 'Courrier',
             str_contains($url, '/parapheur/reunions') || isset($data['meeting_id']) => 'Réunions',
             str_contains($url, '/parapheur/agenda') || isset($data['appointment_id']) => 'Agenda',
+            str_contains($url, '/annonces') || isset($data['announcement_id']) => 'Annonces',
             str_contains($url, '/parapheur') || isset($data['document_id']) => 'Parapheur',
             default => 'E-Tresor',
         };

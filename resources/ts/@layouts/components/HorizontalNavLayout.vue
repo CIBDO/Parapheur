@@ -30,6 +30,10 @@ const configStore = useLayoutConfigStore();
       </div>
     </div>
 
+    <div class="layout-announcement-strip">
+      <slot name="after-nav" />
+    </div>
+
     <main class="layout-page-content">
       <slot />
     </main>
@@ -113,6 +117,15 @@ const configStore = useLayoutConfigStore();
       inset-block-start: 0;
       will-change: transform;
     }
+  }
+
+  .layout-announcement-strip {
+    position: relative;
+    z-index: 1;
+    inline-size: 100%;
+    max-inline-size: 100%;
+    min-inline-size: 0;
+    overflow: hidden;
   }
 
   &.layout-navbar-hidden.horizontal-nav-hidden {

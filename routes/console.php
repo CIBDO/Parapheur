@@ -62,3 +62,18 @@ Schedule::command('parapheur:remind-productions')
     ->everyFifteenMinutes()
     ->withoutOverlapping()
     ->appendOutputTo(storage_path('logs/production-reminders.log'));
+
+Schedule::command('parapheur:publish-announcements')
+    ->everyMinute()
+    ->withoutOverlapping()
+    ->appendOutputTo(storage_path('logs/announcement-publication.log'));
+
+Schedule::command('parapheur:expire-announcements')
+    ->everyFiveMinutes()
+    ->withoutOverlapping()
+    ->appendOutputTo(storage_path('logs/announcement-expiration.log'));
+
+Schedule::command('parapheur:remind-announcements')
+    ->dailyAt('08:30')
+    ->withoutOverlapping()
+    ->appendOutputTo(storage_path('logs/announcement-reminders.log'));

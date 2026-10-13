@@ -81,6 +81,9 @@ const verticalNavAttrs = computed(() => {
           <slot name="navbar" :toggle-vertical-overlay-nav-active="toggleIsOverlayNavActive" />
         </div>
       </header>
+      <div class="layout-announcement-strip">
+        <slot name="after-nav" />
+      </div>
       <main class="layout-page-content">
         <div class="page-content-container">
           <slot />
@@ -112,6 +115,13 @@ const verticalNavAttrs = computed(() => {
 .layout-wrapper.layout-nav-type-vertical {
   // TODO(v2): Check why we need height in vertical nav & min-height in horizontal nav
   block-size: 100%;
+
+  .layout-announcement-strip {
+    inline-size: 100%;
+    max-inline-size: 100%;
+    min-inline-size: 0;
+    overflow: hidden;
+  }
 
   .layout-content-wrapper {
     display: flex;

@@ -19,6 +19,14 @@ declare module 'vue-router/auto-routes' {
    */
   export interface RouteNamedMap {
     '$error': RouteRecordInfo<'$error', '/:error(.*)', { error: ParamValue<true> }, { error: ParamValue<false> }>,
+    'annonces': RouteRecordInfo<'annonces', '/annonces', Record<never, never>, Record<never, never>>,
+    'annonces-id': RouteRecordInfo<'annonces-id', '/annonces/:id', { id: ParamValue<true> }, { id: ParamValue<false> }>,
+    'annonces-categories': RouteRecordInfo<'annonces-categories', '/annonces/categories', Record<never, never>, Record<never, never>>,
+    'annonces-gestion': RouteRecordInfo<'annonces-gestion', '/annonces/gestion', Record<never, never>, Record<never, never>>,
+    'annonces-gestion-id': RouteRecordInfo<'annonces-gestion-id', '/annonces/gestion/:id', { id: ParamValue<true> }, { id: ParamValue<false> }>,
+    'annonces-gestion-id-accuses': RouteRecordInfo<'annonces-gestion-id-accuses', '/annonces/gestion/:id/accuses', { id: ParamValue<true> }, { id: ParamValue<false> }>,
+    'annonces-gestion-nouvelle': RouteRecordInfo<'annonces-gestion-nouvelle', '/annonces/gestion/nouvelle', Record<never, never>, Record<never, never>>,
+    'annonces-statistiques': RouteRecordInfo<'annonces-statistiques', '/annonces/statistiques', Record<never, never>, Record<never, never>>,
     'change-password': RouteRecordInfo<'change-password', '/change-password', Record<never, never>, Record<never, never>>,
     'courrier': RouteRecordInfo<'courrier', '/courrier', Record<never, never>, Record<never, never>>,
     'courrier-a-affecter': RouteRecordInfo<'courrier-a-affecter', '/courrier/a-affecter', Record<never, never>, Record<never, never>>,

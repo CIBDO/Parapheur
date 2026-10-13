@@ -516,6 +516,8 @@ class DatabaseSeeder extends Seeder
         $this->call(TaskTypeSeeder::class);
         $this->call(ProductionPermissionSeeder::class);
         $this->call(ProductionObligationSeeder::class);
+        $this->call(AnnouncementPermissionSeeder::class);
+        $this->call(AnnouncementCatalogSeeder::class);
     }
 
     private function seedDemoDocuments(): void

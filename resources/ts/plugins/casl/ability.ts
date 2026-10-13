@@ -14,6 +14,8 @@ export type Subjects =
   | 'Task'
   | 'MyWork'
   | 'Production'
+  | 'Announcement'
+  | 'AnnouncementStats'
   | 'Meeting'
   | 'MeetingType'
   | 'MeetingTemplate'

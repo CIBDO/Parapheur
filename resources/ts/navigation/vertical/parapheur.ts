@@ -535,6 +535,20 @@ export default [
   },
   { heading: 'Configuration' },
   {
+    title: 'Annonces',
+    icon: { icon: 'tabler-speakerphone' },
+    action: 'read',
+    subject: 'Announcement',
+    children: [
+      { title: 'Fil', icon: { icon: 'tabler-news' }, to: 'annonces', action: 'read', subject: 'Announcement' },
+      { title: 'À confirmer', icon: { icon: 'tabler-checkbox' }, to: { name: 'annonces', query: { acknowledgement: '1' } }, action: 'read', subject: 'Announcement' },
+      { title: 'Archives', icon: { icon: 'tabler-archive' }, to: { name: 'annonces', query: { archive: '1' } }, action: 'read', subject: 'Announcement' },
+      { title: 'Gestion', icon: { icon: 'tabler-edit' }, to: 'annonces-gestion', action: 'create', subject: 'Announcement' },
+      { title: 'Catégories', icon: { icon: 'tabler-category' }, to: 'annonces-categories', action: 'manage', subject: 'Announcement' },
+      { title: 'Statistiques', icon: { icon: 'tabler-chart-bar' }, to: 'annonces-statistiques', action: 'read', subject: 'AnnouncementStats' },
+    ],
+  },
+  {
     title: 'Paramètres',
     icon: { icon: 'tabler-settings' },
     children: [

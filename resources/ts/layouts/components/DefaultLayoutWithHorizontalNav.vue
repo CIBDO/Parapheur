@@ -31,6 +31,10 @@ import { VNodeRenderer } from '@layouts/components/VNodeRenderer'
       <UserProfile />
     </template>
 
+    <template #after-nav>
+      <AnnouncementBanner />
+    </template>
+
     <slot />
 
     <template #footer>

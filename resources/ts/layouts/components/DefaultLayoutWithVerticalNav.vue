@@ -32,6 +32,10 @@ import { VerticalNavLayout } from '@layouts'
       </div>
     </template>
 
+    <template #after-nav>
+      <AnnouncementBanner />
+    </template>
+
     <slot />
 
     <template #footer>

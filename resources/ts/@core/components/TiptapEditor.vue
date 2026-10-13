@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { Placeholder } from '@tiptap/extension-placeholder';
-import { TextAlign } from '@tiptap/extension-text-align';
-import { Underline } from '@tiptap/extension-underline';
-import { StarterKit } from '@tiptap/starter-kit';
+import { Placeholder } from '@tiptap/extension-placeholder'
+import { TextAlign } from '@tiptap/extension-text-align'
+import { Underline } from '@tiptap/extension-underline'
+import Link from '@tiptap/extension-link'
+import { StarterKit } from '@tiptap/starter-kit'
 import { EditorContent, useEditor } from '@tiptap/vue-3';
 
 const props = defineProps<{
@@ -20,6 +21,7 @@ const editor = useEditor({
   content: props.modelValue,
   extensions: [
     StarterKit,
+    Link.configure({ openOnClick: false, autolink: true }),
     TextAlign.configure({
       types: ['heading', 'paragraph'],
     }),
@@ -45,6 +47,22 @@ watch(
     editor.value?.commands.setContent(props.modelValue);
   },
 );
+
+function setLink() {
+  if (!editor.value)
+    return
+
+  const previous = editor.value.getAttributes('link').href as string | undefined
+  const url = window.prompt('Adresse du lien', previous ?? 'https://')
+  if (url === null)
+    return
+  if (url === '') {
+    editor.value.chain().focus().unsetLink().run()
+
+    return
+  }
+  editor.value.chain().focus().extendMarkRange('link').setLink({ href: url }).run()
+}
 </script>
 
 <template>
@@ -88,6 +106,46 @@ watch(
         @click="editor.chain().focus().toggleStrike().run()"
       >
         <VIcon icon="tabler-strikethrough" />
+      </IconBtn>
+
+      <IconBtn
+        size="small"
+        rounded
+        :variant="editor.isActive('heading', { level: 2 }) ? 'tonal' : 'text'"
+        :color="editor.isActive('heading', { level: 2 }) ? 'primary' : 'default'"
+        @click="editor.chain().focus().toggleHeading({ level: 2 }).run()"
+      >
+        <VIcon icon="tabler-h-2" />
+      </IconBtn>
+
+      <IconBtn
+        size="small"
+        rounded
+        :variant="editor.isActive('bulletList') ? 'tonal' : 'text'"
+        :color="editor.isActive('bulletList') ? 'primary' : 'default'"
+        @click="editor.chain().focus().toggleBulletList().run()"
+      >
+        <VIcon icon="tabler-list" />
+      </IconBtn>
+
+      <IconBtn
+        size="small"
+        rounded
+        :variant="editor.isActive('orderedList') ? 'tonal' : 'text'"
+        :color="editor.isActive('orderedList') ? 'primary' : 'default'"
+        @click="editor.chain().focus().toggleOrderedList().run()"
+      >
+        <VIcon icon="tabler-list-numbers" />
+      </IconBtn>
+
+      <IconBtn
+        size="small"
+        rounded
+        :variant="editor.isActive('link') ? 'tonal' : 'text'"
+        :color="editor.isActive('link') ? 'primary' : 'default'"
+        @click="setLink"
+      >
+        <VIcon icon="tabler-link" />
       </IconBtn>
 
       <IconBtn

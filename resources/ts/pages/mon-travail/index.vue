@@ -14,6 +14,8 @@ definePage({
 const router = useRouter()
 const { loading, data, load } = useMyWork()
 const showCreateDialog = ref(false)
+const importantAnnouncements = ref<any[]>([])
+const announcementsLoading = ref(false)
 
 const cards = computed(() => [
   {
@@ -85,7 +87,20 @@ const onQuickAction = (action: typeof quickActions[number]) => {
     router.push({ name: action.route })
 }
 
-onMounted(() => load(12))
+onMounted(async () => {
+  load(12)
+  announcementsLoading.value = true
+  try {
+    const page = await $api<any>('/announcements', { query: { highlight: '1' } })
+    importantAnnouncements.value = page.data ?? []
+  }
+  catch {
+    importantAnnouncements.value = []
+  }
+  finally {
+    announcementsLoading.value = false
+  }
+})
 
 const otherIcon = (type?: string) => {
   switch (type) {
@@ -245,6 +260,50 @@ const otherIcon = (type?: string) => {
         </VCard>
       </VCol>
     </VRow>
+
+    <VCard class="mb-4">
+      <VCardItem>
+        <template #prepend>
+          <VAvatar color="warning" variant="tonal" rounded size="36">
+            <VIcon icon="tabler-speakerphone" size="20" />
+          </VAvatar>
+        </template>
+        <VCardTitle class="text-h6">
+          Annonces importantes
+        </VCardTitle>
+        <VCardSubtitle>
+          Communications internes qui vous concernent
+        </VCardSubtitle>
+        <template #append>
+          <VBtn size="small" variant="tonal" :to="{ name: 'annonces' }">
+            Tout voir
+          </VBtn>
+        </template>
+      </VCardItem>
+      <VCardText>
+        <div v-if="announcementsLoading" class="text-center py-4">
+          <VProgressCircular indeterminate size="24" />
+        </div>
+        <VAlert v-else-if="!importantAnnouncements.length" type="info" variant="tonal">
+          Aucune annonce importante pour le moment.
+        </VAlert>
+        <VList v-else lines="two">
+          <VListItem
+            v-for="item in importantAnnouncements"
+            :key="item.id"
+            :to="{ name: 'annonces-id', params: { id: item.id } }"
+            :title="item.title"
+            :subtitle="item.summary || item.category?.name"
+          >
+            <template #prepend>
+              <VAvatar :color="item.importance?.color || 'warning'" variant="tonal" size="32">
+                <VIcon icon="tabler-speakerphone" size="18" />
+              </VAvatar>
+            </template>
+          </VListItem>
+        </VList>
+      </VCardText>
+    </VCard>
 
     <VRow dense>
       <VCol

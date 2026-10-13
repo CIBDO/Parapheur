@@ -49,6 +49,11 @@ class User extends Authenticatable
         return $this->belongsTo(Structure::class);
     }
 
+    public function announcementAcknowledgements(): HasMany
+    {
+        return $this->hasMany(AnnouncementAcknowledgement::class);
+    }
+
     public function authoredDocuments(): HasMany
     {
         return $this->hasMany(Document::class, 'author_id');
@@ -159,6 +164,27 @@ class User extends Authenticatable
 
         if ($this->can('production.validate') || $this->can('production.manage')) {
             $rules[] = ['action' => 'validate', 'subject' => 'Production'];
+        }
+
+        if ($this->can('announcement.view')) {
+            $rules[] = ['action' => 'read', 'subject' => 'Announcement'];
+        }
+
+        if ($this->can('announcement.create') || $this->can('announcement.update')) {
+            $rules[] = ['action' => 'create', 'subject' => 'Announcement'];
+            $rules[] = ['action' => 'update', 'subject' => 'Announcement'];
+        }
+
+        if ($this->can('announcement.approve') || $this->can('announcement.publish')) {
+            $rules[] = ['action' => 'validate', 'subject' => 'Announcement'];
+        }
+
+        if ($this->can('announcement.manage') || $this->can('announcement.manage_categories')) {
+            $rules[] = ['action' => 'manage', 'subject' => 'Announcement'];
+        }
+
+        if ($this->can('announcement.view_statistics') || $this->can('announcement.manage')) {
+            $rules[] = ['action' => 'read', 'subject' => 'AnnouncementStats'];
         }
 
         if ($this->can('meetings.view') || $this->can('meetings.manage') || $this->can('meetings.create')) {

@@ -49,6 +49,8 @@ use App\Http\Controllers\Api\Ticketing\TicketingDashboardController;
 use App\Http\Controllers\Api\Ticketing\TicketingMetaController;
 use App\Http\Controllers\Api\Ticketing\TicketingReportController;
 use App\Http\Controllers\Api\UnifiedSearchController;
+use App\Http\Controllers\Api\AnnouncementCategoryController;
+use App\Http\Controllers\Api\AnnouncementController;
 use App\Http\Controllers\Api\AppointmentController;
 use App\Http\Controllers\Api\AppointmentTypeController;
 use App\Http\Controllers\Api\AuditLogController;
@@ -108,6 +110,32 @@ Route::middleware(['auth:sanctum', 'password.changed'])->group(function () {
     Route::get('/meta/structures', [MetaController::class, 'structures']);
     Route::get('/meta/users', [MetaController::class, 'users']);
     Route::get('/meta/workflows', [MetaController::class, 'workflows']);
+
+    Route::get('/announcements/banner', [AnnouncementController::class, 'banner']);
+    Route::get('/announcements/managed', [AnnouncementController::class, 'managed']);
+    Route::get('/announcements/statistics', [AnnouncementController::class, 'statistics']);
+    Route::post('/announcements/preview', [AnnouncementController::class, 'preview']);
+    Route::get('/announcements', [AnnouncementController::class, 'index']);
+    Route::post('/announcements', [AnnouncementController::class, 'store']);
+    Route::get('/announcements/{announcement}', [AnnouncementController::class, 'show']);
+    Route::put('/announcements/{announcement}', [AnnouncementController::class, 'update']);
+    Route::post('/announcements/{announcement}/submit', [AnnouncementController::class, 'submit']);
+    Route::post('/announcements/{announcement}/approve', [AnnouncementController::class, 'approve']);
+    Route::post('/announcements/{announcement}/reject', [AnnouncementController::class, 'reject']);
+    Route::post('/announcements/{announcement}/request-correction', [AnnouncementController::class, 'requestCorrection']);
+    Route::post('/announcements/{announcement}/publish', [AnnouncementController::class, 'publish']);
+    Route::post('/announcements/{announcement}/schedule', [AnnouncementController::class, 'schedule']);
+    Route::post('/announcements/{announcement}/unpublish', [AnnouncementController::class, 'unpublish']);
+    Route::post('/announcements/{announcement}/archive', [AnnouncementController::class, 'archive']);
+    Route::post('/announcements/{announcement}/acknowledge', [AnnouncementController::class, 'acknowledge']);
+    Route::post('/announcements/{announcement}/dismiss', [AnnouncementController::class, 'dismiss']);
+    Route::post('/announcements/{announcement}/favorite', [AnnouncementController::class, 'favorite']);
+    Route::get('/announcements/{announcement}/receipts', [AnnouncementController::class, 'receipts']);
+    Route::post('/announcements/{announcement}/remind', [AnnouncementController::class, 'remind']);
+    Route::get('/announcement-importances', [AnnouncementCategoryController::class, 'importances']);
+    Route::get('/announcement-categories', [AnnouncementCategoryController::class, 'index']);
+    Route::post('/announcement-categories', [AnnouncementCategoryController::class, 'store']);
+    Route::put('/announcement-categories/{category}', [AnnouncementCategoryController::class, 'update']);
 
     Route::middleware('permission:admin.access')->group(function () {
         Route::get('/structures', [StructureController::class, 'index']);
