@@ -47,10 +47,9 @@ const sendResetLink = async () => {
     })
     isSent.value = true
   }
-  catch (err) {
+  catch {
     if (!errors.value.email)
       errors.value.email = 'Envoi impossible. Réessayez.'
-    console.error(err)
   }
   finally {
     isSubmitting.value = false

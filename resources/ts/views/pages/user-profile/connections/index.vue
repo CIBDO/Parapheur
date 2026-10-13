@@ -10,7 +10,7 @@ const fetchProjectData = async () => {
       query: {
         tab: router.params.tab,
       },
-    }).catch(err => console.log(err));
+    }).catch(() => {});
 
     connectionData.value = data;
   }

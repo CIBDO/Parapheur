@@ -85,6 +85,39 @@ class CorrespondenceReplyService
         });
     }
 
+    /**
+     * Verser le document du courrier dans la documentation institutionnelle.
+     *
+     * @param  array{classification_node_id?: int|null, folder_id?: int|null, domain_id?: int|null}  $options
+     */
+    public function submitToGed(Correspondence $correspondence, User $user, array $options = []): Correspondence
+    {
+        return DB::transaction(function () use ($correspondence, $user, $options) {
+            $document = $correspondence->document;
+            if (! $document) {
+                throw new InvalidArgumentException('Aucun document associé à ce courrier.');
+            }
+
+            app(\App\Services\InstitutionalDepositService::class)->deposit($document, $user, [
+                'classification_node_id' => $options['classification_node_id'] ?? null,
+                'folder_id' => $options['folder_id'] ?? null,
+                'domain_id' => $options['domain_id'] ?? null,
+                'pin_version' => true,
+                'origin' => DocumentOrigin::Ged->value,
+            ]);
+
+            $this->eventService->logEvent(
+                correspondence: $correspondence,
+                eventType: 'submitted_to_ged',
+                user: $user,
+                metadata: ['document_id' => $document->id],
+                comment: 'Document versé à la documentation institutionnelle',
+            );
+
+            return $correspondence->fresh(['document.folder', 'document.domain']);
+        });
+    }
+
     public function submitToParapheur(Correspondence $correspondence, User $user, array $workflowData = []): Correspondence
     {
         return DB::transaction(function () use ($correspondence, $user, $workflowData) {

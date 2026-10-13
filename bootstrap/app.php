@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\EnsureNotIdle;
 use App\Http\Middleware\EnsurePasswordChanged;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -22,6 +23,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'permission' => PermissionMiddleware::class,
             'role_or_permission' => RoleOrPermissionMiddleware::class,
             'password.changed' => EnsurePasswordChanged::class,
+            'auth.idle' => EnsureNotIdle::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

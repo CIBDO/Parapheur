@@ -53,7 +53,6 @@ const formData = ref({
 })
 
 const onSubmit = () => {
-  console.log(formData.value)
 }
 </script>
 
@@ -484,7 +483,6 @@ const formData = ref({
 })
 
 const onSubmit = () => {
-  console.log(formData.value)
 }
 </script>
 
@@ -918,7 +916,6 @@ const formData = ref({
 })
 
 const onSubmit = () => {
-  console.log(formData.value)
 }
 </script>
 
@@ -1344,7 +1341,6 @@ const formData = ref({
 })
 
 const onSubmit = () => {
-  console.log(formData.value)
 }
 </script>
 
@@ -1759,7 +1755,6 @@ const formData = ref({
 })
 
 const onSubmit = () => {
-  console.log(formData.value)
 }
 </script>
 
@@ -2037,7 +2032,6 @@ const formData = ref({
 })
 
 const onSubmit = () => {
-  console.log(formData.value)
 }
 </script>
 
@@ -2876,7 +2870,7 @@ const validateSocialLinkForm = () => {
 
               <VBtn
                 color="success"
-                @click="console.log('Form Submitted')"
+
               >
                 submit
               </VBtn>
@@ -3489,7 +3483,7 @@ const validateSocialLinkForm = () => {
 
               <VBtn
                 color="success"
-                @click="console.log('Form Submitted')"
+
               >
                 submit
               </VBtn>
@@ -3545,7 +3539,6 @@ const formData = ref({
 })
 
 const onSubmit = () => {
-  console.log(formData.value)
 }
 </script>
 
@@ -3843,7 +3836,6 @@ const formData = ref({
 })
 
 const onSubmit = () => {
-  console.log(formData.value)
 }
 </script>
 

@@ -73,10 +73,9 @@ const resetPassword = async () => {
 
     isDone.value = true
   }
-  catch (err) {
+  catch {
     if (!errors.value.email && !errors.value.password)
       errors.value.email = 'Réinitialisation impossible. Réessayez.'
-    console.error(err)
   }
   finally {
     isSubmitting.value = false

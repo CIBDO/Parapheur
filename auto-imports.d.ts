@@ -200,6 +200,11 @@ declare global {
   const productionStatusLabels: typeof import('./resources/ts/utils/tasksUi')['productionStatusLabels']
   const provide: typeof import('vue')['provide']
   const provideLocal: typeof import('@vueuse/core')['provideLocal']
+  const publicationStatusColor: typeof import('./resources/ts/utils/gedUi')['publicationStatusColor']
+  const publicationStatusLabels: typeof import('./resources/ts/utils/gedUi')['publicationStatusLabels']
+  const publicationStatusOptions: typeof import('./resources/ts/utils/gedUi')['publicationStatusOptions']
+  const publicationWorkflowLabels: typeof import('./resources/ts/utils/gedUi')['publicationWorkflowLabels']
+  const publicationWorkflowOptions: typeof import('./resources/ts/utils/gedUi')['publicationWorkflowOptions']
   const reactify: typeof import('@vueuse/core')['reactify']
   const reactifyObject: typeof import('@vueuse/core')['reactifyObject']
   const reactive: typeof import('vue')['reactive']
@@ -680,6 +685,11 @@ declare module 'vue' {
     readonly productionStatusLabels: UnwrapRef<typeof import('./resources/ts/utils/tasksUi')['productionStatusLabels']>
     readonly provide: UnwrapRef<typeof import('vue')['provide']>
     readonly provideLocal: UnwrapRef<typeof import('@vueuse/core')['provideLocal']>
+    readonly publicationStatusColor: UnwrapRef<typeof import('./resources/ts/utils/gedUi')['publicationStatusColor']>
+    readonly publicationStatusLabels: UnwrapRef<typeof import('./resources/ts/utils/gedUi')['publicationStatusLabels']>
+    readonly publicationStatusOptions: UnwrapRef<typeof import('./resources/ts/utils/gedUi')['publicationStatusOptions']>
+    readonly publicationWorkflowLabels: UnwrapRef<typeof import('./resources/ts/utils/gedUi')['publicationWorkflowLabels']>
+    readonly publicationWorkflowOptions: UnwrapRef<typeof import('./resources/ts/utils/gedUi')['publicationWorkflowOptions']>
     readonly reactify: UnwrapRef<typeof import('@vueuse/core')['reactify']>
     readonly reactifyObject: UnwrapRef<typeof import('@vueuse/core')['reactifyObject']>
     readonly reactive: UnwrapRef<typeof import('vue')['reactive']>

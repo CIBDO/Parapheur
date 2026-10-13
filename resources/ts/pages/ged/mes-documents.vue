@@ -9,9 +9,9 @@ definePage({
 const {
   loading, items, total, page, perPage, filters, headers, load, openDoc,
   labelOf, statusLabels, statusColor, confidentialityLabels, formatDateFr,
-} = useGedDocumentList('mine')
+} = useGedDocumentList('my_deposits')
 
-filters.value.scope = 'mine'
+filters.value.scope = 'my_deposits'
 watch([page, perPage], () => load())
 onMounted(load)
 </script>
@@ -19,8 +19,8 @@ onMounted(load)
 <template>
   <div>
     <ParapheurPageHeader
-      title="Mes documents"
-      subtitle="Documents créés par moi"
+      title="Mes dépôts"
+      subtitle="Documents institutionnels que j’ai déposés"
       icon="tabler-folder-user"
     />
     <VCard class="parapheur-section-card">

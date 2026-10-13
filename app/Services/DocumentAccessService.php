@@ -6,6 +6,7 @@ use App\Enums\DocumentAccessAbility;
 use App\Enums\DocumentArchiveStatus;
 use App\Enums\DocumentConfidentiality;
 use App\Enums\DocumentOrigin;
+use App\Enums\DocumentPublicationStatus;
 use App\Enums\DocumentStatus;
 use App\Models\Document;
 use App\Models\DocumentAccessRule;
@@ -20,6 +21,10 @@ class DocumentAccessService
 
     public function canAccess(User $user, Document $document): bool
     {
+        if (! $this->passesPublicationGate($user, $document)) {
+            return false;
+        }
+
         if ($this->isCircuitParty($user, $document)) {
             return true;
         }
@@ -276,6 +281,7 @@ class DocumentAccessService
         return $query->where(function (Builder $q) use ($user, $workspaceOrigins) {
             // Circuit need-to-know
             $q->where('author_id', $user->id)
+                ->orWhere('document_owner_id', $user->id)
                 ->orWhere('current_assignee_id', $user->id)
                 ->orWhereHas('transmissions', function (Builder $t) use ($user) {
                     $t->where('to_user_id', $user->id)->orWhere('from_user_id', $user->id);
@@ -322,9 +328,15 @@ class DocumentAccessService
                 });
 
             // Clearance hors circuit : JAMAIS pour origines personal/workspace
+            // Documents institutionnels non publiés : uniquement contributeurs / validateurs (déjà couverts ci-dessus)
             if ($user->can('dashboard.dg')) {
                 $q->orWhere(function (Builder $dg) use ($workspaceOrigins) {
                     $dg->whereNotIn('origin', $workspaceOrigins)
+                        ->where(function (Builder $pub) {
+                            $pub->whereNull('publication_status')
+                                ->orWhere('publication_status', DocumentPublicationStatus::Publie->value)
+                                ->orWhereNotIn('origin', [DocumentOrigin::Ged->value]);
+                        })
                         ->whereIn('confidentiality', [
                             DocumentConfidentiality::Normal->value,
                             DocumentConfidentiality::Restreint->value,
@@ -337,14 +349,23 @@ class DocumentAccessService
                     $q->orWhere(function (Builder $rest) use ($user, $workspaceOrigins) {
                         $rest->whereNotIn('origin', $workspaceOrigins)
                             ->where('confidentiality', DocumentConfidentiality::Restreint->value)
-                            ->where('structure_id', $user->structure_id);
+                            ->where('structure_id', $user->structure_id)
+                            ->where(function (Builder $pub) {
+                                $pub->whereNull('publication_status')
+                                    ->orWhere('publication_status', DocumentPublicationStatus::Publie->value)
+                                    ->orWhereNotIn('origin', [DocumentOrigin::Ged->value]);
+                            });
                     });
                 }
 
-                // Documents GED « normal » : auteur, structure émettrice ou propriétaire
+                // Documents GED publiés « normal » : auteur, structure émettrice ou propriétaire
                 $q->orWhere(function (Builder $ged) use ($user) {
                     $ged->where('origin', DocumentOrigin::Ged->value)
                         ->where('confidentiality', DocumentConfidentiality::Normal->value)
+                        ->where(function (Builder $pub) {
+                            $pub->where('publication_status', DocumentPublicationStatus::Publie->value)
+                                ->orWhereNull('publication_status');
+                        })
                         ->where(function (Builder $own) use ($user) {
                             $own->where('author_id', $user->id);
                             if ($user->structure_id) {
@@ -353,8 +374,51 @@ class DocumentAccessService
                             }
                         });
                 });
+
+                // Validateurs : documents en vérification
+                if ($user->can('ged.validate') || $user->can('ged.publish')) {
+                    $q->orWhere(function (Builder $pending) {
+                        $pending->where('origin', DocumentOrigin::Ged->value)
+                            ->whereIn('publication_status', [
+                                DocumentPublicationStatus::EnVerification->value,
+                                DocumentPublicationStatus::Valide->value,
+                                DocumentPublicationStatus::Depose->value,
+                            ]);
+                    });
+                }
             }
         });
+    }
+
+    /**
+     * Les documents GED non publiés ne sont visibles qu’aux contributeurs / validateurs.
+     */
+    private function passesPublicationGate(User $user, Document $document): bool
+    {
+        $origin = $document->origin instanceof DocumentOrigin
+            ? $document->origin
+            : DocumentOrigin::tryFrom((string) $document->origin);
+
+        if ($origin !== DocumentOrigin::Ged) {
+            return true;
+        }
+
+        $pub = $document->publication_status instanceof DocumentPublicationStatus
+            ? $document->publication_status
+            : DocumentPublicationStatus::tryFrom((string) ($document->publication_status ?? ''));
+
+        if ($pub === null || $pub === DocumentPublicationStatus::Publie) {
+            return true;
+        }
+
+        if ($user->can('admin.access') || $user->can('ged.validate') || $user->can('ged.publish')) {
+            return true;
+        }
+
+        return (int) $document->author_id === (int) $user->id
+            || (int) $document->document_owner_id === (int) $user->id
+            || $this->hasExplicitAcl($user, $document, DocumentAccessAbility::View)
+            || $this->hasExplicitAcl($user, $document, DocumentAccessAbility::Edit);
     }
 
     public function hasExplicitAcl(User $user, Document $document, DocumentAccessAbility $ability): bool

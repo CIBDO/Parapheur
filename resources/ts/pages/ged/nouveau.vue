@@ -14,10 +14,13 @@ definePage({
 })
 
 const router = useRouter()
-const documentTypes = ref<Array<{ id: number; name: string }>>([])
+const documentTypes = ref<Array<{ id: number; name: string; metadata_schema?: any[] }>>([])
 const structures = ref<Array<{ id: number; name: string; code: string }>>([])
 const categories = ref<Array<{ id: number; name: string }>>([])
+const domains = ref<Array<{ id: number; name: string }>>([])
+const folderFlat = ref<Array<{ id: number; label: string }>>([])
 const classifFlat = ref<Array<{ id: number; label: string }>>([])
+const extraMetadata = ref<Record<string, string>>({})
 
 const form = ref({
   object: '',
@@ -27,20 +30,37 @@ const form = ref({
   dossier_number: '',
   document_type_id: null as number | null,
   category_id: null as number | null,
+  domain_id: null as number | null,
+  folder_id: null as number | null,
   structure_id: null as number | null,
   classification_node_id: null as number | null,
   priority: 'normale',
   confidentiality: 'normal',
   expected_action: 'consultation',
+  publication_workflow: 'controlled',
   due_date: '',
   document_date: '',
+  effective_at: '',
+  exercise_year: null as number | null,
+  period_label: '',
   keywords: '',
   tags: '',
   language: 'fr',
   source: '',
 })
 
+const selectedTypeSchema = computed(() => {
+  const t = documentTypes.value.find(x => x.id === form.value.document_type_id)
+
+  return Array.isArray(t?.metadata_schema) ? t!.metadata_schema! : []
+})
+
+watch(() => form.value.document_type_id, () => {
+  extraMetadata.value = {}
+})
+
 const mainFile = ref<File | File[] | null>(null)
+const multiFiles = ref<File | File[] | null>(null)
 const piecesJointes = ref<File | File[] | null>(null)
 const annexes = ref<File | File[] | null>(null)
 const justificatifs = ref<File | File[] | null>(null)
@@ -78,15 +98,19 @@ const canSubmit = computed(() =>
 )
 
 onMounted(async () => {
-  const [types, structs, cats, classif] = await Promise.all([
+  const [types, structs, cats, doms, folders, classif] = await Promise.all([
     $api('/meta/document-types'),
     $api('/meta/structures'),
     $api('/meta/document-categories'),
+    $api('/meta/document-domains'),
+    $api('/meta/document-folders'),
     $api('/meta/classification-nodes'),
   ])
   documentTypes.value = types
   structures.value = structs
   categories.value = cats.data || cats
+  domains.value = doms.data || doms || []
+  folderFlat.value = flattenNodes(folders.data || [])
   classifFlat.value = flattenNodes(classif.data || [])
 })
 
@@ -117,7 +141,23 @@ const submit = async () => {
       body.append('tags', JSON.stringify(tags))
     }
 
-    const main = asFile(mainFile.value)
+    const extras = Object.fromEntries(
+      Object.entries(extraMetadata.value).filter(([, v]) => v !== null && v !== ''),
+    )
+    if (Object.keys(extras).length)
+      body.append('extra_metadata', JSON.stringify(extras))
+
+    const batch = asFiles(multiFiles.value)
+    if (batch.length > 1) {
+      batch.forEach(f => body.append('files[]', f))
+      const res = await $api('/ged/documents', { method: 'POST', body })
+      const first = res.data?.[0] || res
+      await router.push({ name: 'ged-id', params: { id: String(first.id) } })
+
+      return
+    }
+
+    const main = asFile(mainFile.value) || batch[0] || null
     if (main)
       body.append('main_file', main)
 
@@ -140,9 +180,9 @@ const submit = async () => {
 <template>
   <div>
     <ParapheurPageHeader
-      title="Nouveau document GED"
-      subtitle="Dépôt hors circuit parapheur (entrée éventuelle ultérieure)"
-      icon="tabler-file-plus"
+      title="Déposer un document"
+      subtitle="Documentation institutionnelle — le dépôt ne publie pas automatiquement"
+      icon="tabler-upload"
     />
 
     <VAlert
@@ -206,6 +246,54 @@ const submit = async () => {
               item-value="id"
               label="Catégorie"
               clearable
+            />
+          </VCol>
+          <VCol
+            cols="12"
+            md="4"
+          >
+            <AppSelect
+              v-model="form.domain_id"
+              :items="domains"
+              item-title="name"
+              item-value="id"
+              label="Domaine"
+              clearable
+            />
+          </VCol>
+          <VCol
+            cols="12"
+            md="4"
+          >
+            <AppSelect
+              v-model="form.folder_id"
+              :items="folderFlat"
+              item-title="label"
+              item-value="id"
+              label="Dossier"
+              clearable
+            />
+          </VCol>
+          <VCol
+            cols="12"
+            md="4"
+          >
+            <AppTextField
+              v-model="form.exercise_year"
+              type="number"
+              label="Exercice"
+            />
+          </VCol>
+          <VCol
+            v-for="field in selectedTypeSchema"
+            :key="field.key"
+            cols="12"
+            md="4"
+          >
+            <AppTextField
+              v-model="extraMetadata[field.key]"
+              :label="field.label + (field.required ? ' *' : '')"
+              :type="field.type === 'number' ? 'number' : field.type === 'date' ? 'date' : 'text'"
             />
           </VCol>
           <VCol
@@ -338,6 +426,20 @@ const submit = async () => {
               label="Document principal"
               prepend-icon="tabler-file"
               show-size
+            />
+          </VCol>
+          <VCol
+            cols="12"
+            md="6"
+          >
+            <VFileInput
+              v-model="multiFiles"
+              label="Téléversement multiple (glisser-déposer)"
+              multiple
+              prepend-icon="tabler-files"
+              show-size
+              hint="Plusieurs fichiers = plusieurs documents dans le dossier cible"
+              persistent-hint
             />
           </VCol>
           <VCol

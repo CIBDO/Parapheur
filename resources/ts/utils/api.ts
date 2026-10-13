@@ -73,8 +73,10 @@ export const $api = ofetch.create({
       useCookie('userData').value = null
       useCookie('userAbilityRules').value = null
 
-      if (typeof window !== 'undefined' && !window.location.pathname.includes('/login'))
-        window.location.assign('/login')
+      if (typeof window !== 'undefined' && !window.location.pathname.includes('/login')) {
+        const reason = response._data?.code === 'IDLE_TIMEOUT' ? 'idle' : undefined
+        window.location.assign(reason ? `/login?reason=${reason}` : '/login')
+      }
 
       return
     }

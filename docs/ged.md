@@ -1,6 +1,19 @@
-# GED — Gestion Électronique des Documents
+# Documentation institutionnelle (GED)
 
-Module transversal du Bureau Numérique DGTCP. La table `documents` existante reste la **source documentaire unique** : parapheur, réunions, agenda et instructions y font référence sans duplication physique.
+Module transversal du Bureau Numérique DGTCP, exposé en UI sous le libellé **Documentation institutionnelle**.  
+La table `documents` reste la **source documentaire unique** : parapheur, réunions, agenda et instructions y font référence sans duplication physique.
+
+## Extensions institutionnelles
+
+- **Dossiers** (`document_folders`) : arborescence opérationnelle, ACL + héritage/exceptions, circuits de publication par défaut
+- **Domaines** (`document_domains`) : axe thématique (Comptabilité, Trésorerie, RH…)
+- **Publication** (`publication_status`) : brouillon → déposé → en vérification → validé → publié / rejeté / archivé
+- **Circuits** : `simple` | `controlled` | `hierarchical` (`DocumentPublicationService`)
+- **Versement unifié** : `InstitutionalDepositService` (Espace, Tâches, Productions, Courrier, CR réunions diffusés)
+- **Antivirus** : `AntivirusScanService` (heuristique EICAR ; driver via `ANTIVIRUS_DRIVER`)
+- **Métadonnées par type** : `document_types.metadata_schema` → `documents.extra_metadata`
+- **Audit** : `GET /ged/audit-logs` · **Publications** : `GET /ged/published`
+- API complémentaire : `/ged/folders`, `/ged/domains`, `/ged/documents/{id}/submit-publication|approve-publication|publish|…`
 
 ## Architecture
 

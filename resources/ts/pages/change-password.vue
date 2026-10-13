@@ -86,10 +86,9 @@ const changePassword = async () => {
     const role = String(res?.userData?.role ?? userData.value?.role ?? '')
     await router.replace(homeForRole(role))
   }
-  catch (err) {
+  catch {
     if (!errors.value.current_password && !errors.value.password)
       errors.value.password = 'Impossible de changer le mot de passe. Réessayez.'
-    console.error(err)
   }
   finally {
     isSubmitting.value = false

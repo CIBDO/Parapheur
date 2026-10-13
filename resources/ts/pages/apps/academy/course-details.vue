@@ -6,7 +6,6 @@ const courseDetails = ref<CourseDetails>();
 
 const { data, error } = await useApi<CourseDetails>('/apps/academy/course-details');
 
-if (error.value) console.log(error.value);
 else if (data.value) courseDetails.value = data.value;
 
 const panelStatus = ref(0);

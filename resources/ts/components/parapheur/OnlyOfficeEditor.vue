@@ -204,7 +204,6 @@ const initEditor = async () => {
           loading.value = false
           error.value = ooErrorMessage(event?.data)
           emit('error', error.value)
-          console.warn('[ONLYOFFICE onError]', event?.data)
         },
         async onRequestHistory() {
           try {

@@ -30,6 +30,9 @@ class WorkspaceBridgeController extends Controller
 
         $data = $request->validate([
             'classification_node_id' => ['nullable', 'exists:classification_nodes,id'],
+            'folder_id' => ['nullable', 'exists:document_folders,id'],
+            'domain_id' => ['nullable', 'exists:document_domains,id'],
+            'exercise_year' => ['nullable', 'integer', 'min:2000', 'max:2100'],
             'detach_link' => ['nullable', 'boolean'],
         ]);
 
@@ -38,6 +41,11 @@ class WorkspaceBridgeController extends Controller
                 $document,
                 $request->user(),
                 $data['classification_node_id'] ?? null,
+                [
+                    'folder_id' => $data['folder_id'] ?? null,
+                    'domain_id' => $data['domain_id'] ?? null,
+                    'exercise_year' => $data['exercise_year'] ?? null,
+                ],
             );
             if (! empty($data['detach_link'])) {
                 $this->bridge->detachFromWorkspaceAfterGedSubmit($result, false);

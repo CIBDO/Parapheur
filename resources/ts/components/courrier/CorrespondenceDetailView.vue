@@ -297,8 +297,7 @@ async function loadReminders() {
   if (props.correspondence.id) {
     try {
       reminders.value = await listReminders(props.correspondence.id)
-    } catch (error) {
-      console.error('Erreur chargement relances:', error)
+    } catch {
     }
   }
 }

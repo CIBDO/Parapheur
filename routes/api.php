@@ -1,11 +1,15 @@
 <?php
 
+use App\Http\Controllers\Api\Ged\GedAuditController;
 use App\Http\Controllers\Api\Ged\GedCategoryController;
 use App\Http\Controllers\Api\Ged\GedClassificationController;
 use App\Http\Controllers\Api\Ged\GedDashboardController;
 use App\Http\Controllers\Api\Ged\GedDocumentController;
+use App\Http\Controllers\Api\Ged\GedDomainController;
 use App\Http\Controllers\Api\Ged\GedEngagementController;
+use App\Http\Controllers\Api\Ged\GedFolderController;
 use App\Http\Controllers\Api\Ged\GedLifecycleController;
+use App\Http\Controllers\Api\Ged\GedPublicationController;
 use App\Http\Controllers\Api\Ged\GedTagController;
 use App\Http\Controllers\Api\Library\BibliographicReferenceController;
 use App\Http\Controllers\Api\Library\ReferenceCollectionController;
@@ -79,6 +83,7 @@ use App\Http\Controllers\Api\MeetingTypeController;
 use App\Http\Controllers\Api\MetaController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\OnlyOfficeController;
+use App\Http\Controllers\Api\PortalAppController;
 use App\Http\Controllers\Api\ReportingController;
 use App\Http\Controllers\Api\RolePermissionController;
 use App\Http\Controllers\Api\StructureController;
@@ -93,14 +98,14 @@ Route::post('/auth/forgot-password', [AuthController::class, 'forgotPassword'])
 Route::post('/auth/reset-password', [AuthController::class, 'resetPassword'])
     ->middleware('throttle:forgot-password');
 
-Route::middleware('auth:sanctum')->group(function () {
+Route::middleware(['auth:sanctum', 'auth.idle'])->group(function () {
     Route::get('/auth/me', [AuthController::class, 'me']);
     Route::put('/auth/profile', [AuthController::class, 'updateProfile']);
     Route::post('/auth/logout', [AuthController::class, 'logout']);
     Route::post('/auth/change-password', [AuthController::class, 'changePassword']);
 });
 
-Route::middleware(['auth:sanctum', 'password.changed'])->group(function () {
+Route::middleware(['auth:sanctum', 'auth.idle', 'password.changed'])->group(function () {
     Route::get('/notifications', [NotificationController::class, 'index']);
     Route::post('/notifications/read', [NotificationController::class, 'markRead']);
     Route::post('/notifications/unread', [NotificationController::class, 'markUnread']);
@@ -110,6 +115,13 @@ Route::middleware(['auth:sanctum', 'password.changed'])->group(function () {
     Route::get('/meta/structures', [MetaController::class, 'structures']);
     Route::get('/meta/users', [MetaController::class, 'users']);
     Route::get('/meta/workflows', [MetaController::class, 'workflows']);
+
+    Route::get('/portal-apps', [PortalAppController::class, 'index']);
+    Route::get('/portal-apps/categories', [PortalAppController::class, 'categories']);
+    Route::post('/portal-apps', [PortalAppController::class, 'store']);
+    Route::get('/portal-apps/{portalApp}', [PortalAppController::class, 'show']);
+    Route::put('/portal-apps/{portalApp}', [PortalAppController::class, 'update']);
+    Route::delete('/portal-apps/{portalApp}', [PortalAppController::class, 'destroy']);
 
     Route::get('/announcements/banner', [AnnouncementController::class, 'banner']);
     Route::get('/announcements/managed', [AnnouncementController::class, 'managed']);
@@ -200,6 +212,23 @@ Route::middleware(['auth:sanctum', 'password.changed'])->group(function () {
 
     // ——— GED (référentiel documentaire transversal) ———
     Route::get('/ged/dashboard', GedDashboardController::class);
+    Route::get('/ged/audit-logs', GedAuditController::class);
+    Route::get('/ged/published', function (\Illuminate\Http\Request $request) {
+        $request->user();
+        abort_unless(
+            $request->user()->can('ged.view') || $request->user()->can('admin.access'),
+            403
+        );
+
+        return response()->json(
+            app(\App\Services\DocumentSearchService::class)->search($request->user(), [
+                'scope' => 'published',
+                'publication_status' => 'publie',
+                'sort' => 'published_at',
+                'dir' => 'desc',
+            ], (int) $request->query('per_page', 8))
+        );
+    });
     Route::get('/ged/documents', [GedDocumentController::class, 'index']);
     Route::post('/ged/documents', [GedDocumentController::class, 'store']);
     Route::get('/ged/documents/{document}', [GedDocumentController::class, 'show']);
@@ -224,6 +253,27 @@ Route::middleware(['auth:sanctum', 'password.changed'])->group(function () {
     Route::put('/ged/categories/{documentCategory}', [GedCategoryController::class, 'update']);
     Route::delete('/ged/categories/{documentCategory}', [GedCategoryController::class, 'destroy']);
 
+    Route::get('/ged/domains', [GedDomainController::class, 'index']);
+    Route::post('/ged/domains', [GedDomainController::class, 'store']);
+    Route::put('/ged/domains/{domain}', [GedDomainController::class, 'update']);
+    Route::delete('/ged/domains/{domain}', [GedDomainController::class, 'destroy']);
+
+    Route::get('/ged/folders', [GedFolderController::class, 'index']);
+    Route::post('/ged/folders', [GedFolderController::class, 'store']);
+    Route::get('/ged/folders/{folder}', [GedFolderController::class, 'show']);
+    Route::put('/ged/folders/{folder}', [GedFolderController::class, 'update']);
+    Route::post('/ged/folders/{folder}/move', [GedFolderController::class, 'move']);
+    Route::delete('/ged/folders/{folder}', [GedFolderController::class, 'destroy']);
+    Route::post('/ged/folders/{folder}/share', [GedFolderController::class, 'share']);
+    Route::delete('/ged/folders/{folder}/share/{rule}', [GedFolderController::class, 'revokeShare']);
+
+    Route::post('/ged/documents/{document}/submit-publication', [GedPublicationController::class, 'submit']);
+    Route::post('/ged/documents/{document}/approve-publication', [GedPublicationController::class, 'approve']);
+    Route::post('/ged/documents/{document}/reject-publication', [GedPublicationController::class, 'reject']);
+    Route::post('/ged/documents/{document}/return-publication', [GedPublicationController::class, 'returnForCorrection']);
+    Route::post('/ged/documents/{document}/publish', [GedPublicationController::class, 'publish']);
+    Route::post('/ged/documents/{document}/archive-publication', [GedPublicationController::class, 'archive']);
+
     Route::get('/ged/tags', [GedTagController::class, 'index']);
     Route::get('/ged/favorites', [GedEngagementController::class, 'favorites']);
     Route::get('/ged/recent', [GedEngagementController::class, 'recent']);
@@ -239,6 +289,8 @@ Route::middleware(['auth:sanctum', 'password.changed'])->group(function () {
     Route::post('/ged/classification-rules', [GedLifecycleController::class, 'storeClassificationRule']);
 
     Route::get('/meta/document-categories', [GedCategoryController::class, 'index']);
+    Route::get('/meta/document-domains', [GedDomainController::class, 'index']);
+    Route::get('/meta/document-folders', [GedFolderController::class, 'index']);
     Route::get('/meta/classification-nodes', [GedClassificationController::class, 'index']);
     Route::get('/meta/document-tags', [GedTagController::class, 'index']);
 
@@ -556,6 +608,7 @@ Route::middleware(['auth:sanctum', 'password.changed'])->group(function () {
             ->middleware('permission:mail.update|admin.access');
         Route::post('/correspondences/{correspondence}/reply', [CorrespondenceController::class, 'reply'])
             ->middleware('permission:mail.create|admin.access');
+        Route::post('/correspondences/{correspondence}/submit-to-ged', [CorrespondenceController::class, 'submitToGed']);
         Route::post('/correspondences/{correspondence}/submit-to-parapheur', [CorrespondenceController::class, 'submitToParapheur'])
             ->middleware('permission:mail.update|documents.create|admin.access');
         Route::post('/correspondences/{correspondence}/dispatch', [CorrespondenceController::class, 'dispatch'])

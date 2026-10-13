@@ -93,9 +93,7 @@ export const useCalendar = (event: Ref<Event | NewEvent>, isEventHandlerSidebarA
           })),
         );
       })
-      .catch(e => {
-        console.error('Error occurred while fetching calendar events', e);
-      });
+      .catch(() => {});
   };
 
   // 👉 Calendar API
@@ -112,7 +110,6 @@ export const useCalendar = (event: Ref<Event | NewEvent>, isEventHandlerSidebarA
     const existingEvent = calendarApi.value?.getEventById(String(updatedEventData.id));
 
     if (!existingEvent) {
-      console.warn("Can't found event in calendar to update");
 
       return;
     }

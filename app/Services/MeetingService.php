@@ -651,6 +651,28 @@ class MeetingService
         $minute->diffused_at = now();
         $minute->save();
 
+        if ($minute->document_id) {
+            $document = $minute->document;
+            if ($document) {
+                app(\App\Services\InstitutionalDepositService::class)->deposit($document, $actor, [
+                    'pin_version' => true,
+                    'exercise_year' => $meeting->meeting_date?->year,
+                ]);
+                // Diffuse = publication institutionnelle du CR
+                if ($actor->can('ged.publish') || $actor->can('admin.access') || $actor->can('meetings.manage')) {
+                    try {
+                        app(\App\Services\DocumentPublicationService::class)->publish(
+                            $document->fresh(),
+                            $actor,
+                            'Publication automatique du compte rendu diffusé'
+                        );
+                    } catch (\Throwable) {
+                        // Le dépôt reste en « déposé / validé » si publication refusée
+                    }
+                }
+            }
+        }
+
         $this->notifyParticipants(
             $meeting,
             'minutes_available',

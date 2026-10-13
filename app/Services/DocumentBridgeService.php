@@ -27,12 +27,15 @@ class DocumentBridgeService
         private readonly AppointmentService $appointments,
         private readonly DocumentAccessService $access,
         private readonly AuditLogger $audit,
+        private readonly InstitutionalDepositService $institutional,
     ) {}
 
     /**
      * Soumettre un document d’espace vers le catalogue GED (changement d’origine, même fichier).
+     *
+     * @param  array{folder_id?: int|null, domain_id?: int|null, exercise_year?: int|null}  $meta
      */
-    public function submitToGed(Document $document, User $actor, ?int $classificationNodeId = null): Document
+    public function submitToGed(Document $document, User $actor, ?int $classificationNodeId = null, array $meta = []): Document
     {
         $this->assertWorkspaceBound($document);
 
@@ -40,22 +43,10 @@ class DocumentBridgeService
             throw new InvalidArgumentException('Seul l’auteur peut soumettre ce document à la GED.');
         }
 
-        return DB::transaction(function () use ($document, $actor, $classificationNodeId) {
-            $document->origin = DocumentOrigin::Ged;
-            if ($classificationNodeId) {
-                $document->classification_node_id = $classificationNodeId;
-            }
-            $document->save();
-
-            $this->pinCurrentVersion($document, $actor, 'Version figée à l’entrée GED');
-
-            $this->audit->log('workspace.submitted_to_ged', $document, [
-                'actor_id' => $actor->id,
-                'classification_node_id' => $classificationNodeId,
-            ]);
-
-            return $document->fresh(['type', 'classificationNode', 'author', 'latestVersion', 'officialVersion']);
-        });
+        return $this->institutional->deposit($document, $actor, array_merge($meta, [
+            'classification_node_id' => $classificationNodeId,
+            'pin_version' => true,
+        ]));
     }
 
     /**

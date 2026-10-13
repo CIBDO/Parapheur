@@ -7,15 +7,18 @@ definePage({
 
 const tab = ref('categories')
 const categories = ref<any[]>([])
+const domains = ref<any[]>([])
 const retentionRules = ref<any[]>([])
 const classificationRules = ref<any[]>([])
 const documentTypes = ref<any[]>([])
 const classificationNodes = ref<any[]>([])
 const loading = ref(false)
 const dialog = ref(false)
+const domainDialog = ref(false)
 const retentionDialog = ref(false)
 const classificationDialog = ref(false)
 const form = ref({ code: '', name: '', description: '', sort_order: 0 })
+const domainForm = ref({ code: '', name: '', description: '', sort_order: 0 })
 const retentionForm = ref({
   code: '',
   name: '',
@@ -57,6 +60,11 @@ const loadCategories = async () => {
   }
 }
 
+const loadDomains = async () => {
+  const res = await $api('/ged/domains')
+  domains.value = res.data || []
+}
+
 const loadRetention = async () => {
   const res = await $api('/ged/retention-rules')
   retentionRules.value = res.data || []
@@ -77,10 +85,12 @@ const loadReferentials = async () => {
 }
 
 onMounted(async () => {
-  await Promise.all([loadCategories(), loadRetention(), loadClassificationRules(), loadReferentials()])
+  await Promise.all([loadCategories(), loadDomains(), loadRetention(), loadClassificationRules(), loadReferentials()])
 })
 
 watch(tab, async (v) => {
+  if (v === 'domains')
+    await loadDomains()
   if (v === 'retention')
     await loadRetention()
   if (v === 'auto-class')
@@ -94,6 +104,19 @@ const saveCategory = async () => {
     dialog.value = false
     form.value = { code: '', name: '', description: '', sort_order: 0 }
     await loadCategories()
+  }
+  catch (e: any) {
+    errorMessage.value = e?.data?.message || 'Erreur'
+  }
+}
+
+const saveDomain = async () => {
+  errorMessage.value = ''
+  try {
+    await $api('/ged/domains', { method: 'POST', body: domainForm.value })
+    domainDialog.value = false
+    domainForm.value = { code: '', name: '', description: '', sort_order: 0 }
+    await loadDomains()
   }
   catch (e: any) {
     errorMessage.value = e?.data?.message || 'Erreur'
@@ -157,8 +180,8 @@ const saveClassificationRule = async () => {
 <template>
   <div>
     <ParapheurPageHeader
-      title="Administration GED"
-      subtitle="Catégories, conservation et classement automatique"
+      title="Administration documentaire"
+      subtitle="Catégories, domaines, conservation et classement"
       icon="tabler-settings"
     />
 
@@ -168,6 +191,9 @@ const saveClassificationRule = async () => {
     >
       <VTab value="categories">
         Catégories
+      </VTab>
+      <VTab value="domains">
+        Domaines
       </VTab>
       <VTab value="retention">
         Conservation
@@ -188,6 +214,85 @@ const saveClassificationRule = async () => {
         Types documentaires
       </VTab>
     </VTabs>
+
+    <VCard
+      v-if="tab === 'domains'"
+      class="parapheur-section-card mb-4"
+    >
+      <VCardItem>
+        <VCardTitle>Domaines documentaires</VCardTitle>
+        <template #append>
+          <VBtn
+            color="primary"
+            size="small"
+            prepend-icon="tabler-plus"
+            @click="domainDialog = true"
+          >
+            Ajouter
+          </VBtn>
+        </template>
+      </VCardItem>
+      <VDivider />
+      <VDataTable
+        :headers="[
+          { title: 'Code', key: 'code' },
+          { title: 'Nom', key: 'name' },
+          { title: 'Description', key: 'description' },
+          { title: 'Actif', key: 'is_active' },
+        ]"
+        :items="domains"
+      >
+        <template #item.is_active="{ item }">
+          <VChip
+            size="small"
+            :color="item.is_active ? 'success' : 'secondary'"
+            label
+          >
+            {{ item.is_active ? 'Oui' : 'Non' }}
+          </VChip>
+        </template>
+      </VDataTable>
+    </VCard>
+
+    <VDialog
+      v-model="domainDialog"
+      max-width="480"
+    >
+      <VCard>
+        <VCardTitle>Nouveau domaine</VCardTitle>
+        <VCardText>
+          <AppTextField
+            v-model="domainForm.code"
+            label="Code"
+            class="mb-3"
+          />
+          <AppTextField
+            v-model="domainForm.name"
+            label="Nom"
+            class="mb-3"
+          />
+          <AppTextarea
+            v-model="domainForm.description"
+            label="Description"
+          />
+        </VCardText>
+        <VCardActions>
+          <VSpacer />
+          <VBtn
+            variant="text"
+            @click="domainDialog = false"
+          >
+            Annuler
+          </VBtn>
+          <VBtn
+            color="primary"
+            @click="saveDomain"
+          >
+            Enregistrer
+          </VBtn>
+        </VCardActions>
+      </VCard>
+    </VDialog>
 
     <VCard
       v-if="tab === 'categories'"

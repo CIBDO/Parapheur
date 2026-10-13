@@ -227,19 +227,22 @@ class DeliverableService
             throw ValidationException::withMessages(['file' => 'Document introuvable.']);
         }
 
-        $document->origin = DocumentOrigin::Ged;
-        if ($classificationNodeId) {
-            $document->classification_node_id = $classificationNodeId;
-        }
-        $document->save();
+        app(\App\Services\InstitutionalDepositService::class)->deposit($document, $actor, [
+            'classification_node_id' => $classificationNodeId,
+            'exercise_year' => $occurrence->reference_date?->year
+                ?? $occurrence->period_start?->year
+                ?? (int) now()->format('Y'),
+            'pin_version' => true,
+        ]);
 
         $this->occurrences->recordEvent($occurrence, $actor, 'classified_in_ged', [
             'production_file_id' => $prodFile->id,
             'document_id' => $document->id,
             'classification_node_id' => $classificationNodeId,
+            'folder_id' => $document->fresh()->folder_id,
         ]);
 
-        return $prodFile->fresh(['document.latestVersion', 'uploader:id,name']);
+        return $prodFile->fresh(['document.latestVersion', 'document.folder', 'uploader:id,name']);
     }
 
     /**

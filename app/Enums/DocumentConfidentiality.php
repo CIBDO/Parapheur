@@ -12,8 +12,8 @@ enum DocumentConfidentiality: string
     public function label(): string
     {
         return match ($this) {
-            self::Normal => 'Normal',
-            self::Restreint => 'Restreint',
+            self::Normal => 'Interne général',
+            self::Restreint => 'Restreint à une structure',
             self::Confidentiel => 'Confidentiel',
             self::TresConfidentiel => 'Très confidentiel',
         };

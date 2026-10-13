@@ -10,7 +10,7 @@ const fetchTeamData = async () => {
       query: {
         tab: router.params.tab,
       },
-    }).catch(err => console.log(err));
+    }).catch(() => {});
 
     teamData.value = data;
   }

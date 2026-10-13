@@ -27,9 +27,11 @@ class DocumentSearchService
             ->with([
                 'type:id,code,name',
                 'category:id,code,name',
+                'domain:id,code,name',
                 'structure:id,code,name',
                 'author:id,name,email',
                 'classificationNode:id,code,name,path',
+                'folder:id,code,name,path',
                 'latestVersion',
                 'tags:id,name,slug',
             ]);
@@ -54,6 +56,7 @@ class DocumentSearchService
         $allowedSort = [
             'created_at', 'document_date', 'reference', 'object', 'title',
             'status', 'priority', 'confidentiality', 'updated_at',
+            'published_at', 'publication_status', 'exercise_year',
         ];
         if (! in_array($sort, $allowedSort, true)) {
             $sort = 'created_at';
@@ -101,6 +104,10 @@ class DocumentSearchService
                     ->orWhereNotNull('legal_hold_at');
             })->count(),
             'sans_index' => (clone $base())->whereNull('indexed_at')->count(),
+            'a_valider' => (clone $base())->whereIn('publication_status', ['en_verification', 'valide'])->count(),
+            'publies' => (clone $base())->where('publication_status', 'publie')->count(),
+            'mes_depots' => (clone $base())->where('author_id', $user->id)
+                ->where('origin', DocumentOrigin::Ged->value)->count(),
         ];
     }
 
@@ -192,9 +199,10 @@ class DocumentSearchService
         }
 
         foreach ([
-            'document_type_id', 'category_id', 'structure_id', 'owner_structure_id',
-            'author_id', 'classification_node_id', 'status', 'priority',
+            'document_type_id', 'category_id', 'domain_id', 'structure_id', 'owner_structure_id',
+            'author_id', 'classification_node_id', 'folder_id', 'status', 'priority',
             'confidentiality', 'origin', 'archive_status', 'expected_action',
+            'publication_status', 'exercise_year',
         ] as $field) {
             if (isset($criteria[$field]) && $criteria[$field] !== '' && $criteria[$field] !== null) {
                 $query->where($field, $criteria[$field]);
@@ -236,7 +244,11 @@ class DocumentSearchService
         }
 
         if (! empty($criteria['exercice'])) {
-            $query->whereYear('document_date', (int) $criteria['exercice']);
+            $year = (int) $criteria['exercice'];
+            $query->where(function (Builder $y) use ($year) {
+                $y->where('exercise_year', $year)
+                    ->orWhereYear('document_date', $year);
+            });
         }
 
         if (isset($criteria['unclassified']) && filter_var($criteria['unclassified'], FILTER_VALIDATE_BOOLEAN)) {
@@ -249,8 +261,13 @@ class DocumentSearchService
                 'shared' => $query->whereHas('accessRules'),
                 'to_process' => $query->where('current_assignee_id', $criteria['_user_id'] ?? 0)
                     ->whereNull('archived_at'),
+                'to_validate' => $query->whereIn('publication_status', ['en_verification', 'valide']),
+                'published' => $query->where('publication_status', 'publie'),
+                'my_deposits' => $query->where('author_id', $criteria['_user_id'] ?? 0)
+                    ->where('origin', DocumentOrigin::Ged->value),
                 'archives' => $query->where(function (Builder $a) {
                     $a->where('archive_status', DocumentArchiveStatus::Archive->value)
+                        ->orWhere('publication_status', 'archive')
                         ->orWhereNotNull('archived_at');
                 }),
                 default => null,

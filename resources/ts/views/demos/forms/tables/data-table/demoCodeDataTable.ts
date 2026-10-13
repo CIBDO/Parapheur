@@ -1767,7 +1767,6 @@ const categoryIconFilter = (categoryName: string): {
 }
 
 if (error.value)
-  console.error(error.value)
 </script>
 
 <template>
@@ -2073,7 +2072,6 @@ const categoryIconFilter = categoryName => {
 }
 
 if (error.value)
-  console.error(error.value)
 </script>
 
 <template>

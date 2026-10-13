@@ -10,13 +10,19 @@ class DocumentType extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['code', 'name', 'is_active', 'sort_order'];
+    protected $fillable = ['code', 'name', 'scope', 'metadata_schema', 'is_active', 'sort_order'];
 
     protected function casts(): array
     {
         return [
             'is_active' => 'boolean',
+            'metadata_schema' => 'array',
         ];
+    }
+
+    public function scopeInstitutional($query)
+    {
+        return $query->whereIn('scope', ['institutional', 'general']);
     }
 
     public function documents(): HasMany

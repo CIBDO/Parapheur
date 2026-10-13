@@ -6,8 +6,10 @@ use App\Enums\DocumentArchiveStatus;
 use App\Enums\DocumentConfidentiality;
 use App\Enums\DocumentOrigin;
 use App\Enums\DocumentPriority;
+use App\Enums\DocumentPublicationStatus;
 use App\Enums\DocumentStatus;
 use App\Enums\ExpectedAction;
+use App\Enums\PublicationWorkflow;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -31,25 +33,36 @@ class Document extends Model
         'summary',
         'document_type_id',
         'category_id',
+        'domain_id',
         'structure_id',
         'owner_structure_id',
         'classification_node_id',
+        'folder_id',
         'author_id',
+        'document_owner_id',
         'current_assignee_id',
         'status',
         'priority',
         'confidentiality',
         'expected_action',
         'document_date',
+        'effective_at',
+        'expires_at',
+        'exercise_year',
+        'period_label',
         'due_date',
         'keywords',
+        'extra_metadata',
         'origin',
         'language',
         'source',
         'current_version',
         'submitted_at',
+        'published_at',
         'archived_at',
         'archive_status',
+        'publication_status',
+        'publication_workflow',
         'retention_years',
         'text_extraction_status',
         'ocr_status',
@@ -71,15 +84,22 @@ class Document extends Model
             'expected_action' => ExpectedAction::class,
             'origin' => DocumentOrigin::class,
             'archive_status' => DocumentArchiveStatus::class,
+            'publication_status' => DocumentPublicationStatus::class,
+            'publication_workflow' => PublicationWorkflow::class,
             'keywords' => 'array',
+            'extra_metadata' => 'array',
             'document_date' => 'date',
+            'effective_at' => 'date',
+            'expires_at' => 'date',
             'due_date' => 'date',
             'submitted_at' => 'datetime',
+            'published_at' => 'datetime',
             'archived_at' => 'datetime',
             'ocr_processed_at' => 'datetime',
             'indexed_at' => 'datetime',
             'legal_hold_at' => 'datetime',
             'retention_until' => 'date',
+            'exercise_year' => 'integer',
         ];
     }
 
@@ -100,6 +120,26 @@ class Document extends Model
     public function category(): BelongsTo
     {
         return $this->belongsTo(DocumentCategory::class, 'category_id');
+    }
+
+    public function domain(): BelongsTo
+    {
+        return $this->belongsTo(DocumentDomain::class, 'domain_id');
+    }
+
+    public function folder(): BelongsTo
+    {
+        return $this->belongsTo(DocumentFolder::class, 'folder_id');
+    }
+
+    public function documentOwner(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'document_owner_id');
+    }
+
+    public function publicationApprovals(): HasMany
+    {
+        return $this->hasMany(DocumentPublicationApproval::class)->orderByDesc('created_at');
     }
 
     public function structure(): BelongsTo

@@ -31,6 +31,12 @@ const credentials = ref({
 
 const rememberMe = ref(false)
 
+const idleMessage = computed(() =>
+  route.query.reason === 'idle'
+    ? 'Votre session a expiré pour cause d’inactivité. Veuillez vous reconnecter.'
+    : null,
+)
+
 const logoSrc = typeof logoDgtcp === 'string'
   ? logoDgtcp
   : (logoDgtcp as { default?: string })?.default || '/logo.png'
@@ -89,8 +95,7 @@ const login = async () => {
       router.replace(route.query.to ? String(route.query.to) : fallback)
     })
   }
-  catch (err) {
-    console.error(err)
+  catch {
     if (!errors.value.email && !errors.value.password)
       errors.value.email = 'Connexion impossible. Vérifiez vos identifiants ou réessayez.'
   }
@@ -193,6 +198,16 @@ onMounted(() => {
             <p class="text-body-2 text-medium-emphasis mb-6 text-center">
               Accédez à votre espace électronique
             </p>
+
+            <VAlert
+              v-if="idleMessage"
+              type="warning"
+              variant="tonal"
+              class="mb-4"
+              density="comfortable"
+            >
+              {{ idleMessage }}
+            </VAlert>
 
             <VForm
               ref="refVForm"

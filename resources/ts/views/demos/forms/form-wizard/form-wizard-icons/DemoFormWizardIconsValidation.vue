@@ -423,7 +423,7 @@ const validateSocialLinkForm = () => {
                 Previous
               </VBtn>
 
-              <VBtn color="success" @click="console.log('Form Submitted')"> submit </VBtn>
+              <VBtn color="success"> submit </VBtn>
             </div>
           </VCol>
         </VWindowItem>

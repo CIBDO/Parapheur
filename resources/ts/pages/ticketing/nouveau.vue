@@ -150,8 +150,7 @@ onMounted(async () => {
     if (incident)
       form.value.ticket_type_id = incident.id
   }
-  catch (e) {
-    console.error(e)
+  catch {
   }
 })
 
@@ -212,8 +211,7 @@ async function submit() {
       try {
         await uploadAttachment(created.id, uploadFile)
       }
-      catch (e) {
-        console.error(e)
+      catch {
       }
     }
     await router.push({ name: 'ticketing-id', params: { id: created.id } })

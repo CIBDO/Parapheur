@@ -69,6 +69,11 @@ class DatabaseSeeder extends Seeder
             'ged.manage_classification',
             'ged.manage_types',
             'ged.manage_categories',
+            'ged.manage_domains',
+            'ged.manage_folders',
+            'ged.validate',
+            'ged.publish',
+            'ged.manage_workflows',
             'ged.view_audit',
             'ged.manage_retention',
             'workspace.access',
@@ -182,7 +187,9 @@ class DatabaseSeeder extends Seeder
         ];
         $gedManage = array_merge($gedBasic, [
             'ged.archive', 'ged.restore', 'ged.manage_metadata',
-            'ged.manage_classification', 'ged.manage_types', 'ged.manage_categories', 'ged.view_audit',
+            'ged.manage_classification', 'ged.manage_types', 'ged.manage_categories',
+            'ged.manage_domains', 'ged.manage_folders', 'ged.validate', 'ged.publish',
+            'ged.manage_workflows', 'ged.view_audit', 'ged.manage_retention',
         ]);
 
         $workspaceBasic = [
@@ -508,6 +515,7 @@ class DatabaseSeeder extends Seeder
             Structure::query()->where('code', 'DGTCP')->first(),
             Structure::query()->where('code', 'DSI')->first(),
         );
+        $this->call(InstitutionalDocumentationSeeder::class);
         $this->seedMailReferentials();
         $this->call(MeetingSeeder::class);
         $this->call(AppointmentSeeder::class);
@@ -518,6 +526,8 @@ class DatabaseSeeder extends Seeder
         $this->call(ProductionObligationSeeder::class);
         $this->call(AnnouncementPermissionSeeder::class);
         $this->call(AnnouncementCatalogSeeder::class);
+        $this->call(PortalAppPermissionSeeder::class);
+        $this->call(PortalAppSeeder::class);
     }
 
     private function seedDemoDocuments(): void

@@ -37,6 +37,7 @@ export type Subjects =
   | 'CourrierAdmin'
   | 'Ticketing'
   | 'TicketingAdmin'
+  | 'PortalApp'
   | 'DocumentTemplate'
   | 'Post'
   | 'Comment'

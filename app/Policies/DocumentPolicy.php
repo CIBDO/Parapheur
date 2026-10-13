@@ -78,4 +78,24 @@ class DocumentPolicy
     {
         return $user->can('ged.manage_categories') || $user->can('admin.access');
     }
+
+    public function manageFolders(User $user): bool
+    {
+        return $user->can('ged.manage_folders') || $user->can('admin.access');
+    }
+
+    public function manageDomains(User $user): bool
+    {
+        return $user->can('ged.manage_domains') || $user->can('ged.manage_categories') || $user->can('admin.access');
+    }
+
+    public function validatePublication(User $user, Document $document): bool
+    {
+        return app(\App\Services\DocumentPublicationService::class)->canValidate($user, $document);
+    }
+
+    public function publish(User $user, Document $document): bool
+    {
+        return app(\App\Services\DocumentPublicationService::class)->canPublish($user, $document);
+    }
 }

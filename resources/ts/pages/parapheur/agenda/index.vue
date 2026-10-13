@@ -160,8 +160,7 @@ async function performSearch() {
     const res = await $api('/appointments', { query })
     searchResults.value = res.data ?? res
   }
-  catch (error) {
-    console.error(error)
+  catch {
     searchResults.value = []
   }
   finally {

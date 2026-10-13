@@ -28,7 +28,6 @@ const clients = ref<Client[]>([]);
 const fetchClients = async () => {
   const { data, error } = await useApi<any>('/apps/invoice/clients');
 
-  if (error.value) console.log(error.value);
   else clients.value = data.value;
 };
 

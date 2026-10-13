@@ -25,6 +25,17 @@ class GedDashboardController extends Controller
                 'sort' => 'created_at',
                 'dir' => 'desc',
             ], 8)->items(),
+            'published' => $this->search->search($request->user(), [
+                'scope' => 'published',
+                'publication_status' => 'publie',
+                'sort' => 'published_at',
+                'dir' => 'desc',
+            ], 8)->items(),
+            'to_validate' => $this->search->search($request->user(), [
+                'scope' => 'to_validate',
+                'sort' => 'updated_at',
+                'dir' => 'desc',
+            ], 5)->items(),
         ]);
     }
 }

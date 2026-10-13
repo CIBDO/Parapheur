@@ -49,10 +49,29 @@ class DocumentService
             $this->syncTags($document, $data['tags']);
         }
 
+        if (($data['origin'] ?? DocumentOrigin::Ged->value) === DocumentOrigin::Ged->value
+            && empty($data['skip_institutional_enrichment'])) {
+            if (! empty($data['folder_id']) || ! empty($data['domain_id']) || ! $document->folder_id) {
+                app(InstitutionalDepositService::class)->deposit($document, $author, [
+                    'folder_id' => $data['folder_id'] ?? $document->folder_id,
+                    'domain_id' => $data['domain_id'] ?? $document->domain_id,
+                    'classification_node_id' => $data['classification_node_id'] ?? $document->classification_node_id,
+                    'exercise_year' => $data['exercise_year'] ?? null,
+                    'publication_workflow' => $data['publication_workflow'] ?? null,
+                    'pin_version' => false,
+                ]);
+                $document = $document->fresh();
+            } else {
+                app(AntivirusScanService::class)->scanDocument($document);
+            }
+        } elseif ($mainFile) {
+            app(AntivirusScanService::class)->scanDocument($document);
+        }
+
         IndexDocumentContentJob::dispatch($document->id);
 
         return $document->fresh([
-            'type', 'category', 'structure', 'ownerStructure', 'classificationNode',
+            'type', 'category', 'domain', 'structure', 'ownerStructure', 'classificationNode', 'folder',
             'author', 'latestVersion', 'attachments', 'tags',
         ]);
     }
@@ -69,9 +88,11 @@ class DocumentService
 
         $fillable = [
             'object', 'title', 'description', 'summary', 'document_type_id', 'category_id',
-            'structure_id', 'owner_structure_id', 'classification_node_id', 'priority',
-            'confidentiality', 'expected_action', 'document_date', 'due_date', 'keywords',
-            'language', 'source', 'dossier_number', 'reference',
+            'domain_id', 'structure_id', 'owner_structure_id', 'classification_node_id', 'folder_id',
+            'document_owner_id', 'priority', 'confidentiality', 'expected_action', 'document_date',
+            'effective_at', 'expires_at', 'exercise_year', 'period_label', 'due_date', 'keywords',
+            'extra_metadata', 'language', 'source', 'dossier_number', 'reference',
+            'publication_workflow',
         ];
 
         foreach ($fillable as $field) {
@@ -113,6 +134,7 @@ class DocumentService
         }
 
         $version = $this->workflow->addVersion($document, $user, $file, $note);
+        app(AntivirusScanService::class)->scanVersion($document->fresh(), $version);
         IndexDocumentContentJob::dispatch($document->id);
 
         return $version;
@@ -319,13 +341,15 @@ class DocumentService
     public function detailPayload(Document $document, User $user): array
     {
         $document->loadMissing([
-            'type', 'category', 'structure', 'ownerStructure', 'classificationNode',
-            'author', 'currentAssignee', 'latestVersion', 'officialVersion', 'versions.uploader',
+            'type', 'category', 'domain', 'structure', 'ownerStructure', 'classificationNode', 'folder',
+            'author', 'documentOwner', 'currentAssignee', 'latestVersion', 'officialVersion', 'versions.uploader',
             'attachments.uploader', 'tags', 'accessRules.user', 'accessRules.structure',
             'outgoingLinks.target.type', 'incomingLinks.source.type',
             'comments.user', 'workflowInstance.workflow', 'visas.user', 'approvals.user',
-            'actions.actor', 'meetings',
+            'actions.actor', 'meetings', 'publicationApprovals.actor',
         ]);
+
+        $publication = app(DocumentPublicationService::class);
 
         return [
             'id' => $document->id,
@@ -342,14 +366,22 @@ class DocumentService
             'expected_action' => $document->expected_action?->value ?? $document->expected_action,
             'origin' => $document->origin?->value ?? $document->origin,
             'archive_status' => $document->archive_status?->value ?? $document->archive_status,
+            'publication_status' => $document->publication_status?->value ?? $document->publication_status,
+            'publication_workflow' => $document->publication_workflow?->value ?? $document->publication_workflow,
             'language' => $document->language,
             'source' => $document->source,
             'document_date' => optional($document->document_date)?->toDateString(),
+            'effective_at' => optional($document->effective_at)?->toDateString(),
+            'expires_at' => optional($document->expires_at)?->toDateString(),
+            'exercise_year' => $document->exercise_year,
+            'period_label' => $document->period_label,
             'due_date' => optional($document->due_date)?->toDateString(),
             'submitted_at' => optional($document->submitted_at)?->toIso8601String(),
+            'published_at' => optional($document->published_at)?->toIso8601String(),
             'archived_at' => optional($document->archived_at)?->toIso8601String(),
             'current_version' => $document->current_version,
             'keywords' => $document->keywords ?? [],
+            'extra_metadata' => $document->extra_metadata ?? [],
             'legal_hold_at' => optional($document->legal_hold_at)?->toIso8601String(),
             'legal_hold_reason' => $document->legal_hold_reason,
             'retention_until' => optional($document->retention_until)?->toDateString(),
@@ -360,10 +392,13 @@ class DocumentService
             'is_favorite' => app(DocumentEngagementService::class)->isFavorite($user, $document),
             'type' => $document->type,
             'category' => $document->category,
+            'domain' => $document->domain,
             'structure' => $document->structure,
             'owner_structure' => $document->ownerStructure,
             'classification_node' => $document->classificationNode,
+            'folder' => $document->folder,
             'author' => $document->author,
+            'document_owner' => $document->documentOwner,
             'current_assignee' => $document->currentAssignee,
             'latest_version' => $document->latestVersion,
             'official_version' => $document->officialVersion,
@@ -371,6 +406,7 @@ class DocumentService
             'attachments' => $document->attachments,
             'tags' => $document->tags,
             'access_rules' => $document->accessRules,
+            'publication_approvals' => $document->publicationApprovals,
             'links' => [
                 'outgoing' => $document->outgoingLinks,
                 'incoming' => $document->incomingLinks,
@@ -388,6 +424,8 @@ class DocumentService
                 'can_share' => $this->access->canShare($user, $document),
                 'can_transmit' => $this->access->canTransmit($user, $document),
                 'can_process' => $this->access->canProcess($user, $document),
+                'can_validate_publication' => $publication->canValidate($user, $document),
+                'can_publish' => $publication->canPublish($user, $document),
             ],
         ];
     }

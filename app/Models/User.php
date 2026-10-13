@@ -239,7 +239,13 @@ class User extends Authenticatable
             $rules[] = ['action' => 'manage', 'subject' => 'Ged'];
         }
 
-        if ($this->can('ged.manage_classification') || $this->can('ged.manage_categories') || $this->can('ged.manage_types')) {
+        if ($this->can('ged.validate') || $this->can('ged.publish')) {
+            $rules[] = ['action' => 'validate', 'subject' => 'Ged'];
+            $rules[] = ['action' => 'update', 'subject' => 'Ged'];
+        }
+
+        if ($this->can('ged.manage_classification') || $this->can('ged.manage_categories') || $this->can('ged.manage_types')
+            || $this->can('ged.manage_domains') || $this->can('ged.manage_folders') || $this->can('ged.manage_workflows')) {
             $rules[] = ['action' => 'manage', 'subject' => 'GedAdmin'];
         }
 
@@ -310,6 +316,17 @@ class User extends Authenticatable
 
         if ($this->can('ticket.admin') || $this->can('ticket.manage_catalog') || $this->can('ticket.manage_sla')) {
             $rules[] = ['action' => 'manage', 'subject' => 'TicketingAdmin'];
+        }
+
+        if ($this->can('portal_app.view') || $this->can('portal_app.manage')) {
+            $rules[] = ['action' => 'read', 'subject' => 'PortalApp'];
+        }
+
+        if ($this->can('portal_app.manage')) {
+            $rules[] = ['action' => 'manage', 'subject' => 'PortalApp'];
+            $rules[] = ['action' => 'create', 'subject' => 'PortalApp'];
+            $rules[] = ['action' => 'update', 'subject' => 'PortalApp'];
+            $rules[] = ['action' => 'delete', 'subject' => 'PortalApp'];
         }
 
         return $rules;

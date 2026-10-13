@@ -215,6 +215,25 @@ class CorrespondenceController extends Controller
         return response()->json($this->correspondenceService->serialize($updated));
     }
 
+    public function submitToGed(Request $request, Correspondence $correspondence): JsonResponse
+    {
+        $this->authorize('update', $correspondence);
+        abort_unless(
+            $request->user()->can('ged.create') || $request->user()->can('admin.access'),
+            403
+        );
+
+        $validated = $request->validate([
+            'classification_node_id' => 'nullable|exists:classification_nodes,id',
+            'folder_id' => 'nullable|exists:document_folders,id',
+            'domain_id' => 'nullable|exists:document_domains,id',
+        ]);
+
+        $updated = $this->replyService->submitToGed($correspondence, $request->user(), $validated);
+
+        return response()->json($this->correspondenceService->serialize($updated));
+    }
+
     public function dispatch(Request $request, Correspondence $correspondence): JsonResponse
     {
         $this->authorize('dispatch', $correspondence);

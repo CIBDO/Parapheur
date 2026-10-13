@@ -34,7 +34,6 @@ const formData = ref({
 });
 
 const onSubmit = () => {
-  console.log(formData.value);
 };
 </script>
 

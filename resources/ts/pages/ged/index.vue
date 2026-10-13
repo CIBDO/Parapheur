@@ -23,6 +23,8 @@ const recentLoading = ref(true)
 const searchLoading = ref(false)
 const counts = ref<Record<string, number>>({})
 const recent = ref<any[]>([])
+const published = ref<any[]>([])
+const toValidate = ref<any[]>([])
 const searchResults = ref<any[]>([])
 const hasSearched = ref(false)
 const showAdvanced = ref(false)
@@ -46,10 +48,10 @@ const structures = ref<Array<{ id: number; name: string }>>([])
 const categories = ref<Array<{ id: number; name: string }>>([])
 
 const cards = computed(() => [
-  { key: 'actifs', title: 'Documents actifs', icon: 'tabler-folder', color: 'primary', to: 'ged-documents', hint: 'Patrimoine vivant' },
-  { key: 'a_traiter', title: 'À traiter', icon: 'tabler-inbox', color: 'warning', to: 'ged-a-traiter', hint: 'En attente d\'action' },
-  { key: 'non_classes', title: 'Non classés', icon: 'tabler-folder-question', color: 'secondary', to: 'ged-documents', hint: 'Sans plan de classement' },
-  { key: 'mes_documents', title: 'Mes documents', icon: 'tabler-folder-user', color: 'success', to: 'ged-mes-documents', hint: 'Mon portefeuille' },
+  { key: 'publies', title: 'Publiés', icon: 'tabler-world', color: 'success', to: 'ged-explorer', hint: 'Documentation officielle' },
+  { key: 'a_valider', title: 'À valider', icon: 'tabler-file-check', color: 'warning', to: 'ged-a-valider', hint: 'File de publication' },
+  { key: 'mes_depots', title: 'Mes dépôts', icon: 'tabler-folder-user', color: 'primary', to: 'ged-mes-documents', hint: 'Mes contributions' },
+  { key: 'favoris', title: 'Favoris', icon: 'tabler-star', color: 'info', to: 'ged-favoris', hint: 'Accès rapides' },
 ])
 
 const activeFilterCount = computed(() => {
@@ -116,10 +118,13 @@ async function loadDashboard() {
     const res = await $api('/ged/dashboard')
     counts.value = res.counts || {}
     recent.value = res.recent || []
+    published.value = res.published || []
+    toValidate.value = res.to_validate || []
   }
-  catch (error) {
-    console.error(error)
+  catch {
     recent.value = []
+    published.value = []
+    toValidate.value = []
   }
   finally {
     loading.value = false
@@ -161,8 +166,7 @@ async function performSearch() {
     const res = await $api('/ged/documents', { query: params })
     searchResults.value = res.data || []
   }
-  catch (error) {
-    console.error(error)
+  catch {
     searchResults.value = []
   }
   finally {
@@ -197,7 +201,7 @@ function openDoc(id: number) {
 <template>
   <div class="ged-dashboard">
     <ParapheurPageHeader
-      title="GED — Tableau de bord"
+      title="Documentation institutionnelle"
       subtitle="Pilotage, recherche et suivi du patrimoine documentaire"
       icon="tabler-folders"
     >
@@ -481,6 +485,72 @@ function openDoc(id: number) {
               </div>
             </div>
           </VCardText>
+        </VCard>
+      </VCol>
+    </VRow>
+
+    <!-- Publications récentes (accueil intranet) -->
+    <VRow
+      v-if="published.length || toValidate.length"
+      class="mb-4"
+      dense
+    >
+      <VCol
+        v-if="published.length"
+        cols="12"
+        md="7"
+      >
+        <VCard class="h-100">
+          <VCardItem>
+            <VCardTitle>Publications officielles récentes</VCardTitle>
+            <template #append>
+              <VBtn
+                size="small"
+                variant="text"
+                :to="{ name: 'ged-explorer' }"
+              >
+                Explorer
+              </VBtn>
+            </template>
+          </VCardItem>
+          <VList lines="two">
+            <VListItem
+              v-for="doc in published"
+              :key="doc.id"
+              :title="doc.title || doc.object"
+              :subtitle="doc.reference"
+              @click="openDoc(doc.id)"
+            />
+          </VList>
+        </VCard>
+      </VCol>
+      <VCol
+        v-if="toValidate.length"
+        cols="12"
+        md="5"
+      >
+        <VCard class="h-100">
+          <VCardItem>
+            <VCardTitle>À valider</VCardTitle>
+            <template #append>
+              <VBtn
+                size="small"
+                variant="text"
+                :to="{ name: 'ged-a-valider' }"
+              >
+                Voir tout
+              </VBtn>
+            </template>
+          </VCardItem>
+          <VList>
+            <VListItem
+              v-for="doc in toValidate"
+              :key="doc.id"
+              :title="doc.title || doc.object"
+              :subtitle="doc.publication_status"
+              @click="openDoc(doc.id)"
+            />
+          </VList>
         </VCard>
       </VCol>
     </VRow>

@@ -135,8 +135,7 @@ async function performSearch() {
     })
     searchResults.value = res.data || []
   }
-  catch (error) {
-    console.error(error)
+  catch {
     searchResults.value = []
   }
   finally {

@@ -228,19 +228,10 @@ class TaskDocumentService
         abort_unless($this->documentAccess->canAccess($actor, $document), 403);
 
         return DB::transaction(function () use ($actor, $task, $link, $document, $classificationNodeId) {
-            $document->origin = DocumentOrigin::Ged;
-            if ($classificationNodeId) {
-                $document->classification_node_id = $classificationNodeId;
-            }
-            $document->save();
-
-            $latest = $document->latestVersion;
-            if ($latest) {
-                $document->versions()->where('is_official', true)->update(['is_official' => false]);
-                $latest->is_official = true;
-                $latest->change_note = trim(($latest->change_note ? $latest->change_note.' — ' : '').'Version figée à l’entrée GED');
-                $latest->save();
-            }
+            app(\App\Services\InstitutionalDepositService::class)->deposit($document, $actor, [
+                'classification_node_id' => $classificationNodeId,
+                'pin_version' => true,
+            ]);
 
             $link->update([
                 'role' => 'final',

@@ -41,7 +41,7 @@ const applyFilters = () => {
   <div>
     <ParapheurPageHeader
       title="Tous les documents"
-      subtitle="Catalogue documentaire GED"
+      subtitle="Catalogue de la documentation institutionnelle"
       icon="tabler-files"
     >
       <VBtn

@@ -9,8 +9,10 @@ use App\Enums\DocumentConfidentiality;
 use App\Enums\DocumentLinkRelation;
 use App\Enums\DocumentOrigin;
 use App\Enums\DocumentPriority;
+use App\Enums\DocumentPublicationStatus;
 use App\Enums\DocumentStatus;
 use App\Enums\ExpectedAction;
+use App\Enums\PublicationWorkflow;
 use App\Http\Controllers\Controller;
 use App\Models\Document;
 use App\Models\DocumentAccessRule;
@@ -49,11 +51,14 @@ class GedDocumentController extends Controller
             'document_type_id' => ['nullable', 'exists:document_types,id'],
             'type_id' => ['nullable', 'exists:document_types,id'],
             'category_id' => ['nullable', 'exists:document_categories,id'],
+            'domain_id' => ['nullable', 'exists:document_domains,id'],
+            'folder_id' => ['nullable', 'exists:document_folders,id'],
             'structure_id' => ['nullable', 'exists:structures,id'],
             'owner_structure_id' => ['nullable', 'exists:structures,id'],
             'author_id' => ['nullable', 'exists:users,id'],
             'classification_node_id' => ['nullable', 'exists:classification_nodes,id'],
             'status' => ['nullable', Rule::in(array_column(DocumentStatus::cases(), 'value'))],
+            'publication_status' => ['nullable', Rule::in(array_column(DocumentPublicationStatus::cases(), 'value'))],
             'priority' => ['nullable', Rule::in(array_column(DocumentPriority::cases(), 'value'))],
             'confidentiality' => ['nullable', Rule::in(array_column(DocumentConfidentiality::cases(), 'value'))],
             'origin' => ['nullable', Rule::in(array_column(DocumentOrigin::cases(), 'value'))],
@@ -68,8 +73,9 @@ class GedDocumentController extends Controller
             'created_from' => ['nullable', 'date'],
             'created_to' => ['nullable', 'date'],
             'exercice' => ['nullable', 'integer', 'min:2000', 'max:2100'],
+            'exercise_year' => ['nullable', 'integer', 'min:2000', 'max:2100'],
             'unclassified' => ['nullable', 'boolean'],
-            'scope' => ['nullable', Rule::in(['mine', 'shared', 'to_process', 'archives', 'all'])],
+            'scope' => ['nullable', Rule::in(['mine', 'shared', 'to_process', 'to_validate', 'published', 'my_deposits', 'archives', 'all'])],
             'meeting_id' => ['nullable', 'exists:meetings,id'],
             'sort' => ['nullable', 'string'],
             'dir' => ['nullable', Rule::in(['asc', 'desc'])],
@@ -95,19 +101,30 @@ class GedDocumentController extends Controller
             'dossier_number' => ['nullable', 'string', 'max:100'],
             'document_type_id' => ['required', 'exists:document_types,id'],
             'category_id' => ['nullable', 'exists:document_categories,id'],
+            'domain_id' => ['nullable', 'exists:document_domains,id'],
+            'folder_id' => ['nullable', 'exists:document_folders,id'],
             'structure_id' => ['nullable', 'exists:structures,id'],
             'owner_structure_id' => ['nullable', 'exists:structures,id'],
             'classification_node_id' => ['nullable', 'exists:classification_nodes,id'],
+            'document_owner_id' => ['nullable', 'exists:users,id'],
             'priority' => ['nullable', Rule::in(array_column(DocumentPriority::cases(), 'value'))],
             'confidentiality' => ['nullable', Rule::in(array_column(DocumentConfidentiality::cases(), 'value'))],
             'expected_action' => ['nullable', Rule::in(array_column(ExpectedAction::cases(), 'value'))],
+            'publication_workflow' => ['nullable', Rule::in(array_column(PublicationWorkflow::cases(), 'value'))],
             'document_date' => ['nullable', 'date'],
+            'effective_at' => ['nullable', 'date'],
+            'expires_at' => ['nullable', 'date'],
+            'exercise_year' => ['nullable', 'integer', 'min:2000', 'max:2100'],
+            'period_label' => ['nullable', 'string', 'max:100'],
             'due_date' => ['nullable', 'date'],
             'keywords' => ['nullable'],
             'tags' => ['nullable'],
+            'extra_metadata' => ['nullable'],
             'language' => ['nullable', 'string', 'max:10'],
             'source' => ['nullable', 'string', 'max:255'],
             'main_file' => AllowedDocumentUploads::fileRules(),
+            'files' => ['nullable', 'array'],
+            'files.*' => AllowedDocumentUploads::fileRules(),
             'attachments' => ['nullable', 'array'],
             'attachments.*' => AllowedDocumentUploads::fileRules(),
             'pieces_jointes' => ['nullable', 'array'],
@@ -132,8 +149,33 @@ class GedDocumentController extends Controller
                 : array_values(array_filter(array_map('trim', explode(',', $data['tags']))));
         }
 
+        if (isset($data['extra_metadata']) && is_string($data['extra_metadata'])) {
+            $decoded = json_decode($data['extra_metadata'], true);
+            $data['extra_metadata'] = is_array($decoded) ? $decoded : null;
+        }
+
         if (empty($data['dossier_number'])) {
             $data['dossier_number'] = $this->documents->generateDossierNumber($request->user());
+        }
+
+        // Dépôt multi-fichiers : chaque fichier devient un document institutionnel
+        $batchFiles = $this->uploadedFiles($request, 'files');
+        if ($batchFiles !== [] && ! $request->file('main_file')) {
+            $created = [];
+            foreach ($batchFiles as $index => $file) {
+                $item = $data;
+                $baseTitle = $data['title'] ?? $data['object'];
+                $item['object'] = count($batchFiles) > 1
+                    ? $baseTitle.' ('.($index + 1).')'
+                    : $data['object'];
+                $item['title'] = $item['object'];
+                unset($item['reference'], $item['dossier_number']);
+                $item['dossier_number'] = $this->documents->generateDossierNumber($request->user());
+                $doc = $this->documents->create($request->user(), $item, $file, []);
+                $created[] = $this->documents->detailPayload($doc, $request->user());
+            }
+
+            return response()->json(['data' => $created, 'count' => count($created)], 201);
         }
 
         $attachments = [];
@@ -182,13 +224,21 @@ class GedDocumentController extends Controller
             'dossier_number' => ['nullable', 'string', 'max:100'],
             'document_type_id' => ['sometimes', 'exists:document_types,id'],
             'category_id' => ['nullable', 'exists:document_categories,id'],
+            'domain_id' => ['nullable', 'exists:document_domains,id'],
+            'folder_id' => ['nullable', 'exists:document_folders,id'],
             'structure_id' => ['nullable', 'exists:structures,id'],
             'owner_structure_id' => ['nullable', 'exists:structures,id'],
             'classification_node_id' => ['nullable', 'exists:classification_nodes,id'],
+            'document_owner_id' => ['nullable', 'exists:users,id'],
             'priority' => ['nullable', Rule::in(array_column(DocumentPriority::cases(), 'value'))],
             'confidentiality' => ['nullable', Rule::in(array_column(DocumentConfidentiality::cases(), 'value'))],
             'expected_action' => ['nullable', Rule::in(array_column(ExpectedAction::cases(), 'value'))],
+            'publication_workflow' => ['nullable', Rule::in(array_column(PublicationWorkflow::cases(), 'value'))],
             'document_date' => ['nullable', 'date'],
+            'effective_at' => ['nullable', 'date'],
+            'expires_at' => ['nullable', 'date'],
+            'exercise_year' => ['nullable', 'integer', 'min:2000', 'max:2100'],
+            'period_label' => ['nullable', 'string', 'max:100'],
             'due_date' => ['nullable', 'date'],
             'keywords' => ['nullable'],
             'tags' => ['nullable'],

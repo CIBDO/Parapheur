@@ -39,7 +39,6 @@ export const handlerDashboard = [
       .reverse();
 
     if (sortByLocal) {
-      console.log(sortByLocal);
       if (sortByLocal === 'project') {
         filteredProjects = filteredProjects.sort((a, b) => {
           if (orderByLocal === 'asc') return a.name.localeCompare(b.name);

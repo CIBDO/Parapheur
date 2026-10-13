@@ -6,6 +6,8 @@ import {
   attachmentKindLabels,
   linkRelationLabels,
   originLabels,
+  publicationStatusColor,
+  publicationStatusLabels,
 } from '@/utils/gedUi'
 import {
   confidentialityLabels,
@@ -31,8 +33,13 @@ const tab = ref('synthese')
 const errorMessage = ref('')
 const classifyNodeId = ref<number | null>(null)
 const classifFlat = ref<Array<{ id: number; label: string }>>([])
-const shareForm = ref({ user_id: null as number | null, ability: 'view' })
+const shareForm = ref({
+  user_id: null as number | null,
+  structure_id: null as number | null,
+  ability: 'view',
+})
 const users = ref<Array<{ id: number; name: string }>>([])
+const structures = ref<Array<{ id: number; name: string }>>([])
 const linkForm = ref({ target_document_id: null as number | null, relation_type: 'related_to' })
 const linkCandidates = ref<Array<{ id: number; reference: string; object: string }>>([])
 const versionFile = ref<File | File[] | null>(null)
@@ -71,12 +78,14 @@ const load = async () => {
 }
 
 onMounted(async () => {
-  const [classif, people] = await Promise.all([
+  const [classif, people, structs] = await Promise.all([
     $api('/meta/classification-nodes'),
     $api('/meta/users'),
+    $api('/meta/structures'),
   ])
   classifFlat.value = flatten(classif.data || [])
   users.value = people
+  structures.value = structs.data || structs || []
   await load()
 })
 
@@ -93,6 +102,25 @@ const archive = async () => {
     return
   await $api(`/ged/documents/${id.value}/archive`, { method: 'POST', body: {} })
   await load()
+}
+
+const publicationAction = async (action: string) => {
+  errorMessage.value = ''
+  try {
+    let motif: string | null = null
+    if (action === 'reject-publication' || action === 'return-publication') {
+      motif = window.prompt(action === 'reject-publication' ? 'Motif du rejet' : 'Motif du retour') || ''
+      if (!motif.trim())
+        return
+    }
+    const body: Record<string, string> = {}
+    if (motif)
+      body.motif = motif
+    doc.value = await $api(`/ged/documents/${id.value}/${action}`, { method: 'POST', body })
+  }
+  catch (e: any) {
+    errorMessage.value = e?.data?.message || 'Action de publication impossible'
+  }
 }
 
 const toggleFavorite = async () => {
@@ -122,13 +150,19 @@ const reindex = async () => {
 }
 
 const share = async () => {
-  if (!shareForm.value.user_id)
+  if (!shareForm.value.user_id && !shareForm.value.structure_id)
     return
   await $api(`/ged/documents/${id.value}/share`, {
     method: 'POST',
     body: shareForm.value,
   })
   shareForm.value.user_id = null
+  shareForm.value.structure_id = null
+  await load()
+}
+
+const revokeShare = async (ruleId: number) => {
+  await $api(`/ged/documents/${id.value}/share/${ruleId}`, { method: 'DELETE' })
   await load()
 }
 
@@ -158,9 +192,24 @@ const uploadVersion = async () => {
     return
   const body = new FormData()
   body.append('file', file)
+  const note = window.prompt('Motif de la nouvelle version (optionnel)') || ''
+  if (note)
+    body.append('change_note', note)
   await $api(`/ged/documents/${id.value}/versions`, { method: 'POST', body })
   versionFile.value = null
   await load()
+}
+
+const restoreVersion = async (versionNumber: number) => {
+  if (!confirm(`Restaurer la version ${versionNumber} comme nouvelle version courante ?`))
+    return
+  try {
+    await $api(`/parapheur/documents/${id.value}/onlyoffice/restore/${versionNumber}`, { method: 'POST' })
+    await load()
+  }
+  catch (e: any) {
+    errorMessage.value = e?.data?.message || 'Restauration impossible'
+  }
 }
 
 const uploadAttachment = async () => {
@@ -185,10 +234,67 @@ const canOnlyOffice = computed(() =>
 <template>
   <div>
     <ParapheurPageHeader
-      :title="doc ? (doc.title || doc.object) : 'Document GED'"
+      :title="doc ? (doc.title || doc.object) : 'Document institutionnel'"
       :subtitle="doc ? `${doc.reference}${doc.dossier_number ? ' · ' + doc.dossier_number : ''}` : ''"
       icon="tabler-file-description"
     >
+      <VChip
+        v-if="doc?.publication_status"
+        class="me-2"
+        size="small"
+        :color="publicationStatusColor[doc.publication_status] || 'secondary'"
+      >
+        {{ labelOf(publicationStatusLabels, doc.publication_status) }}
+      </VChip>
+      <VBtn
+        v-if="doc?.publication_status && ['brouillon', 'depose', 'a_corriger', 'rejete'].includes(doc.publication_status)"
+        class="me-2"
+        color="primary"
+        variant="tonal"
+        size="small"
+        @click="publicationAction('submit-publication')"
+      >
+        Soumettre
+      </VBtn>
+      <VBtn
+        v-if="doc?.permissions?.can_validate_publication && doc?.publication_status === 'en_verification'"
+        class="me-2"
+        color="success"
+        variant="tonal"
+        size="small"
+        @click="publicationAction('approve-publication')"
+      >
+        Valider
+      </VBtn>
+      <VBtn
+        v-if="doc?.permissions?.can_validate_publication && doc?.publication_status === 'en_verification'"
+        class="me-2"
+        color="warning"
+        variant="tonal"
+        size="small"
+        @click="publicationAction('return-publication')"
+      >
+        À corriger
+      </VBtn>
+      <VBtn
+        v-if="doc?.permissions?.can_validate_publication && ['en_verification', 'valide'].includes(doc.publication_status)"
+        class="me-2"
+        color="error"
+        variant="tonal"
+        size="small"
+        @click="publicationAction('reject-publication')"
+      >
+        Rejeter
+      </VBtn>
+      <VBtn
+        v-if="doc?.permissions?.can_publish && ['valide', 'en_verification', 'depose'].includes(doc.publication_status)"
+        class="me-2"
+        color="success"
+        size="small"
+        @click="publicationAction('publish')"
+      >
+        Publier
+      </VBtn>
       <VBtn
         variant="tonal"
         :to="{ name: 'parapheur-id', params: { id: String(id) } }"
@@ -370,6 +476,15 @@ const canOnlyOffice = computed(() =>
                     placeholder="Rechercher…"
                     class="mb-2"
                   />
+                  <AppSelect
+                    v-model="shareForm.structure_id"
+                    :items="structures"
+                    item-title="name"
+                    item-value="id"
+                    label="Structure"
+                    clearable
+                    class="mb-2"
+                  />
                   <VBtn
                     size="small"
                     color="primary"
@@ -377,6 +492,31 @@ const canOnlyOffice = computed(() =>
                   >
                     Partager
                   </VBtn>
+                  <VList
+                    v-if="doc.access_rules?.length"
+                    class="mt-3"
+                    density="compact"
+                  >
+                    <VListItem
+                      v-for="rule in doc.access_rules"
+                      :key="rule.id"
+                    >
+                      <VListItemTitle>
+                        {{ rule.user?.name || rule.structure?.name || rule.role_name }}
+                        · {{ rule.ability }}
+                      </VListItemTitle>
+                      <template #append>
+                        <VBtn
+                          size="x-small"
+                          variant="text"
+                          color="error"
+                          @click="revokeShare(rule.id)"
+                        >
+                          Révoquer
+                        </VBtn>
+                      </template>
+                    </VListItem>
+                  </VList>
                 </VCardText>
               </VCard>
             </VCol>
@@ -512,8 +652,28 @@ const canOnlyOffice = computed(() =>
                   {{ v.original_name }} · {{ v.uploader?.name }} · {{ formatDateFr(v.created_at) }}
                   <span v-if="v.change_note"> — {{ v.change_note }}</span>
                 </VListItemSubtitle>
+                <template
+                  v-if="doc.permissions?.can_edit && !v.is_main"
+                  #append
+                >
+                  <VBtn
+                    size="x-small"
+                    variant="tonal"
+                    @click="restoreVersion(v.version_number)"
+                  >
+                    Restaurer
+                  </VBtn>
+                </template>
               </VListItem>
             </VList>
+            <VAlert
+              v-if="canOnlyOffice"
+              type="info"
+              variant="tonal"
+              class="ma-4"
+            >
+              La comparaison de versions est disponible dans l’éditeur ONLYOFFICE (historique).
+            </VAlert>
             <VCardText v-if="doc.permissions?.can_edit">
               <VFileInput
                 v-model="versionFile"

@@ -68,7 +68,6 @@ const categoryIconFilter = (
   return [{ icon: 'tabler-help-circle', color: 'primary' }];
 };
 
-if (error.value) console.error(error.value);
 </script>
 
 <template>

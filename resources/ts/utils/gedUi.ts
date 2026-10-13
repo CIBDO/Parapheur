@@ -1,4 +1,4 @@
-/** Helpers UI module GED (spécifiques ; le partage statut/priorité/etc. vient de parapheurUi) */
+/** Helpers UI Documentation institutionnelle / GED */
 
 export const archiveStatusLabels: Record<string, string> = {
   actif: 'Actif',
@@ -9,13 +9,45 @@ export const archiveStatusLabels: Record<string, string> = {
   verse: 'Versé',
 }
 
+export const publicationStatusLabels: Record<string, string> = {
+  brouillon: 'Brouillon',
+  depose: 'Déposé',
+  en_verification: 'En vérification',
+  a_corriger: 'À corriger',
+  valide: 'Validé',
+  publie: 'Publié',
+  archive: 'Archivé',
+  rejete: 'Rejeté',
+}
+
+export const publicationStatusColor: Record<string, string> = {
+  brouillon: 'secondary',
+  depose: 'info',
+  en_verification: 'warning',
+  a_corriger: 'orange',
+  valide: 'primary',
+  publie: 'success',
+  archive: 'secondary',
+  rejete: 'error',
+}
+
+export const publicationWorkflowLabels: Record<string, string> = {
+  simple: 'Circuit simple',
+  controlled: 'Circuit contrôlé',
+  hierarchical: 'Circuit hiérarchique',
+}
+
 export const originLabels: Record<string, string> = {
   parapheur: 'Parapheur',
-  ged: 'GED',
+  ged: 'Documentation institutionnelle',
   meeting: 'Réunion',
   appointment: 'Rendez-vous',
   instruction: 'Instruction',
   courrier: 'Courrier',
+  task: 'Tâche',
+  production: 'Production',
+  personal: 'Espace personnel',
+  workspace: 'Espace collaboratif',
 }
 
 export const attachmentKindLabels: Record<string, string> = {
@@ -39,3 +71,5 @@ export const linkRelationLabels: Record<string, string> = {
 
 export const archiveStatusOptions = Object.entries(archiveStatusLabels).map(([value, title]) => ({ value, title }))
 export const originOptions = Object.entries(originLabels).map(([value, title]) => ({ value, title }))
+export const publicationStatusOptions = Object.entries(publicationStatusLabels).map(([value, title]) => ({ value, title }))
+export const publicationWorkflowOptions = Object.entries(publicationWorkflowLabels).map(([value, title]) => ({ value, title }))

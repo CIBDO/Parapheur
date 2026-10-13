@@ -6,7 +6,6 @@ const profileHeaderData = ref<ProfileHeader>();
 const { data, error } = await useApi<ProfileHeader>('/pages/profile/header');
 
 if (error.value) {
-  console.log(error.value);
 } else {
   if (data.value) profileHeaderData.value = data.value;
 }

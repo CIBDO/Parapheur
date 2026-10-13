@@ -72,11 +72,6 @@ const validateSocialLinkForm = () => {
     if (valid.valid) {
       isCurrentStepValid.value = true;
 
-      console.log({
-        ...accountForm.value,
-        ...personalForm.value,
-        ...socialForm.value,
-      });
     } else {
       isCurrentStepValid.value = false;
     }

@@ -112,4 +112,18 @@ return [
 
     'password_timeout' => env('AUTH_PASSWORD_TIMEOUT', 10800),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Idle Session Timeout (minutes)
+    |--------------------------------------------------------------------------
+    |
+    | Déconnexion automatique après N minutes sans activité API.
+    | Mettre à 0 pour désactiver. Alignez SESSION_LIFETIME et
+    | VITE_AUTH_IDLE_TIMEOUT_MINUTES sur la même valeur.
+    |
+    */
+
+    'idle_timeout' => (int) env('AUTH_IDLE_TIMEOUT', 30),
+
 ];
+

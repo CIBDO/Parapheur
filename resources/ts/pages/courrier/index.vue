@@ -119,8 +119,7 @@ async function loadDashboard() {
     else
       stats.value = await fetchDashboard()
   }
-  catch (error) {
-    console.error(error)
+  catch {
   }
   finally {
     loading.value = false
@@ -143,8 +142,7 @@ async function loadRecentIncoming() {
     })
     recentIncoming.value = listItems(response)
   }
-  catch (error) {
-    console.error(error)
+  catch {
     recentIncoming.value = []
   }
   finally {
@@ -173,8 +171,7 @@ async function performSearch() {
     })
     searchResults.value = listItems(response)
   }
-  catch (error) {
-    console.error(error)
+  catch {
     searchResults.value = []
   }
   finally {

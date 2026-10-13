@@ -33,8 +33,7 @@ async function doTakeCharge(item: any) {
     await takeCharge(item.id)
     await fetchTickets({ scope: 'assigned', per_page: 50 })
   }
-  catch (e) {
-    console.error(e)
+  catch {
   }
   finally {
     actionLoading.value = null
