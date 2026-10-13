@@ -284,3 +284,7 @@ export function assignmentStatusLabel(status?: string | null) {
   return assignmentStatusLabels[status || ''] || status || '—'
 }
 
+export function isCorrespondenceAssigned(item: any): boolean {
+  return Array.isArray(item?.assignments) && item.assignments.length > 0
+}
+

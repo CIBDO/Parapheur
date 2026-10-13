@@ -127,6 +127,7 @@ declare global {
   const injectLocal: typeof import('@vueuse/core')['injectLocal']
   const instructionStatusLabels: typeof import('./resources/ts/utils/tasksUi')['instructionStatusLabels']
   const integerValidator: typeof import('./resources/ts/@core/utils/validators')['integerValidator']
+  const isCorrespondenceAssigned: typeof import('./resources/ts/utils/courrierUi')['isCorrespondenceAssigned']
   const isDefined: typeof import('@vueuse/core')['isDefined']
   const isEmpty: typeof import('./resources/ts/@core/utils/helpers')['isEmpty']
   const isEmptyArray: typeof import('./resources/ts/@core/utils/helpers')['isEmptyArray']
@@ -613,6 +614,7 @@ declare module 'vue' {
     readonly injectLocal: UnwrapRef<typeof import('@vueuse/core')['injectLocal']>
     readonly instructionStatusLabels: UnwrapRef<typeof import('./resources/ts/utils/tasksUi')['instructionStatusLabels']>
     readonly integerValidator: UnwrapRef<typeof import('./resources/ts/@core/utils/validators')['integerValidator']>
+    readonly isCorrespondenceAssigned: UnwrapRef<typeof import('./resources/ts/utils/courrierUi')['isCorrespondenceAssigned']>
     readonly isDefined: UnwrapRef<typeof import('@vueuse/core')['isDefined']>
     readonly isEmpty: UnwrapRef<typeof import('./resources/ts/@core/utils/helpers')['isEmpty']>
     readonly isEmptyArray: UnwrapRef<typeof import('./resources/ts/@core/utils/helpers')['isEmptyArray']>

@@ -2,10 +2,11 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import CorrespondenceCreateDialog from '@/components/courrier/CorrespondenceCreateDialog.vue'
+import CorrespondenceListActions from '@/components/courrier/CorrespondenceListActions.vue'
 import { $api } from '@/utils/api'
 import { useCorrespondence } from '@/composables/useCorrespondence'
 import { listItems } from '@/utils/listItems'
-import { correspondenceDirectionLabels, correspondencePriorityColors, correspondencePriorityLabels, correspondenceStatusColors, correspondenceStatusLabels, detailRouteName, formatCorrespondenceNumber, formatCourrierDate, formatCourrierDateTime, partiesByRole, partyDisplayName, statusLabel } from '@/utils/courrierUi'
+import { correspondenceDirectionLabels, correspondencePriorityColors, correspondencePriorityLabels, correspondenceStatusColors, correspondenceStatusLabels, detailRouteName, formatCorrespondenceNumber, formatCourrierDate, formatCourrierDateTime, isCorrespondenceAssigned, partiesByRole, partyDisplayName, statusLabel } from '@/utils/courrierUi'
 
 definePage({
   meta: {
@@ -94,18 +95,9 @@ const recentHeaders = [
   { title: 'Expéditeur', key: 'sender', width: '180px' },
   { title: 'Priorité', key: 'priority', width: '120px' },
   { title: 'Statut', key: 'status', width: '140px' },
+  { title: 'Affectation', key: 'assignment', width: '140px' },
   { title: 'Reçu le', key: 'received_at', width: '150px' },
-]
-
-const sectionButtons = [
-  { title: 'Courriers arrivés', icon: 'tabler-inbox', route: 'courrier-entrants' },
-  { title: 'Courriers de départs', icon: 'tabler-send', route: 'courrier-sortants' },
-  { title: 'Internes', icon: 'tabler-building', route: 'courrier-internes' },
-  { title: 'Bordereaux', icon: 'tabler-file-invoice', route: 'courrier-bordereaux' },
-  { title: 'Fiches', icon: 'tabler-clipboard-list', route: 'courrier-fiches' },
-  { title: 'Archives', icon: 'tabler-archive', route: 'courrier-archives' },
-  { title: 'Modèles', icon: 'tabler-template', route: 'courrier-modeles', action: 'read', subject: 'DocumentTemplate' },
-  { title: 'Administration', icon: 'tabler-settings', route: 'courrier-admin', action: 'manage', subject: 'CourrierAdmin' },
+  { title: '', key: 'actions', width: '110px', sortable: false },
 ]
 
 function openCreate(direction: 'entrant' | 'sortant') {
@@ -221,6 +213,21 @@ function senderLabel(item: any) {
 
 function openItem(item: any) {
   router.push({ name: detailRouteName(item.direction), params: { id: item.id } })
+}
+
+function rowProps({ item }: { item: any }) {
+  const row = item?.raw ?? item
+
+  return {
+    class: isCorrespondenceAssigned(row) ? 'courrier-row--assigned' : 'courrier-row--unassigned',
+  }
+}
+
+async function refreshTable() {
+  if (hasSearched.value)
+    await performSearch()
+  else
+    await loadRecentIncoming()
 }
 </script>
 
@@ -454,17 +461,6 @@ function openItem(item: any) {
             >
               Courrier de départ
             </VBtn>
-            <VBtn
-              v-for="item in sectionButtons"
-              :key="item.route"
-              v-show="!item.action || $can(item.action, item.subject)"
-              size="small"
-              variant="tonal"
-              :prepend-icon="item.icon"
-              :to="{ name: item.route }"
-            >
-              {{ item.title }}
-            </VBtn>
           </VCardText>
         </VCard>
       </VCol>
@@ -574,7 +570,8 @@ function openItem(item: any) {
         :loading="hasSearched ? searchLoading : recentLoading"
         item-value="id"
         hover
-        class="text-no-wrap"
+        class="text-no-wrap courrier-list"
+        :row-props="rowProps"
         @click:row="(_: any, { item }: any) => openItem(item)"
       >
         <template #item.number="{ item }">
@@ -629,6 +626,24 @@ function openItem(item: any) {
             : formatCourrierDate(item.correspondence_date) }}
         </template>
 
+        <template #item.assignment="{ item }">
+          <VChip
+            size="small"
+            :color="isCorrespondenceAssigned(item) ? 'success' : 'warning'"
+            :prepend-icon="isCorrespondenceAssigned(item) ? 'tabler-user-check' : 'tabler-user-question'"
+            variant="flat"
+          >
+            {{ isCorrespondenceAssigned(item) ? 'Affecté' : 'Non affecté' }}
+          </VChip>
+        </template>
+
+        <template #item.actions="{ item }">
+          <CorrespondenceListActions
+            :item="item"
+            @imputed="refreshTable"
+          />
+        </template>
+
         <template #no-data>
           <div class="text-center py-10 text-medium-emphasis">
             <VIcon
@@ -675,5 +690,15 @@ function openItem(item: any) {
 .subject-cell {
   max-inline-size: 420px;
   white-space: normal;
+}
+
+.courrier-list :deep(tr.courrier-row--assigned) {
+  background: rgba(var(--v-theme-success), 0.1);
+  box-shadow: inset 4px 0 0 rgb(var(--v-theme-success));
+}
+
+.courrier-list :deep(tr.courrier-row--unassigned) {
+  background: rgba(var(--v-theme-warning), 0.14);
+  box-shadow: inset 4px 0 0 rgb(var(--v-theme-warning));
 }
 </style>
