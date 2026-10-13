@@ -23,7 +23,6 @@ import {
   assignmentStatusColors,
   detailRouteName,
 } from '@/utils/courrierUi'
-import OnlyOfficeEditor from '@/components/parapheur/OnlyOfficeEditor.vue'
 import UserAutocomplete from '@/components/common/UserAutocomplete.vue'
 import { $api } from '@/utils/api'
 
@@ -66,6 +65,7 @@ const structures = ref<any[]>([])
 const channels = ref<any[]>([])
 const categories = ref<any[]>([])
 const creatingFiche = ref(false)
+const printingFiche = ref(false)
 const ficheMessage = ref('')
 const ficheError = ref('')
 const outputBusy = ref(false)
@@ -88,10 +88,12 @@ const showSignedUploadDialog = ref(false)
 
 // Forms
 const assignForm = ref({
+  to_structure_id: null as number | null,
   to_user_id: null as number | null,
   instruction_text: '',
   due_date: '',
 })
+const serviceAgents = ref<any[]>([])
 const complementForm = ref({ assignmentId: null as number | null, observation: '' })
 const reminderForm = ref({ reminder_date: '', note: '' })
 const printForm = ref({ reason: '', copies: 1, is_reprint: false })
@@ -232,12 +234,10 @@ const documentStreamUrl = computed(() => {
     return mainDocumentVersion.value?.stream_url || null
   return null
 })
-const isDocumentOnlyOffice = computed(() =>
-  mainDocumentVersion.value?.preview?.mode === 'onlyoffice_editor',
-)
-const isDocumentOfficeDownload = computed(() =>
-  mainDocumentVersion.value?.preview?.mode === 'office_download',
-)
+const isDocumentOfficeDownload = computed(() => {
+  const preview = mainDocumentVersion.value?.preview
+  return preview?.mode === 'office_download' || preview?.mode === 'onlyoffice_editor'
+})
 
 async function loadDocumentPreview() {
   const documentId = props.correspondence.document?.id
@@ -322,27 +322,55 @@ async function prepareReply() {
 }
 
 function openAssignDialog() {
-  assignForm.value = { to_user_id: null, instruction_text: '', due_date: '' }
+  assignForm.value = { to_structure_id: null, to_user_id: null, instruction_text: '', due_date: '' }
+  serviceAgents.value = []
   showAssignDialog.value = true
 }
 
+async function loadServiceAgents(structureId: number | null) {
+  assignForm.value.to_user_id = null
+  serviceAgents.value = []
+  if (!structureId)
+    return
+
+  const query: Record<string, string | number> = { structure_id: structureId }
+  const clearance = props.correspondence.confidentiality
+  if (clearance === 'confidentiel' || clearance === 'tres_confidentiel')
+    query.clearance = clearance
+
+  const list = await $api('/meta/users', { query })
+  serviceAgents.value = Array.isArray(list) ? list : []
+}
+
+async function openImputationSheet() {
+  const blob = await $api(`/mail/correspondences/${props.correspondence.id}/imputation-sheet`, {
+    responseType: 'blob',
+  }) as Blob
+  const url = URL.createObjectURL(blob)
+  window.open(url, '_blank')
+}
+
 async function handleAssign() {
-  if (!assignForm.value.to_user_id)
+  if (!assignForm.value.to_user_id || !assignForm.value.to_structure_id)
     return
 
   assigning.value = true
   try {
     await assign(props.correspondence.id, [{
       to_user_id: assignForm.value.to_user_id,
+      to_structure_id: assignForm.value.to_structure_id,
       instruction_text: assignForm.value.instruction_text || undefined,
       due_date: assignForm.value.due_date || undefined,
     }])
     showAssignDialog.value = false
-    assignForm.value = { to_user_id: null, instruction_text: '', due_date: '' }
+    assignForm.value = { to_structure_id: null, to_user_id: null, instruction_text: '', due_date: '' }
     emit('refresh')
-  } catch (error: any) {
-    alert('Erreur : ' + (error.message || 'Impossible d\'affecter'))
-  } finally {
+    await openImputationSheet()
+  }
+  catch (error: any) {
+    alert(error?.data?.message || 'Imputation impossible')
+  }
+  finally {
     assigning.value = false
   }
 }
@@ -531,6 +559,34 @@ async function handlePrint() {
   }
 }
 
+async function printCirculationSheet() {
+  printingFiche.value = true
+  ficheError.value = ''
+  ficheMessage.value = ''
+  try {
+    const blob = await $api(`/mail/correspondences/${props.correspondence.id}/circulation-sheet/pdf`, {
+      responseType: 'blob',
+    }) as Blob
+    const file = blob instanceof Blob ? blob : new Blob([blob], { type: 'application/pdf' })
+    const url = URL.createObjectURL(file)
+    const win = window.open(url, '_blank')
+    if (win) {
+      win.addEventListener('load', () => {
+        win.focus()
+        win.print()
+      })
+    }
+    ficheMessage.value = 'Fiche de circulation prête à l’impression.'
+    emit('refresh')
+  }
+  catch (error: any) {
+    ficheError.value = error?.data?.message || 'Impossible d’imprimer la fiche de circulation.'
+  }
+  finally {
+    printingFiche.value = false
+  }
+}
+
 async function handleCreateCirculationSheet(generate = false) {
   creatingFiche.value = true
   ficheMessage.value = ''
@@ -703,7 +759,7 @@ async function archiveCorrespondence() {
           prepend-icon="tabler-user-plus"
           @click="openAssignDialog"
         >
-          Affecter
+          Imputer
         </VBtn>
         <VBtn
           v-if="canRegisterDeparture"
@@ -1545,19 +1601,12 @@ async function archiveCorrespondence() {
                 :src="documentStreamUrl"
                 title="Aperçu du document"
               />
-              <OnlyOfficeEditor
-                v-else-if="isDocumentOnlyOffice && correspondence.document?.id"
-                :key="`oo-mail-${correspondence.document.id}-${editorRemountKey}`"
-                :document-id="correspondence.document.id"
-                @reload="reloadDocumentPreview"
-              />
               <VAlert
                 v-else-if="isDocumentOfficeDownload"
                 type="info"
                 variant="tonal"
               >
-                Document Office : prévisualisation navigateur indisponible.
-                Téléchargez le fichier pour le consulter, ou activez ONLYOFFICE pour l’édition en ligne.
+                Téléchargez le fichier pour le consulter.
               </VAlert>
               <VAlert
                 v-else-if="mainDocumentVersion && !documentPreviewLoading"
@@ -1786,9 +1835,29 @@ async function archiveCorrespondence() {
                 />
                 Fiche de circulation (FC)
               </div>
-              <p class="text-body-2 text-medium-emphasis mb-4">
-                Une seule fiche numérotée par courrier (imputation et annotations).
-              </p>
+              <div class="d-flex flex-wrap align-center justify-space-between gap-3 mb-4">
+                <p class="text-body-2 text-medium-emphasis mb-0">
+                  Une seule fiche numérotée par courrier. Imprimez-la en PDF, puis imputez.
+                </p>
+                <VBtn
+                  color="primary"
+                  size="small"
+                  prepend-icon="tabler-printer"
+                  :loading="printingFiche"
+                  @click="printCirculationSheet"
+                >
+                  Imprimer
+                </VBtn>
+              </div>
+              <VBtn
+                class="mb-4"
+                size="small"
+                variant="tonal"
+                prepend-icon="tabler-file-download"
+                @click="openImputationSheet"
+              >
+                Fiche d’imputation
+              </VBtn>
 
               <div
                 v-if="primaryCirculationSheet"
@@ -2140,14 +2209,28 @@ async function archiveCorrespondence() {
       v-model="showAssignDialog"
       max-width="520"
     >
-      <VCard :title="`Affecter — ${formatCorrespondenceNumber(correspondence)}`">
+      <VCard :title="`Imputer — ${formatCorrespondenceNumber(correspondence)}`">
         <VCardText>
+          <AppAutocomplete
+            :model-value="assignForm.to_structure_id"
+            class="mb-3"
+            :items="structureItems"
+            label="Service *"
+            placeholder="Rechercher un service…"
+            item-title="title"
+            item-value="value"
+            clearable
+            @update:model-value="(value: number | null) => { assignForm.to_structure_id = value; loadServiceAgents(value) }"
+          />
           <UserAutocomplete
             v-model="assignForm.to_user_id"
             class="mb-3"
-            :items="users"
-            label="Agent destinataire *"
-            placeholder="Rechercher un agent…"
+            :items="serviceAgents"
+            :disabled="!assignForm.to_structure_id"
+            label="Agent *"
+            placeholder="Agents du service…"
+            hint="Seuls les agents du service sélectionné sont proposés."
+            persistent-hint
           />
           <AppTextField
             v-model="assignForm.due_date"
@@ -2169,7 +2252,7 @@ async function archiveCorrespondence() {
           <VBtn
             color="primary"
             :loading="assigning"
-            :disabled="!assignForm.to_user_id"
+            :disabled="!assignForm.to_user_id || !assignForm.to_structure_id"
             @click="handleAssign"
           >
             Confirmer

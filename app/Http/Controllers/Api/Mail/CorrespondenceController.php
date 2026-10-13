@@ -11,6 +11,7 @@ use App\Services\CorrespondenceReminderService;
 use App\Services\CorrespondenceReplyService;
 use App\Services\CorrespondenceService;
 use App\Services\MailOutputDocumentService;
+use App\Services\MailSheetPdfService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -22,6 +23,7 @@ class CorrespondenceController extends Controller
         private readonly CorrespondenceDispatchService $dispatchService,
         private readonly CorrespondenceReminderService $reminderService,
         private readonly MailOutputDocumentService $outputDocumentService,
+        private readonly MailSheetPdfService $sheets,
     ) {}
 
     public function index(Request $request): JsonResponse
@@ -78,6 +80,7 @@ class CorrespondenceController extends Controller
             'summary' => 'nullable|string',
             'observations' => 'nullable|string',
             'external_reference' => 'nullable|string|max:200',
+            'ministry_number' => 'nullable|string|max:100',
             'correspondence_date' => 'nullable|date',
             'received_at' => 'nullable|date',
             'due_date' => 'nullable|date',
@@ -103,6 +106,8 @@ class CorrespondenceController extends Controller
             'recipient_name' => 'nullable|string|max:200',
             'sender_structure_id' => 'nullable|exists:structures,id',
             'recipient_structure_id' => 'nullable|exists:structures,id',
+            'recipient_structure_ids' => 'nullable|array',
+            'recipient_structure_ids.*' => 'integer|exists:structures,id',
         ]);
 
         $direction = $validated['direction'];
@@ -136,6 +141,7 @@ class CorrespondenceController extends Controller
             'summary' => 'nullable|string',
             'observations' => 'nullable|string',
             'external_reference' => 'nullable|string|max:200',
+            'ministry_number' => 'nullable|string|max:100',
             'correspondence_date' => 'nullable|date',
             'due_date' => 'nullable|date',
             'medium' => 'sometimes|in:physique,electronique,hybride',
@@ -161,6 +167,20 @@ class CorrespondenceController extends Controller
         $correspondence->delete();
 
         return response()->json(['message' => 'Courrier supprimé']);
+    }
+
+    public function imputationSheet(Request $request, Correspondence $correspondence)
+    {
+        $this->authorize('view', $correspondence);
+
+        $path = $this->sheets->imputationSheet($correspondence, $request->user());
+        $name = MailSheetPdfService::safeFilename(
+            'fiche-imputation-'.($correspondence->arrival_number ?: $correspondence->id).'.pdf'
+        );
+
+        return response()->download($path, $name, [
+            'Content-Type' => 'application/pdf',
+        ])->deleteFileAfterSend(true);
     }
 
     public function history(Correspondence $correspondence): JsonResponse

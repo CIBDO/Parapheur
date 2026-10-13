@@ -18,6 +18,7 @@ class CirculationSheetService
         private readonly DocumentTemplateService $templateService,
         private readonly DocumentTemplateRenderer $renderer,
         private readonly DocumentService $documentService,
+        private readonly MailSheetPdfService $pdf,
         private readonly AuditLogger $audit,
     ) {}
 
@@ -104,7 +105,7 @@ class CirculationSheetService
             'category',
             'qualification',
             'registeredBy',
-            'structure',
+            'structure.type',
             'assignments.toUser',
             'assignments.toStructure',
             'assignments.action',
@@ -113,54 +114,38 @@ class CirculationSheetService
         $variables = $this->buildVariables($sheet, $correspondence);
 
         try {
-            $template = \App\Models\DocumentTemplate::query()
-                ->where('kind', 'fiche_circulation')
-                ->where('is_active', true)
-                ->whereHas('currentPublishedVersion')
-                ->first();
+            $path = $this->pdf->writeCirculationSheet($variables);
 
-            if ($template) {
-                $document = $this->templateService->generateDocument(
-                    template: $template,
-                    user: $user,
-                    variables: $variables,
-                    correspondenceId: $correspondence->id
-                );
-                $sheet->template_version_id = $template->current_published_version_id;
+            $uploaded = new \Illuminate\Http\UploadedFile(
+                $path,
+                MailSheetPdfService::safeFilename('fiche-circulation-'.$sheet->number.'.pdf'),
+                'application/pdf',
+                null,
+                true
+            );
+
+            if ($sheet->document_id && ($existing = \App\Models\Document::query()->find($sheet->document_id))) {
+                $this->documentService->addVersion($existing, $user, $uploaded, 'Régénération fiche de circulation');
+                $existing->title = 'Fiche de circulation — '.$sheet->number;
+                $existing->object = 'Fiche circulation '.$sheet->number;
+                $existing->save();
+                $document = $existing->fresh();
+            } elseif ($sheet->number && ($existing = \App\Models\Document::query()->where('reference', $sheet->number)->first())) {
+                $this->documentService->addVersion($existing, $user, $uploaded, 'Régénération fiche de circulation');
+                $document = $existing->fresh();
             } else {
-                $path = $this->renderer->createCirculationSheetDocx($variables);
-
-                $uploaded = new \Illuminate\Http\UploadedFile(
-                    $path,
-                    'fiche-circulation-'.$sheet->number.'.docx',
-                    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-                    null,
-                    true
-                );
-
-                if ($sheet->document_id && ($existing = \App\Models\Document::query()->find($sheet->document_id))) {
-                    $this->documentService->addVersion($existing, $user, $uploaded, 'Régénération fiche de circulation');
-                    $existing->title = 'Fiche de circulation — '.$sheet->number;
-                    $existing->object = 'Fiche circulation '.$sheet->number;
-                    $existing->save();
-                    $document = $existing->fresh();
-                } elseif ($sheet->number && ($existing = \App\Models\Document::query()->where('reference', $sheet->number)->first())) {
-                    $this->documentService->addVersion($existing, $user, $uploaded, 'Régénération fiche de circulation');
-                    $document = $existing->fresh();
-                } else {
-                    $document = $this->documentService->create($user, [
-                        'origin' => 'courrier',
-                        'object' => 'Fiche circulation '.$sheet->number,
-                        'title' => 'Fiche de circulation — '.$sheet->number,
-                        'reference' => $sheet->number,
-                        'document_type_id' => \App\Models\DocumentType::query()->value('id'),
-                        'structure_id' => $correspondence->structure_id,
-                        'confidentiality' => $correspondence->confidentiality?->value,
-                    ], $uploaded);
-                }
-
-                @unlink($path);
+                $document = $this->documentService->create($user, [
+                    'origin' => 'courrier',
+                    'object' => 'Fiche circulation '.$sheet->number,
+                    'title' => 'Fiche de circulation — '.$sheet->number,
+                    'reference' => $sheet->number,
+                    'document_type_id' => \App\Models\DocumentType::query()->value('id'),
+                    'structure_id' => $correspondence->structure_id,
+                    'confidentiality' => $correspondence->confidentiality?->value,
+                ], $uploaded);
             }
+
+            @unlink($path);
         } catch (Throwable $e) {
             throw new \InvalidArgumentException(
                 'Impossible de générer le document de fiche : '.$e->getMessage(),
@@ -327,7 +312,6 @@ class CirculationSheetService
             'canal' => $correspondence->channel?->name ?? '',
             'categorie' => $correspondence->category?->name ?? '',
             'type_courrier' => $correspondence->category?->name
-                ?? $correspondence->channel?->name
                 ?? ($correspondence->medium?->value === 'electronique' ? 'Email' : 'Lettre'),
             'qualification' => $correspondence->qualification?->name ?? '',
             'structure' => $correspondence->structure?->name ?? '',
@@ -336,22 +320,162 @@ class CirculationSheetService
             'expediteur' => $fromParty?->name ?? $fromParty?->correspondent?->name ?? '',
             'expediteur_organisation' => $fromParty?->organization ?? $fromParty?->correspondent?->organization ?? '',
             'expediteur_fonction' => $fromParty?->function ?? '',
-            'origine' => $fromParty?->organization
-                ?? $fromParty?->correspondent?->organization
-                ?? $fromParty?->name
-                ?? $fromParty?->correspondent?->name
-                ?? '',
+            'origine' => $fromParty?->correspondent?->sigle
+                ?: $fromParty?->organization
+                ?: $fromParty?->correspondent?->organization
+                ?: $fromParty?->name
+                ?: $fromParty?->correspondent?->name
+                ?: '',
+            'sens' => match ($correspondence->direction?->value) {
+                'sortant' => 'DEPART',
+                'interne' => 'INTERNE',
+                default => 'ARRIVEE',
+            },
+            'numero_ministere' => $correspondence->ministry_number ?? '',
+            'structure_entete' => mb_strtoupper(
+                $correspondence->structure?->name
+                    ?: 'Direction Générale du Trésor et de la Comptabilité Publique',
+                'UTF-8'
+            ),
+            'signataire_gauche' => $this->pdf->signatories($correspondence->structure)[0],
+            'signataire_droite' => $this->pdf->signatories($correspondence->structure)[1],
+            'services_imputation' => $this->imputationColumns($correspondence),
+            'annotations_grille' => $this->annotationGrid($correspondence, $selectedActions),
+            'emblem' => MailSheetPdfService::emblemPath(),
             'destinataires' => $toParties->map(fn ($party) => $party->name ?? $party->correspondent?->name ?? '')
                 ->filter()
                 ->implode(', '),
             'imputations' => $imputations,
             'annotations' => $annotations,
             'affectations' => $correspondence->assignments->map(fn ($a) => [
+                'service' => $a->toStructure?->name ?? '',
                 'destinataire' => $a->toUser?->name ?? $a->toStructure?->name ?? '',
                 'instruction' => $a->instruction_text ?? '',
                 'action' => $a->action?->name ?? '',
             ])->values()->all(),
             'genere_le' => now()->format('d/m/Y H:i'),
         ];
+    }
+
+    /**
+     * Services à cocher à la main. L'imputation déjà faite n'est pas reprise ici.
+     *
+     * @return array<int, array{label: string}>
+     */
+    private function imputationColumns(Correspondence $correspondence): array
+    {
+        $parentId = $correspondence->structure_id;
+        $structures = $parentId
+            ? Structure::query()
+                ->where('parent_id', $parentId)
+                ->where('is_active', true)
+                ->orderBy('sort_order')
+                ->orderBy('name')
+                ->get(['id', 'name'])
+            : collect();
+
+        if ($structures->isEmpty() && $correspondence->structure?->parent_id) {
+            $structures = Structure::query()
+                ->where('parent_id', $correspondence->structure->parent_id)
+                ->where('is_active', true)
+                ->orderBy('sort_order')
+                ->orderBy('name')
+                ->get(['id', 'name']);
+        }
+
+        return $structures
+            ->map(fn (Structure $structure) => ['label' => $structure->name])
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Grille d'annotations du modèle papier.
+     *
+     * @param  array<int, string>  $selectedActions
+     * @return array<int, array<int, array{label: string, checked: bool}>>
+     */
+    private function annotationGrid(Correspondence $correspondence, array $selectedActions): array
+    {
+        $rows = [
+            ['Pour attribution', 'Pour analyse', 'Pour information', 'Pour lecture'],
+            ['Pour suivi', 'Pour étude et avis', 'Pour représentation', 'Pour supervision'],
+            ['A classer', 'Pour éléments de rép.', 'Pour dispo. à prendre', 'M\'en parler'],
+            ['En instance', 'Pour suite à donner', 'A photocopier', 'Pour Observation'],
+            ['Pour exploitation', 'Synthèse', 'Pour diffusion', 'En parler au ...'],
+            ['En rapport avec...', 'Urgent', 'Très urgent', 'Pour transmission à...'],
+            ['Remis à l\'intéressé', 'A Saisir', 'M\'accompagner', 'Pour publication'],
+        ];
+
+        $byCode = [
+            'POUR_ATTRIBUTION' => 'Pour attribution',
+            'POUR_ANALYSE' => 'Pour analyse',
+            'POUR_INFO' => 'Pour information',
+            'POUR_LECTURE' => 'Pour lecture',
+            'POUR_SUIVI' => 'Pour suivi',
+            'POUR_AVIS' => 'Pour étude et avis',
+            'SUITE_A_DONNER' => 'Pour suite à donner',
+            'PREPARER_REPONSE' => 'Pour éléments de rép.',
+            'A_CLASSER' => 'A classer',
+            'A_PHOTOCOPIER' => 'A photocopier',
+            'POUR_DIFFUSION' => 'Pour diffusion',
+            'URGENT' => 'Urgent',
+            'TRES_URGENT' => 'Très urgent',
+        ];
+
+        $checked = [];
+        foreach ($selectedActions as $code) {
+            if (isset($byCode[$code])) {
+                $checked[$byCode[$code]] = true;
+            }
+        }
+
+        $priority = $correspondence->priority?->value;
+        if (in_array($priority, ['urgente', 'importante'], true)) {
+            $checked['Urgent'] = true;
+        }
+        if ($priority === 'tres_urgente') {
+            $checked['Très urgent'] = true;
+        }
+
+        $hints = $correspondence->assignments
+            ->flatMap(fn ($assignment) => [$assignment->action?->name, $assignment->instruction_text])
+            ->filter()
+            ->map(fn ($text) => $this->fold((string) $text))
+            ->all();
+
+        $labels = array_merge(...$rows);
+        usort($labels, fn (string $a, string $b) => mb_strlen($b) <=> mb_strlen($a));
+        foreach ($hints as $hint) {
+            foreach ($labels as $label) {
+                $folded = $this->fold($label);
+                if (mb_strlen($folded) >= 4 && str_contains($hint, $folded)) {
+                    $checked[$label] = true;
+                    break;
+                }
+            }
+        }
+
+        return array_map(function (array $row) use ($checked) {
+            return array_map(fn (string $label) => [
+                'label' => $label,
+                'checked' => isset($checked[$label]),
+            ], $row);
+        }, $rows);
+    }
+
+    private function fold(string $value): string
+    {
+        $value = mb_strtolower(trim($value), 'UTF-8');
+        $value = strtr($value, [
+            'à' => 'a', 'â' => 'a', 'ä' => 'a',
+            'é' => 'e', 'è' => 'e', 'ê' => 'e', 'ë' => 'e',
+            'î' => 'i', 'ï' => 'i',
+            'ô' => 'o', 'ö' => 'o',
+            'ù' => 'u', 'û' => 'u', 'ü' => 'u',
+            'ç' => 'c',
+        ]);
+
+        return preg_replace('/[^a-z0-9]+/', ' ', $value) ?? $value;
     }
 }

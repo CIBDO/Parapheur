@@ -45,6 +45,17 @@ class MetaController extends Controller
             $query->where('structure_id', $request->integer('structure_id'));
         }
 
+        $clearance = $request->string('clearance')->toString();
+        $permission = match ($clearance) {
+            'confidentiel' => 'mail.view_confidential',
+            'tres_confidentiel' => 'mail.view_very_confidential',
+            default => null,
+        };
+
+        if ($permission) {
+            $query->permission([$permission, 'admin.access']);
+        }
+
         $users = $query->orderBy('name')->get(['id', 'name', 'email', 'structure_id', 'position_title']);
 
         return response()->json($users->map(fn (User $user) => [

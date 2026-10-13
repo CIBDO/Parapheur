@@ -13,6 +13,7 @@ class Correspondent extends Model
     protected $fillable = [
         'type',
         'name',
+        'sigle',
         'function',
         'organization',
         'address',

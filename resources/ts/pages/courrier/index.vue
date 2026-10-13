@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import CorrespondenceCreateDialog from '@/components/courrier/CorrespondenceCreateDialog.vue'
 import { $api } from '@/utils/api'
 import { useCorrespondence } from '@/composables/useCorrespondence'
 import { listItems } from '@/utils/listItems'
@@ -26,6 +27,8 @@ const showAdvanced = ref(false)
 const hasSearched = ref(false)
 const recentIncoming = ref<any[]>([])
 const searchResults = ref<any[]>([])
+const showCreate = ref(false)
+const createDirection = ref<'entrant' | 'sortant'>('entrant')
 
 const simpleQuery = ref('')
 const filters = ref({
@@ -82,7 +85,7 @@ const tableItems = computed(() =>
 const tableTitle = computed(() =>
   hasSearched.value
     ? `Résultats de recherche (${searchResults.value.length})`
-    : 'Derniers courriers entrants',
+    : 'Derniers courriers arrivés',
 )
 
 const recentHeaders = [
@@ -94,12 +97,26 @@ const recentHeaders = [
   { title: 'Reçu le', key: 'received_at', width: '150px' },
 ]
 
-const quickActions = [
-  { title: 'Enregistrer un entrant', icon: 'tabler-mail-plus', color: 'primary', route: 'courrier-entrants-nouveau' },
-  { title: 'Nouveau sortant', icon: 'tabler-send', color: 'success', route: 'courrier-sortants-nouveau' },
-  { title: 'Note interne', icon: 'tabler-arrows-exchange', color: 'warning', route: 'courrier-internes-nouveau' },
-  { title: 'Bordereau', icon: 'tabler-clipboard-list', color: 'info', route: 'courrier-bordereaux' },
+const sectionButtons = [
+  { title: 'Courriers arrivés', icon: 'tabler-inbox', route: 'courrier-entrants' },
+  { title: 'Courriers de départs', icon: 'tabler-send', route: 'courrier-sortants' },
+  { title: 'Internes', icon: 'tabler-building', route: 'courrier-internes' },
+  { title: 'Bordereaux', icon: 'tabler-file-invoice', route: 'courrier-bordereaux' },
+  { title: 'Fiches', icon: 'tabler-clipboard-list', route: 'courrier-fiches' },
+  { title: 'Archives', icon: 'tabler-archive', route: 'courrier-archives' },
+  { title: 'Modèles', icon: 'tabler-template', route: 'courrier-modeles', action: 'read', subject: 'DocumentTemplate' },
+  { title: 'Administration', icon: 'tabler-settings', route: 'courrier-admin', action: 'manage', subject: 'CourrierAdmin' },
 ]
+
+function openCreate(direction: 'entrant' | 'sortant') {
+  createDirection.value = direction
+  showCreate.value = true
+}
+
+async function onCreated() {
+  showCreate.value = false
+  await Promise.all([loadDashboard(), loadRecentIncoming()])
+}
 
 onMounted(async () => {
   await Promise.all([loadDashboard(), loadRecentIncoming()])
@@ -211,7 +228,7 @@ function openItem(item: any) {
   <div class="courrier-dashboard">
     <ParapheurPageHeader
       title="Bureau d'ordre — Courrier"
-      subtitle="Pilotage, recherche et suivi des flux entrants / sortants"
+      subtitle="Pilotage, recherche et suivi des courriers arrivés et de départs"
     >
       <template #actions>
         <VBtn
@@ -226,9 +243,9 @@ function openItem(item: any) {
         <VBtn
           color="primary"
           prepend-icon="tabler-plus"
-          :to="{ name: 'courrier-entrants-nouveau' }"
+          @click="openCreate('entrant')"
         >
-          Enregistrer un entrant
+          Enregistrer un courrier arrivé
         </VBtn>
       </template>
     </ParapheurPageHeader>
@@ -420,15 +437,33 @@ function openItem(item: any) {
         <VCard>
           <VCardText class="d-flex flex-wrap gap-2 py-3">
             <VBtn
-              v-for="action in quickActions"
-              :key="action.route"
+              size="small"
+              color="primary"
+              variant="tonal"
+              prepend-icon="tabler-mail-plus"
+              @click="openCreate('entrant')"
+            >
+              Courrier arrivé
+            </VBtn>
+            <VBtn
+              size="small"
+              color="success"
+              variant="tonal"
+              prepend-icon="tabler-send"
+              @click="openCreate('sortant')"
+            >
+              Courrier de départ
+            </VBtn>
+            <VBtn
+              v-for="item in sectionButtons"
+              :key="item.route"
+              v-show="!item.action || $can(item.action, item.subject)"
               size="small"
               variant="tonal"
-              :color="action.color"
-              :prepend-icon="action.icon"
-              :to="{ name: action.route }"
+              :prepend-icon="item.icon"
+              :to="{ name: item.route }"
             >
-              {{ action.title }}
+              {{ item.title }}
             </VBtn>
           </VCardText>
         </VCard>
@@ -518,7 +553,7 @@ function openItem(item: any) {
             color="primary"
             :to="{ name: 'courrier-entrants' }"
           >
-            Voir tous les entrants
+            Voir tous les courriers arrivés
           </VBtn>
           <VBtn
             v-else
@@ -610,6 +645,12 @@ function openItem(item: any) {
         </template>
       </VDataTable>
     </VCard>
+
+    <CorrespondenceCreateDialog
+      v-model="showCreate"
+      :direction="createDirection"
+      @created="onCreated"
+    />
   </div>
 </template>
 

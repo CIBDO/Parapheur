@@ -6,8 +6,10 @@ use App\Http\Controllers\Controller;
 use App\Models\CirculationSheet;
 use App\Models\Correspondence;
 use App\Services\CirculationSheetService;
+use App\Services\MailSheetPdfService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Throwable;
 
 class CirculationSheetController extends Controller
@@ -84,6 +86,31 @@ class CirculationSheetController extends Controller
             [],
             (bool) ($validated['generate'] ?? false),
         );
+    }
+
+    public function pdf(Request $request, Correspondence $correspondence)
+    {
+        $this->authorize('view', $correspondence);
+
+        $result = $this->service->findOrCreate($correspondence, $request->user());
+        $sheet = $this->service->generateDocument($result['sheet'], $request->user());
+        $sheet->load('document.latestVersion');
+
+        $version = $sheet->document?->latestVersion;
+        if (! $version) {
+            return response()->json(['message' => 'PDF de la fiche indisponible.'], 422);
+        }
+
+        $disk = $version->disk ?: 'local';
+        $absolute = Storage::disk($disk)->path($version->path);
+        $name = MailSheetPdfService::safeFilename(
+            'fiche-circulation-'.($sheet->number ?: $correspondence->id).'.pdf'
+        );
+
+        return response()->file($absolute, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'inline; filename="'.$name.'"',
+        ]);
     }
 
     private function respondWithSheet(

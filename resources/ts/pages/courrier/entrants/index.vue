@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import CorrespondenceCreateDialog from '@/components/courrier/CorrespondenceCreateDialog.vue'
 import { useCorrespondence } from '@/composables/useCorrespondence'
 import { formatCorrespondenceNumber, formatCourrierDateTime, statusLabel, correspondenceStatusColors, correspondencePriorityColors } from '@/utils/courrierUi'
 
@@ -11,9 +13,12 @@ definePage({
   },
 })
 
+const router = useRouter()
+const route = useRoute()
 const { correspondences, fetchCorrespondences, loading } = useCorrespondence()
 const search = ref('')
 const status = ref<string | null>(null)
+const showCreate = ref(false)
 
 async function load() {
   await fetchCorrespondences({
@@ -23,7 +28,15 @@ async function load() {
   })
 }
 
-onMounted(load)
+function onCreated(item: { id: number }) {
+  router.push({ name: 'courrier-entrants-id', params: { id: item.id } })
+}
+
+onMounted(() => {
+  load()
+  if (route.query.nouveau)
+    showCreate.value = true
+})
 
 const headers = [
   { title: 'N° arrivée', key: 'arrival_number' },
@@ -37,14 +50,14 @@ const headers = [
 <template>
   <div>
     <ParapheurPageHeader
-      title="Courriers entrants"
+      title="Courriers arrivés"
       subtitle="Registre d'arrivée"
     >
       <template #actions>
         <VBtn
           color="primary"
           prepend-icon="tabler-plus"
-          :to="{ name: 'courrier-entrants-nouveau' }"
+          @click="showCreate = true"
         >
           Nouveau
         </VBtn>
@@ -102,5 +115,11 @@ const headers = [
         </template>
       </VDataTable>
     </VCard>
+
+    <CorrespondenceCreateDialog
+      v-model="showCreate"
+      direction="entrant"
+      @created="onCreated"
+    />
   </div>
 </template>

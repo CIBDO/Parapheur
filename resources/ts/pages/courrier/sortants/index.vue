@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import CorrespondenceCreateDialog from '@/components/courrier/CorrespondenceCreateDialog.vue'
 import { useCorrespondence } from '@/composables/useCorrespondence'
 import { listItems } from '@/utils/listItems'
 import { correspondenceStatusColors, formatCorrespondenceNumber, formatCourrierDate, statusLabel } from '@/utils/courrierUi'
@@ -8,8 +10,11 @@ definePage({
   meta: { layout: 'default', action: 'read', subject: 'Courrier' },
 })
 
+const router = useRouter()
+const route = useRoute()
 const { correspondences, fetchCorrespondences, loading } = useCorrespondence()
 const search = ref('')
+const showCreate = ref(false)
 
 async function load() {
   await fetchCorrespondences({
@@ -19,7 +24,15 @@ async function load() {
   })
 }
 
-onMounted(load)
+function onCreated(item: { id: number }) {
+  router.push({ name: 'courrier-sortants-id', params: { id: item.id } })
+}
+
+onMounted(() => {
+  load()
+  if (route.query.nouveau)
+    showCreate.value = true
+})
 
 const items = computed(() => listItems(correspondences.value))
 </script>
@@ -27,14 +40,14 @@ const items = computed(() => listItems(correspondences.value))
 <template>
   <div>
     <ParapheurPageHeader
-      title="Courriers sortants"
+      title="Courriers de départs"
       subtitle="Projets et registre de départ (DEP)"
     >
       <template #actions>
         <VBtn
           color="primary"
           prepend-icon="tabler-plus"
-          :to="{ name: 'courrier-sortants-nouveau' }"
+          @click="showCreate = true"
         >
           Nouveau
         </VBtn>
@@ -86,5 +99,11 @@ const items = computed(() => listItems(correspondences.value))
         </template>
       </VDataTable>
     </VCard>
+
+    <CorrespondenceCreateDialog
+      v-model="showCreate"
+      direction="sortant"
+      @created="onCreated"
+    />
   </div>
 </template>

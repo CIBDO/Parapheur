@@ -31,6 +31,7 @@ class Correspondence extends Model
         'registered_at',
         'due_date',
         'external_reference',
+        'ministry_number',
         'subject',
         'summary',
         'observations',

@@ -151,7 +151,7 @@ class CorrespondenceService
     {
         DB::transaction(function () use ($correspondence, $user, $data) {
             $fillable = [
-                'subject', 'summary', 'observations', 'external_reference',
+                'subject', 'summary', 'observations', 'external_reference', 'ministry_number',
                 'correspondence_date', 'due_date', 'medium', 'priority',
                 'confidentiality', 'structure_id', 'channel_id', 'category_id', 'qualification_id',
                 'piece_count', 'keywords', 'requires_reply',
@@ -367,6 +367,7 @@ class CorrespondenceService
             'arrival_number' => $correspondence->arrival_number,
             'departure_number' => $correspondence->departure_number,
             'external_reference' => $correspondence->external_reference,
+            'ministry_number' => $correspondence->ministry_number,
             'subject' => $correspondence->subject,
             'summary' => $correspondence->summary,
             'observations' => $correspondence->observations,
@@ -498,6 +499,9 @@ class CorrespondenceService
 
         $senderStructureId = $data['sender_structure_id'] ?? null;
         $recipientStructureId = $data['recipient_structure_id'] ?? null;
+        $recipientStructureIds = array_values(array_filter(
+            is_array($data['recipient_structure_ids'] ?? null) ? $data['recipient_structure_ids'] : []
+        ));
 
         if ($senderStructureId && ! $roles->contains('from')) {
             $structure = Structure::query()->find($senderStructureId);
@@ -512,15 +516,20 @@ class CorrespondenceService
         }
 
         if ($recipientStructureId && ! $roles->contains('to')) {
-            $structure = Structure::query()->find($recipientStructureId);
-            if ($structure) {
-                $parties[] = [
-                    'role' => 'to',
-                    'name' => $structure->name,
-                    'organization' => $structure->code ?: $structure->name,
-                ];
-                $roles->push('to');
+            $recipientStructureIds[] = $recipientStructureId;
+        }
+
+        foreach ($recipientStructureIds as $structureId) {
+            $structure = Structure::query()->find($structureId);
+            if (! $structure) {
+                continue;
             }
+            $parties[] = [
+                'role' => 'to',
+                'name' => $structure->name,
+                'organization' => $structure->code ?: $structure->name,
+            ];
+            $roles->push('to');
         }
 
         $senderName = trim((string) ($data['sender_name'] ?? ''));
@@ -540,6 +549,7 @@ class CorrespondenceService
             $data['document_data'],
             $data['sender_structure_id'],
             $data['recipient_structure_id'],
+            $data['recipient_structure_ids'],
         );
 
         return [$data, $parties];

@@ -357,6 +357,14 @@ class DatabaseSeeder extends Seeder
             ['code' => 'DIR'],
             ['name' => 'Direction', 'sort_order' => 2]
         );
+        StructureType::query()->updateOrCreate(
+            ['code' => 'TRESORERIE'],
+            ['name' => 'Trésorerie', 'sort_order' => 3]
+        );
+        StructureType::query()->updateOrCreate(
+            ['code' => 'SERVICE'],
+            ['name' => 'Service rattaché', 'sort_order' => 4]
+        );
 
         $dgtcp = Structure::query()->updateOrCreate(
             ['code' => 'DGTCP'],

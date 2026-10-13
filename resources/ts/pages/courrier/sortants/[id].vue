@@ -50,7 +50,7 @@ async function refresh() {
       prepend-icon="tabler-arrow-left"
       @click="router.push({ name: 'courrier-sortants' })"
     >
-      Retour aux sortants
+      Retour aux courriers de départs
     </VBtn>
   </div>
   <div v-else-if="correspondence && !loading">

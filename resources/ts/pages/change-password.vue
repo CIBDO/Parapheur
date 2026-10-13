@@ -37,7 +37,7 @@ const userData = useCookie<any>('userData')
 const homeForRole = (role: string) => {
   if (role === 'Administrateur')
     return '/parapheur/admin'
-  if (role === 'Directeur Général' || role === 'DGA')
+  if (role === 'Directeur Général' || role === 'Directeur Général')
     return '/parapheur/dg'
 
   return '/parapheur'

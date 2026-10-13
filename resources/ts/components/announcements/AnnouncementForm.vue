@@ -52,7 +52,7 @@ const form = reactive({
 
 const roles = [
   'Directeur Général',
-  'DGA',
+  'Directeur Général Adjoint',
   'Secrétariat DG',
   'Directeur',
   'Chef de division',

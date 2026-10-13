@@ -601,6 +601,7 @@ Route::middleware(['auth:sanctum', 'auth.idle', 'password.changed'])->group(func
             ->middleware('permission:mail.update|admin.access');
         Route::delete('/correspondences/{correspondence}', [CorrespondenceController::class, 'destroy'])
             ->middleware('permission:mail.delete|admin.access');
+        Route::get('/correspondences/{correspondence}/imputation-sheet', [CorrespondenceController::class, 'imputationSheet']);
         Route::get('/correspondences/{correspondence}/history', [CorrespondenceController::class, 'history']);
 
         // Correspondances - Actions
@@ -639,7 +640,7 @@ Route::middleware(['auth:sanctum', 'auth.idle', 'password.changed'])->group(func
         // Correspondants
         Route::get('/correspondents', [CorrespondentController::class, 'index']);
         Route::post('/correspondents', [CorrespondentController::class, 'store'])
-            ->middleware('permission:mail.update|admin.access');
+            ->middleware('permission:mail.create|mail.update|admin.access');
         Route::get('/correspondents/{correspondent}', [CorrespondentController::class, 'show']);
         Route::put('/correspondents/{correspondent}', [CorrespondentController::class, 'update'])
             ->middleware('permission:mail.update|admin.access');
@@ -687,6 +688,7 @@ Route::middleware(['auth:sanctum', 'auth.idle', 'password.changed'])->group(func
             ->middleware('permission:mail.update|admin.access');
         Route::post('/correspondences/{correspondence}/circulation-sheet', [CirculationSheetController::class, 'createForCorrespondence'])
             ->middleware('permission:mail.create|admin.access');
+        Route::get('/correspondences/{correspondence}/circulation-sheet/pdf', [CirculationSheetController::class, 'pdf']);
 
         // Administration des référentiels
         Route::middleware('permission:mail.admin|admin.access')->prefix('admin')->group(function () {

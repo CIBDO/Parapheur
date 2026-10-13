@@ -17,6 +17,7 @@ class CorrespondentController extends Controller
             $q = '%'.$request->string('q').'%';
             $query->where(function ($builder) use ($q) {
                 $builder->where('name', 'like', $q)
+                    ->orWhere('sigle', 'like', $q)
                     ->orWhere('organization', 'like', $q);
             });
         }
@@ -29,6 +30,7 @@ class CorrespondentController extends Controller
         $validated = $request->validate([
             'type' => 'required|string|max:50',
             'name' => 'required|string|max:255',
+            'sigle' => 'nullable|string|max:50',
             'function' => 'nullable|string|max:255',
             'organization' => 'nullable|string|max:255',
             'address' => 'nullable|string',
@@ -64,6 +66,7 @@ class CorrespondentController extends Controller
         $validated = $request->validate([
             'type' => 'sometimes|string|max:50',
             'name' => 'sometimes|string|max:255',
+            'sigle' => 'nullable|string|max:50',
             'function' => 'nullable|string|max:255',
             'organization' => 'nullable|string|max:255',
             'address' => 'nullable|string',

@@ -28,27 +28,27 @@ class CorrespondenceAccessService
             return false;
         }
 
-        // Vue globale bureau courrier
         if ($user->can('mail.view_all')) {
             return true;
         }
 
-        // L'utilisateur propriétaire peut toujours voir
         if ($correspondence->owner_user_id === $user->id) {
             return true;
         }
 
-        // L'utilisateur qui a enregistré peut voir
         if ($correspondence->registered_by === $user->id) {
             return true;
         }
 
-        // Membre de la structure propriétaire
-        if ($correspondence->structure_id && $user->structure_id === $correspondence->structure_id) {
+        $restricted = in_array($correspondence->confidentiality, [
+            DocumentConfidentiality::Confidentiel,
+            DocumentConfidentiality::TresConfidentiel,
+        ], true);
+
+        if (! $restricted && $correspondence->structure_id && $user->structure_id === $correspondence->structure_id) {
             return true;
         }
 
-        // A une affectation
         return $correspondence->assignments()
             ->where('to_user_id', $user->id)
             ->exists();
@@ -57,7 +57,7 @@ class CorrespondenceAccessService
     /**
      * Vérifie l'accès selon la confidentialité.
      */
-    protected function canAccessConfidentiality(User $user, Correspondence $correspondence): bool
+    public function canAccessConfidentiality(User $user, Correspondence $correspondence): bool
     {
         $confidentiality = $correspondence->confidentiality;
 

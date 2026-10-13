@@ -35,6 +35,7 @@ declare module 'vue' {
     CardStatisticsVerticalSimple: typeof import('./resources/ts/@core/components/CardStatisticsVerticalSimple.vue')['default']
     ClassificationTreeNodes: typeof import('./resources/ts/components/ged/ClassificationTreeNodes.vue')['default']
     ConfirmDialog: typeof import('./resources/ts/components/dialogs/ConfirmDialog.vue')['default']
+    CorrespondenceCreateDialog: typeof import('./resources/ts/components/courrier/CorrespondenceCreateDialog.vue')['default']
     CorrespondenceDetailView: typeof import('./resources/ts/components/courrier/CorrespondenceDetailView.vue')['default']
     CreateAppDialog: typeof import('./resources/ts/components/dialogs/CreateAppDialog.vue')['default']
     CreateTaskDialog: typeof import('./resources/ts/components/tasks/CreateTaskDialog.vue')['default']

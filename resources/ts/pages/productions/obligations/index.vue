@@ -127,10 +127,10 @@ const create = async () => {
         schedule_config: scheduleConfig(),
         validators: form.value.validators.filter(v => v.user_id),
         recipients: recipient_user_id
-          ? [{ user_id: recipient_user_id }, { role_name: 'Directeur Général' }, { role_name: 'DGA' }]
+          ? [{ user_id: recipient_user_id }, { role_name: 'Directeur Général' }, { role_name: 'Directeur Général' }]
           : [
               { role_name: 'Directeur Général' },
-              { role_name: 'DGA' },
+              { role_name: 'Directeur Général Adjoint' },
             ],
       },
     })

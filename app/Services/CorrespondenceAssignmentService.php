@@ -17,6 +17,7 @@ class CorrespondenceAssignmentService
     public function __construct(
         private readonly CorrespondenceEventService $eventService,
         private readonly CorrespondenceStateMachine $stateMachine,
+        private readonly CorrespondenceAccessService $access,
         private readonly AuditLogger $audit,
     ) {}
 
@@ -41,6 +42,16 @@ class CorrespondenceAssignmentService
 
                 if (! $toUserId && ! $toStructureId) {
                     throw new InvalidArgumentException('Chaque affectation doit spécifier un utilisateur ou une structure.');
+                }
+
+                $toUser = $toUserId ? User::query()->find($toUserId) : null;
+
+                if ($toUser && ! $this->access->canAccessConfidentiality($toUser, $correspondence)) {
+                    throw new InvalidArgumentException('Cet agent n’est pas habilité à recevoir un courrier de ce niveau de confidentialité.');
+                }
+
+                if ($toUser && $toStructureId && (int) $toUser->structure_id !== (int) $toStructureId) {
+                    throw new InvalidArgumentException('L’agent sélectionné n’appartient pas au service choisi.');
                 }
 
                 $assignment = CorrespondenceAssignment::query()->create([
@@ -89,8 +100,6 @@ class CorrespondenceAssignmentService
 
                 $created[] = $assignment;
 
-                $toUser = $toUserId ? User::query()->find($toUserId) : null;
-
                 $this->eventService->logAssignment(
                     $correspondence,
                     $fromUser,
@@ -103,7 +112,7 @@ class CorrespondenceAssignmentService
                     $toUser->notify(new MailCorrespondenceNotification(
                         $correspondence,
                         'assigned',
-                        'Un courrier vous a été affecté : '.$correspondence->subject,
+                        'Un courrier vous a été imputé : '.$correspondence->subject,
                         $fromUser->name,
                     ));
                 }
@@ -133,7 +142,12 @@ class CorrespondenceAssignmentService
     public function takeCharge(CorrespondenceAssignment $assignment, User $user): CorrespondenceAssignment
     {
         if ($assignment->to_user_id !== $user->id) {
-            throw new InvalidArgumentException('Vous ne pouvez prendre en charge que vos propres affectations.');
+            throw new InvalidArgumentException('Vous ne pouvez prendre en charge que vos propres imputations.');
+        }
+
+        $correspondence = $assignment->correspondence;
+        if (! $this->access->canAccessConfidentiality($user, $correspondence)) {
+            throw new InvalidArgumentException('Vous n’êtes pas habilité à prendre en charge un courrier de ce niveau de confidentialité.');
         }
 
         if ($assignment->status !== CorrespondenceAssignmentStatus::Transmis && $assignment->status !== CorrespondenceAssignmentStatus::Recu) {
