@@ -70,8 +70,7 @@ onMounted(loadContext)
 <template>
   <div
     v-if="showSelect || currentLabel"
-    class="d-flex align-center me-2"
-    style="max-width: 320px;"
+    class="mail-context d-flex align-center me-2"
   >
     <VSelect
       v-if="showSelect"
@@ -85,17 +84,57 @@ onMounted(loadContext)
       :loading="switching"
       :disabled="switching"
       label="Périmètre"
-      style="min-width: 220px;"
+      class="mail-context-select"
       @update:model-value="onSwitch"
-    />
+    >
+      <template #selection="{ item }">
+        <span class="mail-context-label">{{ item.title }}</span>
+      </template>
+    </VSelect>
     <VChip
       v-else
+      class="mail-context-chip"
       size="small"
       variant="tonal"
       color="primary"
       prepend-icon="tabler-building"
+      :title="currentLabel"
     >
-      {{ currentLabel }}
+      <span class="mail-context-label">{{ currentLabel }}</span>
     </VChip>
   </div>
 </template>
+
+<style scoped>
+.mail-context {
+  flex: 0 1 auto;
+  max-width: calc(100% - 220px);
+  min-width: 0;
+}
+
+.mail-context-label {
+  white-space: normal;
+  line-height: 1.25;
+  text-align: start;
+}
+
+.mail-context-chip {
+  height: auto;
+  max-width: 100%;
+  padding-block: 4px;
+}
+
+.mail-context-chip :deep(.v-chip__content) {
+  white-space: normal;
+  overflow: visible;
+}
+
+.mail-context-select {
+  min-width: 280px;
+  max-width: 100%;
+}
+
+.mail-context-select :deep(.v-field__input) {
+  flex-wrap: wrap;
+}
+</style>

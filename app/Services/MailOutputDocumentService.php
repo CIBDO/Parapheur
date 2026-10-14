@@ -26,6 +26,8 @@ class MailOutputDocumentService
         private readonly DocumentTemplateRenderer $renderer,
         private readonly DocumentService $documentService,
         private readonly AuditLogger $audit,
+        private readonly MailSheetPdfService $sheets,
+        private readonly MailIdentityService $identity,
     ) {}
 
     public function generateDispatchSlip(CorrespondenceDispatch $dispatch, User $user): CorrespondenceDispatch
@@ -43,19 +45,38 @@ class MailOutputDocumentService
                 $dispatch->number = $this->numberingService->generateDispatchSlipNumber($correspondence->structure_id);
             }
 
-            $variables = $this->buildDispatchVariables($dispatch, $correspondence);
-            $document = $this->createOrRenderDocument(
-                kind: DocumentTemplateKind::BordereauEnvoi,
-                user: $user,
-                variables: $variables,
-                correspondence: $correspondence,
-                filename: 'bordereau-envoi-'.$dispatch->number.'.docx',
-                title: 'Bordereau d\'envoi — '.$dispatch->number,
-                object: 'Bordereau d\'envoi '.$dispatch->number,
-                reference: $dispatch->number,
-                fallback: fn () => $this->renderer->createDispatchSlipDocx($variables),
-                existingDocumentId: $dispatch->document_id,
+            $dispatch = $this->ensureSlipContent($dispatch, $correspondence);
+            $path = $this->sheets->writeDispatchSlip($this->pdfPayload($dispatch, $correspondence));
+            $uploaded = new UploadedFile(
+                $path,
+                MailSheetPdfService::safeFilename('bordereau-envoi-'.$dispatch->number.'.pdf'),
+                'application/pdf',
+                null,
+                true
             );
+
+            if ($dispatch->document_id && ($existing = \App\Models\Document::query()->find($dispatch->document_id))) {
+                $this->documentService->addVersion($existing, $user, $uploaded, 'Régénération bordereau d\'envoi');
+                $existing->title = 'Bordereau d\'envoi — '.$dispatch->number;
+                $existing->object = 'Bordereau d\'envoi '.$dispatch->number;
+                $existing->save();
+                $document = $existing->fresh();
+            } elseif ($dispatch->number && ($existing = \App\Models\Document::query()->where('reference', $dispatch->number)->first())) {
+                $this->documentService->addVersion($existing, $user, $uploaded, 'Régénération bordereau d\'envoi');
+                $document = $existing->fresh();
+            } else {
+                $document = $this->documentService->create($user, [
+                    'origin' => 'courrier',
+                    'object' => 'Bordereau d\'envoi '.$dispatch->number,
+                    'title' => 'Bordereau d\'envoi — '.$dispatch->number,
+                    'reference' => $dispatch->number,
+                    'document_type_id' => DocumentType::query()->value('id'),
+                    'structure_id' => $correspondence->structure_id,
+                    'confidentiality' => $correspondence->confidentiality?->value,
+                ], $uploaded);
+            }
+
+            @unlink($path);
 
             $dispatch->document_id = $document->id;
             $dispatch->save();
@@ -67,6 +88,286 @@ class MailOutputDocumentService
 
             return $dispatch->fresh(['document', 'dispatchedBy']);
         });
+    }
+
+    /**
+     * Valeurs proposées pour le bordereau, toutes remplaçables à la saisie.
+     *
+     * @return array{presentation: array{place: string, sender_title: string, recipient_title: string, recipient_city: string, structure_code: string}, lines: list<array{designation: string, quantity: int, observation: string}>}
+     */
+    public function suggestSlip(Correspondence $correspondence): array
+    {
+        $correspondence->loadMissing(['parties.correspondent', 'structure']);
+        $identity = $this->identity->forCorrespondence($correspondence);
+
+        $recipient = $this->partyNames($correspondence, 'to');
+        $toParty = $correspondence->parties->first(function ($party) {
+            $role = $party->role instanceof \BackedEnum ? $party->role->value : (string) $party->role;
+
+            return $role === 'to';
+        });
+        $organization = trim((string) ($toParty?->organization ?: $toParty?->correspondent?->organization ?: ''));
+        $city = $organization !== '' && mb_strtolower($organization) !== mb_strtolower($recipient) ? $organization : '';
+
+        $sender = trim((string) ($identity['signatory_left'] ?? ''));
+        if ($sender === '' || $sender === '—') {
+            $sender = $correspondence->structure?->name ?? '';
+        }
+
+        return [
+            'presentation' => [
+                'place' => 'Bamako',
+                'sender_title' => $sender,
+                'recipient_title' => $recipient,
+                'recipient_city' => $city,
+                'structure_code' => (string) ($identity['structure_code'] ?? $correspondence->structure?->code ?? ''),
+            ],
+            'lines' => [[
+                'designation' => trim((string) ($correspondence->subject ?: 'Courrier')),
+                'quantity' => max(1, (int) ($correspondence->piece_count ?? 1)),
+                'observation' => '',
+            ]],
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @return array{presentation: array<string, string>, lines: list<array{designation: string, quantity: int, observation: string}>}
+     */
+    public function resolveSlipContent(Correspondence $correspondence, array $data): array
+    {
+        $suggested = $this->suggestSlip($correspondence);
+        $presentation = $suggested['presentation'];
+        $given = is_array($data['presentation'] ?? null) ? $data['presentation'] : [];
+        foreach ($presentation as $key => $default) {
+            if (array_key_exists($key, $given)) {
+                $presentation[$key] = trim((string) $given[$key]);
+            }
+        }
+
+        $lines = $this->normalizeLines($data['lines'] ?? null);
+
+        return [
+            'presentation' => $presentation,
+            'lines' => $lines !== [] ? $lines : $suggested['lines'],
+        ];
+    }
+
+    public function ensureSlipContent(CorrespondenceDispatch $dispatch, Correspondence $correspondence): CorrespondenceDispatch
+    {
+        $suggested = $this->suggestSlip($correspondence);
+        if (! is_array($dispatch->lines) || $dispatch->lines === []) {
+            $dispatch->lines = $suggested['lines'];
+        } else {
+            $dispatch->lines = $this->normalizeLines($dispatch->lines) ?: $suggested['lines'];
+        }
+
+        $presentation = $suggested['presentation'];
+        if (is_array($dispatch->presentation)) {
+            foreach ($presentation as $key => $default) {
+                if (array_key_exists($key, $dispatch->presentation)) {
+                    $presentation[$key] = trim((string) $dispatch->presentation[$key]);
+                }
+            }
+        }
+        $dispatch->presentation = $presentation;
+        $dispatch->save();
+
+        return $dispatch;
+    }
+
+    public function renderDispatchPdf(CorrespondenceDispatch $dispatch): string
+    {
+        $correspondence = $dispatch->correspondence()->with([
+            'parties.correspondent',
+            'registeredBy',
+            'structure',
+        ])->firstOrFail();
+        $dispatch->loadMissing('dispatchedBy');
+        if (! $dispatch->number) {
+            $dispatch->number = $this->numberingService->generateDispatchSlipNumber($correspondence->structure_id);
+            $dispatch->save();
+        }
+        $dispatch = $this->ensureSlipContent($dispatch, $correspondence);
+
+        return $this->sheets->writeDispatchSlip($this->pdfPayload($dispatch, $correspondence));
+    }
+
+    /**
+     * @param  mixed  $lines
+     * @return list<array{designation: string, quantity: int, observation: string}>
+     */
+    private function normalizeLines(mixed $lines): array
+    {
+        if (! is_array($lines)) {
+            return [];
+        }
+
+        $normalized = [];
+        foreach ($lines as $line) {
+            if (! is_array($line)) {
+                continue;
+            }
+            $designation = trim((string) ($line['designation'] ?? ''));
+            if ($designation === '') {
+                continue;
+            }
+            $normalized[] = [
+                'designation' => $designation,
+                'quantity' => max(0, (int) ($line['quantity'] ?? 0)),
+                'observation' => trim((string) ($line['observation'] ?? '')),
+            ];
+        }
+
+        return $normalized;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function pdfPayload(CorrespondenceDispatch $dispatch, Correspondence $correspondence): array
+    {
+        $identity = $this->identity->forCorrespondence($correspondence);
+        $presentation = is_array($dispatch->presentation) ? $dispatch->presentation : [];
+        $lines = is_array($dispatch->lines) ? $dispatch->lines : [];
+        $total = 0;
+        foreach ($lines as $line) {
+            $total += (int) ($line['quantity'] ?? 0);
+        }
+
+        $date = $dispatch->dispatched_at ?? now();
+
+        return [
+            'saisiPar' => $dispatch->dispatchedBy?->name ?? $correspondence->registeredBy?->name ?? '',
+            'structureEntete' => $identity['header'] ?? '',
+            'structureLine' => $identity['structure_line'] ?? null,
+            'ministry' => $identity['ministry'] ?? null,
+            'headerExtra' => $identity['extra'] ?? null,
+            'footer' => $identity['footer'] ?? null,
+            'republic' => $identity['republic'] ?? null,
+            'motto' => $identity['motto'] ?? null,
+            'emblem' => $this->dispatchLogoPath(),
+            'place' => $presentation['place'] ?? '',
+            'dateLong' => $this->frenchLongDate($date),
+            'senderTitle' => $this->senderFormula($presentation, $identity),
+            'recipientTitle' => $presentation['recipient_title'] ?? '',
+            'recipientCity' => $presentation['recipient_city'] ?? '',
+            'number' => $dispatch->number ?? '',
+            'structureCode' => $presentation['structure_code'] ?? '',
+            'lines' => $lines,
+            'total' => $total,
+            'signatoryRole' => $this->signatoryRole($identity),
+            'signatoryName' => $this->signatoryName($identity),
+            'signatoryGrade' => $this->signatoryGrade($identity),
+        ];
+    }
+
+    private function frenchLongDate(\Carbon\CarbonInterface $date): string
+    {
+        $months = [1 => 'JAN', 2 => 'FEV', 3 => 'MARS', 4 => 'AVR', 5 => 'MAI', 6 => 'JUIN', 7 => 'JUIL', 8 => 'AOUT', 9 => 'SEPT', 10 => 'OCT', 11 => 'NOV', 12 => 'DEC'];
+
+        return $date->format('d').' '.($months[(int) $date->format('n')] ?? $date->format('M')).' '.$date->format('Y');
+    }
+
+    /**
+     * @param  array<string, mixed>  $identity
+     */
+    private function signatoryRole(array $identity): string
+    {
+        $label = trim((string) ($identity['signatory_left'] ?? ''));
+        if ($label === '' || $label === '—') {
+            return 'LE DIRECTEUR GENERAL';
+        }
+
+        $upper = mb_strtoupper($label, 'UTF-8');
+        if (! str_starts_with($upper, 'LE ') && ! str_starts_with($upper, 'LA ')) {
+            $upper = 'LE '.$upper;
+        }
+
+        return $upper;
+    }
+
+    /**
+     * @param  array<string, mixed>  $presentation
+     * @param  array<string, mixed>  $identity
+     */
+    private function senderFormula(array $presentation, array $identity): string
+    {
+        $annex = 'Le Directeur Général du Trésor et de la Comptabilité Publique';
+        $title = trim((string) ($presentation['sender_title'] ?? ''));
+        $short = trim((string) ($identity['signatory_left'] ?? ''));
+        if ($title === '' || $title === '—' || $this->sameLabel($title, $short) || $this->sameLabel($title, 'Le '.$short)) {
+            return $annex;
+        }
+
+        return $title;
+    }
+
+    private function dispatchLogoPath(): ?string
+    {
+        $logo = public_path('logo.png');
+        if (is_file($logo)) {
+            return str_replace('\\', '/', $logo);
+        }
+
+        return MailSheetPdfService::emblemPath();
+    }
+
+    private function sameLabel(string $left, string $right): bool
+    {
+        $fold = static function (string $value): string {
+            $value = mb_strtolower(trim($value), 'UTF-8');
+            $value = strtr($value, [
+                'à' => 'a', 'á' => 'a', 'â' => 'a', 'ä' => 'a',
+                'é' => 'e', 'è' => 'e', 'ê' => 'e', 'ë' => 'e',
+                'í' => 'i', 'î' => 'i', 'ï' => 'i',
+                'ô' => 'o', 'ö' => 'o',
+                'ù' => 'u', 'û' => 'u', 'ü' => 'u',
+                'ç' => 'c',
+            ]);
+
+            return preg_replace('/[^a-z0-9]+/', '', $value) ?? '';
+        };
+
+        $a = $fold($left);
+        $b = $fold($right);
+
+        return $a !== '' && $a === $b;
+    }
+
+    /**
+     * @param  array<string, mixed>  $identity
+     */
+    private function signatoryName(array $identity): string
+    {
+        $userId = $identity['signatory_user_id'] ?? null;
+        if (! $userId) {
+            return '';
+        }
+
+        return trim((string) User::query()->whereKey($userId)->value('name'));
+    }
+
+    /**
+     * @param  array<string, mixed>  $identity
+     */
+    private function signatoryGrade(array $identity): string
+    {
+        $grade = trim((string) ($identity['signatory_function'] ?? ''));
+        $left = trim((string) ($identity['signatory_left'] ?? ''));
+        $right = trim((string) ($identity['signatory_right'] ?? ''));
+        $sameAsRole = $grade === ''
+            || $grade === '—'
+            || mb_strtolower($grade) === mb_strtolower($left)
+            || mb_strtolower($grade) === mb_strtolower($right);
+        if ($sameAsRole) {
+            $userId = $identity['signatory_user_id'] ?? null;
+            $grade = $userId
+                ? trim((string) User::query()->whereKey($userId)->value('position_title'))
+                : '';
+        }
+
+        return $grade === '—' ? '' : $grade;
     }
 
     public function generateAcknowledgementDocument(CorrespondenceAcknowledgement $ack, User $user): CorrespondenceAcknowledgement

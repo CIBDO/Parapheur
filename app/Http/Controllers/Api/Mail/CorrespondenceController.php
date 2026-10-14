@@ -263,6 +263,16 @@ class CorrespondenceController extends Controller
             'tracking_number' => 'nullable|string|max:100',
             'dispatched_at' => 'nullable|date',
             'observations' => 'nullable|string',
+            'presentation' => 'nullable|array',
+            'presentation.place' => 'nullable|string|max:120',
+            'presentation.sender_title' => 'nullable|string|max:255',
+            'presentation.recipient_title' => 'nullable|string|max:255',
+            'presentation.recipient_city' => 'nullable|string|max:120',
+            'presentation.structure_code' => 'nullable|string|max:50',
+            'lines' => 'nullable|array',
+            'lines.*.designation' => 'nullable|string|max:500',
+            'lines.*.quantity' => 'nullable|integer|min:0',
+            'lines.*.observation' => 'nullable|string|max:500',
         ]);
 
         $dispatch = $this->dispatchService->recordDispatch($correspondence, $request->user(), $validated);
@@ -288,6 +298,28 @@ class CorrespondenceController extends Controller
             'dispatch' => $dispatch,
             'correspondence' => $this->correspondenceService->serialize($correspondence->fresh()),
         ]);
+    }
+
+    public function dispatchSlipPreview(Correspondence $correspondence): JsonResponse
+    {
+        $this->authorize('view', $correspondence);
+
+        return response()->json($this->outputDocumentService->suggestSlip($correspondence));
+    }
+
+    public function dispatchSlipPdf(Correspondence $correspondence, CorrespondenceDispatch $dispatch)
+    {
+        $this->authorize('view', $correspondence);
+        abort_unless((int) $dispatch->correspondence_id === (int) $correspondence->id, 404);
+
+        $path = $this->outputDocumentService->renderDispatchPdf($dispatch);
+        $name = MailSheetPdfService::safeFilename(
+            'bordereau-envoi-'.($dispatch->fresh()->number ?: $dispatch->id).'.pdf'
+        );
+
+        return response()->download($path, $name, [
+            'Content-Type' => 'application/pdf',
+        ])->deleteFileAfterSend(true);
     }
 
     public function acknowledge(Request $request, Correspondence $correspondence): JsonResponse

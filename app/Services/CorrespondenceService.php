@@ -417,6 +417,8 @@ class CorrespondenceService
                 'tracking_number' => $dispatch->tracking_number,
                 'dispatched_at' => $dispatch->dispatched_at?->toIso8601String(),
                 'observations' => $dispatch->observations,
+                'lines' => $dispatch->lines ?? [],
+                'presentation' => $dispatch->presentation ?? [],
                 'document_id' => $dispatch->document_id,
                 'document' => $dispatch->document,
                 'dispatched_by' => $dispatch->dispatchedBy?->only(['id', 'name']),

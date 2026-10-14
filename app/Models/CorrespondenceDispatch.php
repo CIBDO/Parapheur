@@ -18,6 +18,8 @@ class CorrespondenceDispatch extends Model
         'tracking_number',
         'dispatched_by',
         'observations',
+        'lines',
+        'presentation',
         'document_id',
     ];
 
@@ -25,6 +27,8 @@ class CorrespondenceDispatch extends Model
     {
         return [
             'dispatched_at' => 'datetime',
+            'lines' => 'array',
+            'presentation' => 'array',
         ];
     }
 

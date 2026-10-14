@@ -44,13 +44,18 @@ class CorrespondenceDispatchService
 
             app(MailIdentityService::class)->freeze($correspondence, force: true);
 
+            $slip = app(MailOutputDocumentService::class)->resolveSlipContent($correspondence, $data);
+
             $dispatch = CorrespondenceDispatch::query()->create([
                 'correspondence_id' => $correspondence->id,
+                'number' => app(NumberingService::class)->generateDispatchSlipNumber($correspondence->structure_id),
                 'dispatched_at' => $data['dispatched_at'] ?? now(),
                 'method' => $data['method'] ?? 'courrier',
                 'tracking_number' => $data['tracking_number'] ?? null,
                 'dispatched_by' => $user->id,
                 'observations' => $data['observations'] ?? null,
+                'lines' => $slip['lines'],
+                'presentation' => $slip['presentation'],
             ]);
 
             if ($correspondence->status !== CorrespondenceStatus::Expedie

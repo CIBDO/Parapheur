@@ -66,6 +66,7 @@ const channels = ref<any[]>([])
 const categories = ref<any[]>([])
 const creatingFiche = ref(false)
 const printingFiche = ref(false)
+const printingImputation = ref(false)
 const ficheMessage = ref('')
 const ficheError = ref('')
 const outputBusy = ref(false)
@@ -97,7 +98,19 @@ const serviceAgents = ref<any[]>([])
 const complementForm = ref({ assignmentId: null as number | null, observation: '' })
 const reminderForm = ref({ reminder_date: '', note: '' })
 const printForm = ref({ reason: '', copies: 1, is_reprint: false })
-const dispatchForm = ref({ method: 'courrier', date: '', tracking_number: '', observations: '' })
+const dispatchForm = ref({
+  method: 'courrier',
+  date: '',
+  tracking_number: '',
+  observations: '',
+  place: 'Bamako',
+  sender_title: '',
+  recipient_title: '',
+  recipient_city: '',
+  structure_code: '',
+  lines: [{ designation: '', quantity: 1, observation: '' }] as { designation: string; quantity: number; observation: string }[],
+})
+const printingDispatch = ref(false)
 const signedFile = ref<File | null>(null)
 
 // Parties management
@@ -343,11 +356,30 @@ async function loadServiceAgents(structureId: number | null) {
 }
 
 async function openImputationSheet() {
-  const blob = await $api(`/mail/correspondences/${props.correspondence.id}/imputation-sheet`, {
-    responseType: 'blob',
-  }) as Blob
-  const url = URL.createObjectURL(blob)
-  window.open(url, '_blank')
+  printingImputation.value = true
+  ficheError.value = ''
+  ficheMessage.value = ''
+  try {
+    const blob = await $api(`/mail/correspondences/${props.correspondence.id}/imputation-sheet`, {
+      responseType: 'blob',
+    }) as Blob
+    const file = blob instanceof Blob ? blob : new Blob([blob], { type: 'application/pdf' })
+    const url = URL.createObjectURL(file)
+    const win = window.open(url, '_blank')
+    if (win) {
+      win.addEventListener('load', () => {
+        win.focus()
+        win.print()
+      })
+    }
+    ficheMessage.value = 'Fiche d’imputation prête à l’impression.'
+  }
+  catch (error: any) {
+    ficheError.value = error?.data?.message || 'Impossible d’imprimer la fiche d’imputation.'
+  }
+  finally {
+    printingImputation.value = false
+  }
 }
 
 async function handleAssign() {
@@ -659,24 +691,117 @@ async function handleRegisterDeparture() {
   }
 }
 
+async function openDispatchDialog() {
+  dispatchForm.value = {
+    method: 'courrier',
+    date: '',
+    tracking_number: '',
+    observations: '',
+    place: 'Bamako',
+    sender_title: '',
+    recipient_title: '',
+    recipient_city: '',
+    structure_code: '',
+    lines: [{ designation: props.correspondence.subject || 'Courrier', quantity: Number(props.correspondence.piece_count) || 1, observation: '' }],
+  }
+  showDispatchDialog.value = true
+  try {
+    const preview = await $api(`/mail/correspondences/${props.correspondence.id}/dispatch-slip/preview`)
+    const presentation = preview?.presentation || {}
+    dispatchForm.value.place = presentation.place || 'Bamako'
+    dispatchForm.value.sender_title = presentation.sender_title || ''
+    dispatchForm.value.recipient_title = presentation.recipient_title || ''
+    dispatchForm.value.recipient_city = presentation.recipient_city || ''
+    dispatchForm.value.structure_code = presentation.structure_code || ''
+    if (Array.isArray(preview?.lines) && preview.lines.length) {
+      dispatchForm.value.lines = preview.lines.map((line: any) => ({
+        designation: line.designation || '',
+        quantity: Number(line.quantity) || 0,
+        observation: line.observation || '',
+      }))
+    }
+  }
+  catch {
+    // Les valeurs déjà affichées restent modifiables.
+  }
+}
+
+function addDispatchLine() {
+  dispatchForm.value.lines.push({ designation: '', quantity: 1, observation: '' })
+}
+
+function removeDispatchLine(index: number) {
+  if (dispatchForm.value.lines.length === 1) {
+    dispatchForm.value.lines[0] = { designation: '', quantity: 1, observation: '' }
+    return
+  }
+  dispatchForm.value.lines.splice(index, 1)
+}
+
+const dispatchTotal = computed(() =>
+  dispatchForm.value.lines.reduce((sum, line) => sum + (Number(line.quantity) || 0), 0),
+)
+
+async function printDispatchSlip(dispatchId: number) {
+  printingDispatch.value = true
+  outputError.value = ''
+  outputMessage.value = ''
+  try {
+    const blob = await $api(`/mail/correspondences/${props.correspondence.id}/dispatches/${dispatchId}/pdf`, {
+      responseType: 'blob',
+    }) as Blob
+    const file = blob instanceof Blob ? blob : new Blob([blob], { type: 'application/pdf' })
+    const url = URL.createObjectURL(file)
+    const win = window.open(url, '_blank')
+    if (win) {
+      win.addEventListener('load', () => {
+        win.focus()
+        win.print()
+      })
+    }
+    outputMessage.value = 'Bordereau d’envoi prêt à l’impression.'
+  }
+  catch (error: any) {
+    outputError.value = error?.data?.message || 'Impossible d’imprimer le bordereau d’envoi.'
+  }
+  finally {
+    printingDispatch.value = false
+  }
+}
 async function handleDispatch() {
   if (!dispatchForm.value.method) {
     alert('Choisissez un mode d\'expédition')
 
     return
   }
+  const lines = dispatchForm.value.lines.filter(line => line.designation.trim() !== '')
+  if (!lines.length) {
+    alert('Indiquez au moins une pièce')
+
+    return
+  }
   dispatching.value = true
   try {
-    await dispatch(props.correspondence.id, {
+    const result = await dispatch(props.correspondence.id, {
       method: dispatchForm.value.method,
       dispatched_at: dispatchForm.value.date || undefined,
       tracking_number: dispatchForm.value.tracking_number || undefined,
       observations: dispatchForm.value.observations,
+      presentation: {
+        place: dispatchForm.value.place,
+        sender_title: dispatchForm.value.sender_title,
+        recipient_title: dispatchForm.value.recipient_title,
+        recipient_city: dispatchForm.value.recipient_city,
+        structure_code: dispatchForm.value.structure_code,
+      },
+      lines,
       generate: true,
     })
     showDispatchDialog.value = false
-    dispatchForm.value = { method: 'courrier', date: '', tracking_number: '', observations: '' }
     emit('refresh')
+    const dispatchId = result?.dispatch?.id
+    if (dispatchId)
+      await printDispatchSlip(dispatchId)
   }
   catch (error: any) {
     alert(error?.data?.message || error.message || 'Impossible d\'expédier')
@@ -775,7 +900,7 @@ async function archiveCorrespondence() {
           v-if="canDispatch"
           color="primary"
           prepend-icon="tabler-send"
-          @click="showDispatchDialog = true"
+          @click="openDispatchDialog"
         >
           {{ correspondence.departure_number ? 'Expédier' : 'Enregistrer & expédier' }}
         </VBtn>
@@ -1797,7 +1922,7 @@ async function archiveCorrespondence() {
                 États de sortie
               </div>
               <p class="text-body-2 text-medium-emphasis mb-4">
-                Documents administratifs DGTCP : fiche de circulation, bordereau d’envoi, accusé de réception.
+                Documents administratifs DGTCP : fiche de circulation, fiche d’imputation, bordereau d’envoi, accusé de réception.
                 Le bordereau de transmission interne reste disponible dans
                 <RouterLink :to="{ name: 'courrier-bordereaux' }">
                   Bordereaux
@@ -1849,15 +1974,6 @@ async function archiveCorrespondence() {
                   Imprimer
                 </VBtn>
               </div>
-              <VBtn
-                class="mb-4"
-                size="small"
-                variant="tonal"
-                prepend-icon="tabler-file-download"
-                @click="openImputationSheet"
-              >
-                Fiche d’imputation
-              </VBtn>
 
               <div
                 v-if="primaryCirculationSheet"
@@ -1931,6 +2047,76 @@ async function archiveCorrespondence() {
               </div>
             </div>
 
+            <!-- Fiche d'imputation -->
+            <div class="parapheur-form-section mb-6">
+              <div class="parapheur-form-section__title mb-2">
+                <VIcon
+                  icon="tabler-user-share"
+                  size="20"
+                />
+                Fiche d’imputation
+              </div>
+              <div class="d-flex flex-wrap align-center justify-space-between gap-3 mb-4">
+                <p class="text-body-2 text-medium-emphasis mb-0">
+                  Récapitulatif des imputations du courrier : agent, service, annotation et signature.
+                </p>
+                <VBtn
+                  color="primary"
+                  size="small"
+                  prepend-icon="tabler-printer"
+                  :loading="printingImputation"
+                  @click="openImputationSheet"
+                >
+                  Imprimer
+                </VBtn>
+              </div>
+
+              <div
+                v-if="correspondence.assignments?.length"
+                class="d-flex flex-column ga-3"
+              >
+                <div
+                  v-for="a in correspondence.assignments"
+                  :key="a.id"
+                  class="courrier-party-card"
+                >
+                  <div class="d-flex flex-wrap justify-space-between align-center ga-3">
+                    <div>
+                      <div class="font-weight-medium">
+                        {{ a.to_user?.name || 'Agent non désigné' }}
+                      </div>
+                      <div class="text-caption text-medium-emphasis mt-1">
+                        {{ a.to_structure?.name || 'Service non renseigné' }}
+                        <span v-if="a.created_at"> · {{ new Date(a.created_at).toLocaleString('fr-FR') }}</span>
+                      </div>
+                      <div
+                        v-if="a.instruction_text"
+                        class="text-caption mt-1"
+                      >
+                        {{ a.instruction_text }}
+                      </div>
+                    </div>
+                    <VBtn
+                      size="small"
+                      color="primary"
+                      variant="tonal"
+                      prepend-icon="tabler-printer"
+                      :loading="printingImputation"
+                      @click="openImputationSheet"
+                    >
+                      Imprimer
+                    </VBtn>
+                  </div>
+                </div>
+              </div>
+              <div
+                v-else
+                class="parapheur-empty py-6"
+              >
+                Aucune imputation enregistrée — utilisez l’action « Imputer ».
+              </div>
+            </div>
+
             <!-- Bordereau d'envoi -->
             <div class="parapheur-form-section mb-6">
               <div class="parapheur-form-section__title mb-2">
@@ -1940,9 +2126,21 @@ async function archiveCorrespondence() {
                 />
                 Bordereau d’envoi (BE)
               </div>
-              <p class="text-body-2 text-medium-emphasis mb-4">
-                Preuve d’expédition externe. Généré automatiquement à l’expédition, ou régénérable ici.
-              </p>
+              <div class="d-flex flex-wrap align-center justify-space-between gap-3 mb-4">
+                <p class="text-body-2 text-medium-emphasis mb-0">
+                  Lettre d’envoi : formule, pièces et total. Imprimez le PDF, ou régénérez le document enregistré.
+                </p>
+                <VBtn
+                  v-if="latestDispatch"
+                  color="primary"
+                  size="small"
+                  prepend-icon="tabler-printer"
+                  :loading="printingDispatch"
+                  @click="printDispatchSlip(latestDispatch.id)"
+                >
+                  Imprimer
+                </VBtn>
+              </div>
 
               <div
                 v-if="latestDispatch"
@@ -2349,7 +2547,8 @@ async function archiveCorrespondence() {
     <!-- Dialog Expédition -->
     <VDialog
       v-model="showDispatchDialog"
-      max-width="600"
+      max-width="760"
+      scrollable
     >
       <VCard>
         <VCardTitle>
@@ -2371,13 +2570,6 @@ async function archiveCorrespondence() {
               puis générera le bordereau d’envoi.
             </template>
           </VAlert>
-          <div
-            v-if="toParties.length || fallbackRecipientName"
-            class="mb-4 text-body-2"
-          >
-            <span class="text-medium-emphasis">Destinataire :</span>
-            {{ toParties.map(p => partyDisplayName(p)).filter(Boolean).join(', ') || fallbackRecipientName }}
-          </div>
           <VSelect
             v-model="dispatchForm.method"
             :items="[
@@ -2403,9 +2595,92 @@ async function archiveCorrespondence() {
           />
           <VTextarea
             v-model="dispatchForm.observations"
-            label="Observations"
-            rows="3"
+            label="Observations générales"
+            rows="2"
+            class="mb-4"
           />
+          <div class="text-subtitle-2 mb-2">
+            Formule du bordereau
+          </div>
+          <VRow>
+            <VCol cols="12" sm="6">
+              <AppTextField
+                v-model="dispatchForm.place"
+                label="Lieu"
+              />
+            </VCol>
+            <VCol cols="12" sm="6">
+              <AppTextField
+                v-model="dispatchForm.structure_code"
+                label="Code de structure"
+              />
+            </VCol>
+            <VCol cols="12">
+              <AppTextField
+                v-model="dispatchForm.sender_title"
+                label="Qualité de l'expéditeur"
+              />
+            </VCol>
+            <VCol cols="12" sm="8">
+              <AppTextField
+                v-model="dispatchForm.recipient_title"
+                label="Destinataire"
+              />
+            </VCol>
+            <VCol cols="12" sm="4">
+              <AppTextField
+                v-model="dispatchForm.recipient_city"
+                label="Ville"
+              />
+            </VCol>
+          </VRow>
+          <div class="d-flex align-center justify-space-between mt-2 mb-2">
+            <div class="text-subtitle-2">
+              Pièces — total {{ dispatchTotal }}
+            </div>
+            <VBtn
+              size="small"
+              variant="tonal"
+              prepend-icon="tabler-plus"
+              @click="addDispatchLine"
+            >
+              Ajouter une pièce
+            </VBtn>
+          </div>
+          <div
+            v-for="(line, index) in dispatchForm.lines"
+            :key="index"
+            class="d-flex flex-wrap ga-2 mb-2 align-end"
+          >
+            <AppTextField
+              v-model="line.designation"
+              label="Désignation"
+              class="flex-grow-1"
+              style="min-inline-size: 220px;"
+            />
+            <AppTextField
+              v-model.number="line.quantity"
+              label="Nombre"
+              type="number"
+              min="0"
+              style="max-inline-size: 110px;"
+            />
+            <AppTextField
+              v-model="line.observation"
+              label="Observation"
+              class="flex-grow-1"
+              style="min-inline-size: 160px;"
+            />
+            <VBtn
+              icon
+              size="small"
+              variant="text"
+              color="error"
+              @click="removeDispatchLine(index)"
+            >
+              <VIcon icon="tabler-trash" />
+            </VBtn>
+          </div>
         </VCardText>
         <VCardActions>
           <VSpacer />

@@ -17,6 +17,14 @@ class MailSheetPdfService
         return $this->write('mail.circulation-sheet', $variables, 'fiche-circulation');
     }
 
+    /**
+     * @param  array<string, mixed>  $variables
+     */
+    public function writeDispatchSlip(array $variables): string
+    {
+        return $this->write('mail.dispatch-slip', $variables, 'bordereau-envoi');
+    }
+
     public function imputationSheet(Correspondence $correspondence, ?User $actor = null): string
     {
         return $this->write('mail.imputation-sheet', $this->imputationPayload($correspondence, $actor), 'fiche-imputation');
@@ -136,6 +144,10 @@ class MailSheetPdfService
         $dir = storage_path('app/temp');
         if (! is_dir($dir)) {
             File::makeDirectory($dir, 0755, true);
+        }
+        $fontCache = storage_path('fonts');
+        if (! is_dir($fontCache)) {
+            File::makeDirectory($fontCache, 0755, true);
         }
 
         $path = $dir.'/'.uniqid($prefix.'_', true).'.pdf';
