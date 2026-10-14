@@ -20,10 +20,11 @@
     table.meta td, table.grid td, table.grid th { border: 1px solid #000; padding: 5px 6px; }
     td.h, th.h { background: #d9d9d9; font-weight: bold; text-align: center; font-size: 11px; }
     td.v { height: 20px; }
-    table.grid { margin-top: 16px; }
-    table.grid th { background: #d9d9d9; font-size: 10px; }
-    table.grid td { height: 28px; vertical-align: middle; text-align: center; }
+    table.grid { margin-top: 16px; table-layout: fixed; width: 100%; }
+    table.grid th { background: #d9d9d9; font-size: 9px; }
+    table.grid td { height: 36px; vertical-align: top; text-align: center; font-size: 10px; word-wrap: break-word; }
     table.grid td.note { text-align: left; }
+    table.grid td.sign { height: 52px; }
   </style>
 </head>
 <body>
@@ -77,11 +78,12 @@
   <table class="grid">
     <thead>
       <tr>
-        <th class="h" width="16%">DATE<br>D'IMPUTATION</th>
-        <th class="h" width="16%">PRENOM</th>
-        <th class="h" width="16%">NOM</th>
-        <th class="h">ANNOTATION(S)</th>
-        <th class="h" width="16%">SIGNATURE</th>
+        <th class="h" width="12%">DATE</th>
+        <th class="h" width="13%">PRENOM</th>
+        <th class="h" width="13%">NOM</th>
+        <th class="h" width="18%">SERVICE</th>
+        <th class="h" width="26%">ANNOTATION(S)</th>
+        <th class="h" width="18%">SIGNATURE</th>
       </tr>
     </thead>
     <tbody>
@@ -90,8 +92,9 @@
           <td>{{ $row['date'] }}</td>
           <td>{{ $row['prenom'] }}</td>
           <td>{{ $row['nom'] }}</td>
-          <td class="note">{{ $row['annotation'] }}</td>
-          <td></td>
+          <td>{{ $row['service'] ?? '' }}</td>
+          <td class="note">{{ preg_replace('/(\S{18})/u', '$1'."\u{200B}", (string) ($row['annotation'] ?? '')) }}</td>
+          <td class="sign"></td>
         </tr>
       @endforeach
     </tbody>

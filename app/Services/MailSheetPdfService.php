@@ -29,7 +29,8 @@ class MailSheetPdfService
     {
         $correspondence->loadMissing([
             'parties.correspondent',
-            'assignments.toUser',
+            'assignments.toUser.structure:id,name',
+            'assignments.toStructure:id,name',
             'assignments.fromUser',
             'registeredBy',
             'structure',
@@ -69,6 +70,7 @@ class MailSheetPdfService
                     'date' => $assignment->created_at?->format('d/m/Y') ?? '',
                     'prenom' => $prenom,
                     'nom' => $nom,
+                    'service' => $assignment->toStructure?->name ?: $user?->structure?->name ?: '',
                     'annotation' => $assignment->instruction_text ?? '',
                 ];
             })
@@ -76,7 +78,7 @@ class MailSheetPdfService
             ->all();
 
         if ($imputations === []) {
-            $imputations[] = ['date' => '', 'prenom' => '', 'nom' => '', 'annotation' => ''];
+            $imputations[] = ['date' => '', 'prenom' => '', 'nom' => '', 'service' => '', 'annotation' => ''];
         }
 
         $identity = app(MailIdentityService::class)->forCorrespondence($correspondence);

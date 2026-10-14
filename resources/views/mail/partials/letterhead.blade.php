@@ -9,9 +9,27 @@
       @endif
     </td>
     <td class="identity" align="center" valign="middle">
+      @php
+        $foldHeading = function (string $value): string {
+          $value = mb_strtoupper(trim(preg_replace('/\s+/u', ' ', $value) ?? $value), 'UTF-8');
+          $value = strtr($value, [
+            'À' => 'A', 'Á' => 'A', 'Â' => 'A', 'Ã' => 'A', 'Ä' => 'A', 'Å' => 'A',
+            'Ç' => 'C', 'È' => 'E', 'É' => 'E', 'Ê' => 'E', 'Ë' => 'E',
+            'Ì' => 'I', 'Í' => 'I', 'Î' => 'I', 'Ï' => 'I', 'Ñ' => 'N',
+            'Ò' => 'O', 'Ó' => 'O', 'Ô' => 'O', 'Õ' => 'O', 'Ö' => 'O',
+            'Ù' => 'U', 'Ú' => 'U', 'Û' => 'U', 'Ü' => 'U', 'Ý' => 'Y', 'Ÿ' => 'Y',
+            'Œ' => 'OE', 'Æ' => 'AE',
+          ]);
+
+          return preg_replace('/[^A-Z0-9 ]/u', '', $value) ?? $value;
+        };
+        $headerText = trim((string) ($structureEntete ?? ''));
+        $lineText = trim((string) ($structureLine ?? ''));
+        $sameStructure = $headerText !== '' && $foldHeading($headerText) === $foldHeading($lineText);
+      @endphp
       <div class="ministry">{{ $ministry ?? "MINISTÈRE DE L'ÉCONOMIE ET DES FINANCES." }}</div>
       <div class="direction">{{ $structureEntete ?? 'DIRECTION GÉNÉRALE DU TRÉSOR ET DE LA COMPTABILITÉ PUBLIQUE' }}</div>
-      @if(!empty($structureLine))
+      @if($lineText !== '' && ! $sameStructure)
         <div class="direction">{{ $structureLine }}</div>
       @endif
       @if(!empty($headerExtra))
