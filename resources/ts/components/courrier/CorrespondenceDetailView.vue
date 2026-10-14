@@ -2630,7 +2630,7 @@ async function archiveCorrespondence() {
             <VCol cols="12">
               <AppTextField
                 v-model="dispatchForm.sender_title"
-                label="Qualité de l'expéditeur"
+                label="Structure qui envoie"
               />
             </VCol>
             <VCol cols="12" sm="8">

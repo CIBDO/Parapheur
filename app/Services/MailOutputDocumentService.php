@@ -9,6 +9,8 @@ use App\Models\CorrespondenceAcknowledgement;
 use App\Models\CorrespondenceDispatch;
 use App\Models\DocumentTemplate;
 use App\Models\DocumentType;
+use App\Models\Structure;
+use App\Models\StructureDocumentProfile;
 use App\Models\User;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
@@ -109,23 +111,19 @@ class MailOutputDocumentService
         $organization = trim((string) ($toParty?->organization ?: $toParty?->correspondent?->organization ?: ''));
         $city = $organization !== '' && mb_strtolower($organization) !== mb_strtolower($recipient) ? $organization : '';
 
-        $sender = trim((string) ($identity['signatory_right'] ?? ''));
-        if ($sender === '' || $sender === '—') {
-            $sender = trim((string) ($identity['signatory_left'] ?? ''));
-        }
-        if ($sender === '' || $sender === '—') {
-            $sender = $correspondence->structure?->name ?? '';
-        }
+        $sender = trim((string) ($correspondence->structure?->name ?? ''));
         $person = $this->identity->personForSignatory($identity);
+
+        $locality = $this->serviceLocality($correspondence);
 
         return [
             'presentation' => [
-                'place' => 'Bamako',
+                'place' => $locality,
                 'sender_title' => $sender,
                 'recipient_title' => $recipient,
-                'recipient_city' => $city,
-                'structure_code' => (string) ($identity['structure_code'] ?? $correspondence->structure?->code ?? ''),
-                'signatory_post' => $this->signatoryRole($identity),
+                'recipient_city' => $city !== '' ? $city : $locality,
+                'structure_code' => $this->serviceAbbreviation($correspondence),
+                'signatory_post' => '',
                 'signatory_name' => $person['name'],
                 'signatory_grade' => $person['grade'],
             ],
@@ -243,6 +241,20 @@ class MailOutputDocumentService
         }
 
         $date = $dispatch->dispatched_at ?? now();
+        $locality = $this->serviceLocality($correspondence);
+        $abbreviation = $this->serviceAbbreviation($correspondence);
+        $place = trim((string) ($presentation['place'] ?? ''));
+        if ($place === '' || ($this->sameLabel($place, 'Bamako') && $locality !== '' && ! $this->sameLabel($locality, 'Bamako'))) {
+            $place = $locality;
+        }
+        $city = trim((string) ($presentation['recipient_city'] ?? ''));
+        if ($city === '' || ($this->sameLabel($city, 'Bamako') && $locality !== '' && ! $this->sameLabel($locality, 'Bamako'))) {
+            $city = $locality !== '' ? $locality : $city;
+        }
+        $code = trim((string) ($presentation['structure_code'] ?? ''));
+        if ($code === '' || preg_match('/^DGTCP(\s*-\s*DG)?$/i', $code)) {
+            $code = $abbreviation !== '' ? $abbreviation : $code;
+        }
 
         $person = $this->identity->personForSignatory($identity);
 
@@ -256,18 +268,16 @@ class MailOutputDocumentService
             'republic' => $identity['republic'] ?? null,
             'motto' => $identity['motto'] ?? null,
             'emblem' => $this->dispatchLogoPath(),
-            'place' => $presentation['place'] ?? '',
+            'place' => $place,
             'dateLong' => $this->frenchLongDate($date),
-            'senderTitle' => $this->senderFormula($presentation, $identity),
+            'senderTitle' => $this->senderFormula($presentation, $identity, $correspondence),
             'recipientTitle' => $presentation['recipient_title'] ?? '',
-            'recipientCity' => $presentation['recipient_city'] ?? '',
+            'recipientCity' => $city,
             'number' => $dispatch->number ?? '',
-            'structureCode' => $presentation['structure_code'] ?? '',
+            'structureCode' => $code,
             'lines' => $lines,
             'total' => $total,
-            'signatoryRole' => array_key_exists('signatory_post', $presentation)
-                ? trim((string) $presentation['signatory_post'])
-                : $this->signatoryRole($identity),
+            'signatoryRole' => trim((string) ($presentation['signatory_post'] ?? '')),
             'signatoryName' => array_key_exists('signatory_name', $presentation)
                 ? trim((string) $presentation['signatory_name'])
                 : $person['name'],
@@ -285,36 +295,133 @@ class MailOutputDocumentService
     }
 
     /**
-     * @param  array<string, mixed>  $identity
+     * Lieu du service émetteur : Bamako pour le siège, la ville de la structure pour une trésorerie ou un service en région.
      */
-    private function signatoryRole(array $identity): string
+    private function serviceLocality(Correspondence $correspondence): string
     {
-        $label = trim((string) ($identity['signatory_right'] ?? ''));
-        if ($label === '' || $label === '—') {
-            $label = trim((string) ($identity['signatory_left'] ?? ''));
+        $correspondence->loadMissing('structure.type');
+        $current = $correspondence->structure;
+        $guard = 0;
+        while ($current && $guard < 8) {
+            $fromAddress = $this->cityInText((string) StructureDocumentProfile::query()
+                ->where('structure_id', $current->id)
+                ->value('address'));
+            if ($fromAddress !== null) {
+                return $fromAddress;
+            }
+            $fromName = $this->cityInText((string) $current->name);
+            if ($fromName !== null) {
+                return $fromName;
+            }
+            if (! $current->parent_id) {
+                break;
+            }
+            $current = Structure::query()->find($current->parent_id);
+            $guard++;
         }
 
-        return $label === '—' ? '' : $label;
+        $type = strtoupper((string) ($correspondence->structure?->type?->code ?? ''));
+
+        return $type === 'TRESORERIE' ? '' : 'Bamako';
     }
 
     /**
+     * Abréviation imprimée après le numéro : DGTCP - DG pour la direction générale, le code propre sinon.
+     */
+    private function serviceAbbreviation(Correspondence $correspondence): string
+    {
+        $correspondence->loadMissing('structure.type');
+        $structure = $correspondence->structure;
+        $code = trim((string) ($structure?->code ?? ''));
+        if ($code === '') {
+            return '';
+        }
+        $type = strtoupper((string) ($structure?->type?->code ?? ''));
+        if ($type === 'DG' || strcasecmp($code, 'DGTCP') === 0) {
+            return 'DGTCP - DG';
+        }
+
+        return $code;
+    }
+
+    private function cityInText(string $text): ?string
+    {
+        $folded = $this->foldLabel($text);
+        if ($folded === '') {
+            return null;
+        }
+        $found = null;
+        $foundLength = 0;
+        foreach ($this->localities() as $city) {
+            $needle = $this->foldLabel($city);
+            if ($needle === '' || ! preg_match('/(?<![a-z])'.preg_quote($needle, '/').'(?![a-z])/', $folded)) {
+                continue;
+            }
+            if ($needle === 'bamako') {
+                $found ??= $city;
+                continue;
+            }
+            if (strlen($needle) > $foundLength) {
+                $found = $city;
+                $foundLength = strlen($needle);
+            }
+        }
+
+        return $found;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function localities(): array
+    {
+        return [
+            'Koulikoro', 'Tombouctou', 'Taoudénit', 'Bandiagara', 'Bougouni', 'Kolondiéba', 'Yanfolila',
+            'Koutiala', 'Barouéli', 'Ténenkou', 'Douentza', 'Niafunké', 'Goundam', 'Abeïbara',
+            'Tin-Essako', 'Anderamboukane', 'Tidermène', 'Sikasso', 'Ségou', 'Mopti', 'Ménaka',
+            'Kayes', 'Kidal', 'Gao', 'Kita', 'Nioro', 'Dioïla', 'Kati', 'Kangaba', 'Kolokani',
+            'Banamba', 'Yorosso', 'Macina', 'Djenné', 'Bankass', 'Youwarou', 'Ansongo', 'Bourem',
+            'Diré', 'Tessalit', 'Inékar', 'Nara', 'San', 'Bla', 'Koro', 'Bamako',
+        ];
+    }
+
+    private function foldLabel(string $value): string
+    {
+        $value = mb_strtolower(trim($value), 'UTF-8');
+        $value = strtr($value, [
+            'à' => 'a', 'á' => 'a', 'â' => 'a', 'ä' => 'a',
+            'é' => 'e', 'è' => 'e', 'ê' => 'e', 'ë' => 'e',
+            'í' => 'i', 'î' => 'i', 'ï' => 'i',
+            'ô' => 'o', 'ö' => 'o',
+            'ù' => 'u', 'û' => 'u', 'ü' => 'u',
+            'ç' => 'c',
+        ]);
+
+        return trim(preg_replace('/[^a-z0-9]+/', ' ', $value) ?? '');
+    }
+
+    /**
+     * L'expéditeur du bordereau est la structure qui envoie, pas le titulaire du poste.
+     *
      * @param  array<string, mixed>  $presentation
      * @param  array<string, mixed>  $identity
      */
-    private function senderFormula(array $presentation, array $identity): string
+    private function senderFormula(array $presentation, array $identity, Correspondence $correspondence): string
     {
+        $structure = trim((string) ($correspondence->structure?->name ?? ''));
         $title = trim((string) ($presentation['sender_title'] ?? ''));
-        $principal = $this->signatoryRole($identity);
-        $annex = 'Le Directeur Général du Trésor et de la Comptabilité Publique';
-        $usesProfile = $title === ''
+        $left = trim((string) ($identity['signatory_left'] ?? ''));
+        $right = trim((string) ($identity['signatory_right'] ?? ''));
+        $isPerson = $title === ''
             || $title === '—'
-            || $this->sameLabel($title, $principal)
-            || $this->sameLabel($title, 'Le '.$principal)
-            || $this->sameLabel($title, $annex)
-            || $this->sameLabel($title, trim((string) ($identity['signatory_left'] ?? '')));
+            || $this->sameLabel($title, $left)
+            || $this->sameLabel($title, $right)
+            || $this->sameLabel($title, 'Le '.$left)
+            || $this->sameLabel($title, 'Le '.$right)
+            || $this->sameLabel($title, 'Le Directeur Général du Trésor et de la Comptabilité Publique');
 
-        if ($usesProfile) {
-            return $principal !== '' ? $principal : 'Le responsable';
+        if ($isPerson) {
+            return $structure !== '' ? $structure : $title;
         }
 
         return $title;

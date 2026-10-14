@@ -38,8 +38,8 @@
     td.obs, th.obs { width: 30%; text-align: center; }
     td.designation { text-align: left; height: 28px; }
     tr.total td { font-weight: bold; text-align: center; height: 30px; }
-    table.sign { width: 100%; border-collapse: collapse; margin-top: 26px; }
-    table.sign td { border: none; text-align: right; padding: 0; font-family: 'Times New Roman', serif; }
+    table.sign { border-collapse: collapse; margin-top: 22px; margin-left: auto; }
+    table.sign td { border: none; text-align: center; padding: 0 2px; white-space: nowrap; font-family: 'Times New Roman', serif; }
     .sign-role { font-weight: bold; text-transform: uppercase; font-size: 13pt; }
     .sign-name { font-weight: bold; font-size: 13pt; }
     .sign-grade { font-style: italic; font-size: 12pt; }
@@ -56,8 +56,12 @@
     $mottoText = trim((string) ($motto ?? 'Un Peuple – Un But – Une Foi'));
     $recipient = trim((string) ($recipientTitle ?? ''));
     $code = trim((string) ($structureCode ?? ''));
-    $suffix = ($code === '' || preg_match('/^DGTCP$/i', $code)) ? 'DGTCP - DG' : $code;
-    $placeName = trim((string) ($place ?? '')) !== '' ? trim((string) $place) : 'Bamako';
+    $suffix = $code;
+    $placeName = trim((string) ($place ?? ''));
+    $cityName = trim((string) ($recipientCity ?? ''));
+    if ($cityName === '') {
+        $cityName = $placeName;
+    }
     $formula = trim((string) ($senderTitle ?? ''));
     if ($formula === '') {
         $formula = 'Le Directeur Général du Trésor et de la Comptabilité Publique';
@@ -83,10 +87,9 @@
     if ($contact === '') {
         $contact = "Direction générale du Trésor et de la Comptabilité publique BP : 1887, Hamdallaye ACI 2000 (BAMAKO), Tél : 20 23 19 79/17 07 29 50, site web : www.tresor.gouv.ml";
     }
-    $rows = array_values($lines ?? []);
-    while (count($rows) < 4) {
-        $rows[] = ['designation' => '', 'quantity' => '', 'observation' => ''];
-    }
+    $rows = array_values(array_filter($lines ?? [], function ($line) {
+        return trim((string) ($line['designation'] ?? '')) !== '';
+    }));
   @endphp
 
   <table class="banner">
@@ -102,7 +105,7 @@
       <td width="44%" align="right">
         <div class="republic">{{ $republicText }}</div>
         <div class="motto">{{ $mottoText }}</div>
-        <div class="date-line">{{ $placeName }}, le</div>
+        <div class="date-line">@if($placeName !== ''){{ $placeName }}, @endif le</div>
       </td>
     </tr>
   </table>
@@ -120,7 +123,7 @@
         </div>
         <div class="a">A</div>
         <div class="recipient">{{ $recipient !== '' ? $recipient : 'Madame/Monsieur le ............' }}</div>
-        <div class="city">{{ $recipientCity ?: 'BAMAKO' }}</div>
+        <div class="city">{{ $cityName }}</div>
       </td>
     </tr>
   </table>
@@ -129,7 +132,7 @@
     <tr>
       <td>Bordereau d'envoi N°</td>
       <td class="title-gap"><table style="width:100%; border-collapse:collapse;"><tr><td style="border-bottom:1px solid #000; font-size:14pt; line-height:1;">&nbsp;</td></tr></table></td>
-      <td>/{{ $suffix }}</td>
+      <td>@if($suffix !== '')/{{ $suffix }}@endif</td>
     </tr>
   </table>
 
@@ -165,23 +168,25 @@
     </table>
   </div>
 
-  <table class="sign">
-    <tr>
-      <td class="sign-role">{{ $signatoryRole }}</td>
-    </tr>
-    @if(($signatoryName ?? '') !== '' || ($signatoryGrade ?? '') !== '')
+  <table class="sign" align="right">
+    @if(trim((string) ($signatoryRole ?? '')) !== '')
       <tr>
-        <td style="height:28px;">&nbsp;</td>
+        <td class="sign-role" align="center">{{ $signatoryRole }}</td>
+      </tr>
+      @if(trim((string) ($signatoryName ?? '')) !== '' || trim((string) ($signatoryGrade ?? '')) !== '')
+        <tr>
+          <td align="center" style="height:28px;">&nbsp;</td>
+        </tr>
+      @endif
+    @endif
+    @if(trim((string) ($signatoryName ?? '')) !== '')
+      <tr>
+        <td class="sign-name" align="center">{{ $signatoryName }}</td>
       </tr>
     @endif
-    @if(($signatoryName ?? '') !== '')
+    @if(trim((string) ($signatoryGrade ?? '')) !== '')
       <tr>
-        <td class="sign-name">{{ $signatoryName }}</td>
-      </tr>
-    @endif
-    @if(($signatoryGrade ?? '') !== '')
-      <tr>
-        <td class="sign-grade">{{ $signatoryGrade }}</td>
+        <td class="sign-grade" align="center">{{ $signatoryGrade }}</td>
       </tr>
     @endif
   </table>
