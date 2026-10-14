@@ -123,7 +123,7 @@ export default [
         title: 'Pilotage DG',
         icon: { icon: 'tabler-chart-dots' },
         to: 'productions-direction',
-        action: 'read',
+        action: 'pilot',
         subject: 'Production',
       },
     ],

@@ -12,6 +12,7 @@ definePage({
 const route = useRoute()
 const router = useRouter()
 const loading = ref(false)
+const errorMessage = ref('')
 const items = ref<any[]>([])
 const total = ref(0)
 const filters = ref({
@@ -33,6 +34,7 @@ const title = computed(() => {
 
 const load = async () => {
   loading.value = true
+  errorMessage.value = ''
   try {
     const query: Record<string, any> = {
       q: filters.value.q || undefined,
@@ -50,6 +52,11 @@ const load = async () => {
     const res = await $api('/productions/occurrences', { query })
     items.value = res.data ?? res
     total.value = res.total ?? items.value.length
+  }
+  catch (error: any) {
+    items.value = []
+    total.value = 0
+    errorMessage.value = error?.data?.message || 'Impossible de charger les occurrences.'
   }
   finally {
     loading.value = false
@@ -94,6 +101,17 @@ onMounted(load)
       </template>
     </ParapheurPageHeader>
 
+    <VAlert
+      v-if="errorMessage"
+      type="error"
+      variant="tonal"
+      class="mb-4"
+      closable
+      @click:close="errorMessage = ''"
+    >
+      {{ errorMessage }}
+    </VAlert>
+
     <VCard>
       <VCardText>
         <VRow>
@@ -110,6 +128,7 @@ onMounted(load)
             />
           </VCol>
           <VCol
+            v-if="view === 'all' || view === 'mine'"
             cols="12"
             md="4"
           >

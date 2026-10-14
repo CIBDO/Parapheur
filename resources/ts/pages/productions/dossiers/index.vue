@@ -11,9 +11,13 @@ definePage({
 
 const router = useRouter()
 const loading = ref(false)
+const saving = ref(false)
 const items = ref<any[]>([])
 const total = ref(0)
 const search = ref('')
+const errorMessage = ref('')
+const dialog = ref(false)
+const form = ref({ title: '', period_date: '' })
 
 const folderStatusColor = (status?: string) => {
   if (status === 'closed' || status === 'cloture')
@@ -35,13 +39,49 @@ const folderStatusLabel = (status?: string) => {
 
 const load = async () => {
   loading.value = true
+  errorMessage.value = ''
   try {
     const res = await $api('/productions/folders', { query: { q: search.value || undefined } })
     items.value = res.data ?? res
     total.value = res.total ?? items.value.length
   }
+  catch (error: any) {
+    items.value = []
+    total.value = 0
+    errorMessage.value = error?.data?.message || 'Impossible de charger les dossiers.'
+  }
   finally {
     loading.value = false
+  }
+}
+
+const openCreate = () => {
+  form.value = { title: '', period_date: '' }
+  errorMessage.value = ''
+  dialog.value = true
+}
+
+const createFolder = async () => {
+  saving.value = true
+  errorMessage.value = ''
+  try {
+    const created = await $api('/productions/folders', {
+      method: 'POST',
+      body: {
+        title: form.value.title,
+        period_date: form.value.period_date || null,
+      },
+    })
+    dialog.value = false
+    await router.push(`/productions/dossiers/${created.id}`)
+  }
+  catch (error: any) {
+    errorMessage.value = error?.data?.message
+      || error?.data?.errors?.title?.[0]
+      || 'Création impossible.'
+  }
+  finally {
+    saving.value = false
   }
 }
 
@@ -64,6 +104,14 @@ onMounted(load)
           Tableau de bord
         </VBtn>
         <VBtn
+          v-if="$can('manage', 'Production')"
+          color="primary"
+          prepend-icon="tabler-folder-plus"
+          @click="openCreate"
+        >
+          Nouveau dossier
+        </VBtn>
+        <VBtn
           variant="tonal"
           color="primary"
           prepend-icon="tabler-refresh"
@@ -74,6 +122,17 @@ onMounted(load)
         </VBtn>
       </template>
     </ParapheurPageHeader>
+
+    <VAlert
+      v-if="errorMessage && !dialog"
+      type="error"
+      variant="tonal"
+      class="mb-4"
+      closable
+      @click:close="errorMessage = ''"
+    >
+      {{ errorMessage }}
+    </VAlert>
 
     <VCard>
       <VCardText>
@@ -155,6 +214,18 @@ onMounted(load)
                 class="mb-2 d-block mx-auto"
               />
               Aucun dossier
+              <div
+                v-if="$can('manage', 'Production')"
+                class="mt-3"
+              >
+                <VBtn
+                  color="primary"
+                  prepend-icon="tabler-folder-plus"
+                  @click="openCreate"
+                >
+                  Créer le premier dossier
+                </VBtn>
+              </div>
             </td>
           </tr>
         </tbody>
@@ -166,5 +237,54 @@ onMounted(load)
         {{ total }} résultat(s)
       </VCardText>
     </VCard>
+
+    <VDialog
+      v-model="dialog"
+      max-width="480"
+    >
+      <VCard>
+        <VCardItem>
+          <VCardTitle>Nouveau dossier</VCardTitle>
+          <VCardSubtitle>
+            Un titre suffit. La date précise la période couverte.
+          </VCardSubtitle>
+        </VCardItem>
+        <VCardText class="d-flex flex-column gap-4">
+          <VAlert
+            v-if="errorMessage"
+            type="error"
+            variant="tonal"
+          >
+            {{ errorMessage }}
+          </VAlert>
+          <AppTextField
+            v-model="form.title"
+            label="Titre"
+            autofocus
+          />
+          <AppTextField
+            v-model="form.period_date"
+            label="Période"
+            type="date"
+          />
+        </VCardText>
+        <VCardActions class="justify-end">
+          <VBtn
+            variant="text"
+            @click="dialog = false"
+          >
+            Annuler
+          </VBtn>
+          <VBtn
+            color="primary"
+            :loading="saving"
+            :disabled="!form.title.trim()"
+            @click="createFolder"
+          >
+            Créer
+          </VBtn>
+        </VCardActions>
+      </VCard>
+    </VDialog>
   </div>
 </template>

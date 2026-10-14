@@ -53,7 +53,7 @@ Schedule::command('parapheur:purge-workspace-trash')
     ->withoutOverlapping()
     ->appendOutputTo(storage_path('logs/workspace-trash-purge.log'));
 
-Schedule::command('parapheur:generate-productions')
+Schedule::command('parapheur:generate-productions --sync')
     ->dailyAt('00:15')
     ->withoutOverlapping()
     ->appendOutputTo(storage_path('logs/production-generation.log'));

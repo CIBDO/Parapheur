@@ -13,14 +13,64 @@ const route = useRoute()
 const router = useRouter()
 const item = ref<any>(null)
 const loading = ref(false)
+const attaching = ref(false)
+const dialog = ref(false)
+const occurrenceId = ref<number | null>(null)
+const candidates = ref<{ title: string; value: number }[]>([])
+const errorMessage = ref('')
 
 const load = async () => {
   loading.value = true
+  errorMessage.value = ''
   try {
     item.value = await $api(`/productions/folders/${route.params.id}`)
   }
+  catch (error: any) {
+    errorMessage.value = error?.data?.message || 'Impossible de charger ce dossier.'
+  }
   finally {
     loading.value = false
+  }
+}
+
+const openAttach = async () => {
+  dialog.value = true
+  occurrenceId.value = null
+  errorMessage.value = ''
+  try {
+    const res = await $api('/productions/occurrences', { query: { per_page: 50 } })
+    const present = new Set((item.value?.occurrences || []).map((occ: any) => occ.id))
+    candidates.value = (res.data ?? res)
+      .filter((occ: any) => !present.has(occ.id))
+      .map((occ: any) => ({
+        title: `${occ.reference} — ${occ.obligation?.label || 'Occurrence'}`,
+        value: occ.id,
+      }))
+  }
+  catch (error: any) {
+    candidates.value = []
+    errorMessage.value = error?.data?.message || 'Impossible de charger les occurrences.'
+  }
+}
+
+const attach = async () => {
+  if (!occurrenceId.value)
+    return
+  attaching.value = true
+  errorMessage.value = ''
+  try {
+    await $api(`/productions/folders/${route.params.id}/attach`, {
+      method: 'POST',
+      body: { occurrence_id: occurrenceId.value },
+    })
+    dialog.value = false
+    await load()
+  }
+  catch (error: any) {
+    errorMessage.value = error?.data?.message || 'Ajout impossible.'
+  }
+  finally {
+    attaching.value = false
   }
 }
 
@@ -46,6 +96,14 @@ const kpis = computed(() => {
       icon="tabler-folder"
     >
       <template #actions>
+        <VBtn
+          v-if="$can('manage', 'Production')"
+          color="primary"
+          prepend-icon="tabler-plus"
+          @click="openAttach"
+        >
+          Ajouter une occurrence
+        </VBtn>
         <VBtn
           variant="tonal"
           color="primary"
@@ -73,6 +131,16 @@ const kpis = computed(() => {
     </div>
 
     <template v-else-if="item">
+      <VAlert
+        v-if="errorMessage && !dialog"
+        type="error"
+        variant="tonal"
+        class="mb-4"
+        closable
+        @click:close="errorMessage = ''"
+      >
+        {{ errorMessage }}
+      </VAlert>
       <VRow
         dense
         class="mb-4"
@@ -183,6 +251,52 @@ const kpis = computed(() => {
           </tbody>
         </VTable>
       </VCard>
+
+      <VDialog
+        v-model="dialog"
+        max-width="520"
+      >
+        <VCard>
+          <VCardItem>
+            <VCardTitle>Ajouter une occurrence</VCardTitle>
+            <VCardSubtitle>
+              Le dossier regroupe les productions, sans copier les fichiers.
+            </VCardSubtitle>
+          </VCardItem>
+          <VCardText class="d-flex flex-column gap-4">
+            <VAlert
+              v-if="errorMessage"
+              type="error"
+              variant="tonal"
+            >
+              {{ errorMessage }}
+            </VAlert>
+            <AppSelect
+              v-model="occurrenceId"
+              label="Occurrence"
+              :items="candidates"
+              :disabled="!candidates.length"
+              no-data-text="Aucune occurrence disponible"
+            />
+          </VCardText>
+          <VCardActions class="justify-end">
+            <VBtn
+              variant="text"
+              @click="dialog = false"
+            >
+              Annuler
+            </VBtn>
+            <VBtn
+              color="primary"
+              :loading="attaching"
+              :disabled="!occurrenceId"
+              @click="attach"
+            >
+              Ajouter
+            </VBtn>
+          </VCardActions>
+        </VCard>
+      </VDialog>
     </template>
   </div>
 </template>

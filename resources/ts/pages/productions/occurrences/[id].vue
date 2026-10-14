@@ -24,14 +24,39 @@ const fileInput = ref<File[] | null>(null)
 const decision = ref('approved')
 const motif = ref('')
 const errorMessage = ref('')
+const justification = ref('')
 
 const id = computed(() => Number(route.params.id))
+
+const depositStatuses = ['a_produire', 'en_preparation', 'deposee', 'a_completer', 'rejetee']
+
+const canDeposit = computed(() => depositStatuses.includes(item.value?.status))
+const awaitingDecision = computed(() => ['soumise_validation', 'en_validation'].includes(item.value?.status))
+const readyToSend = computed(() => ['validee', 'prete_a_transmettre'].includes(item.value?.status))
+const isLate = computed(() => Boolean(item.value?.delay_flags?.length))
+
+const nextStep = computed(() => {
+  if (canDeposit.value)
+    return item.value?.files?.length ? 'Le fichier est prêt : soumettez-le.' : 'Déposez le fichier attendu.'
+  if (awaitingDecision.value)
+    return 'Une décision est attendue.'
+  if (readyToSend.value)
+    return 'Le livrable peut être transmis.'
+  if (item.value?.status === 'transmise')
+    return 'Production transmise. Une rectification reste possible.'
+
+  return 'Aucune action à cette étape.'
+})
 
 const load = async () => {
   loading.value = true
   errorMessage.value = ''
   try {
     item.value = await $api(`/productions/occurrences/${id.value}`)
+    justification.value = item.value?.delay_justification || ''
+  }
+  catch (error: any) {
+    errorMessage.value = error?.data?.message || 'Impossible de charger cette production.'
   }
   finally {
     loading.value = false
@@ -103,6 +128,13 @@ const submitParapheur = () => run(() => $api(`/productions/occurrences/${id.valu
   method: 'POST',
 }))
 
+const justify = () => run(async () => {
+  await $api(`/productions/occurrences/${id.value}/justify-delay`, {
+    method: 'POST',
+    body: { justification: justification.value },
+  })
+})
+
 onMounted(load)
 </script>
 
@@ -152,6 +184,40 @@ onMounted(load)
         {{ item.delay_flags.map((flag: string) => productionDelayLabels[flag] || flag).join(' · ') }}
         — échéance {{ formatTaskDue(item.deadline_at) }}
       </VAlert>
+
+      <VCard
+        v-if="isLate && !['cloturee', 'annulee'].includes(item.status)"
+        class="mb-4"
+      >
+        <VCardItem>
+          <VCardTitle class="text-h6">
+            Justification du retard
+          </VCardTitle>
+          <VCardSubtitle>
+            Expliquez pourquoi l’échéance n’a pas été tenue.
+          </VCardSubtitle>
+        </VCardItem>
+        <VCardText class="d-flex flex-column gap-3">
+          <AppTextarea
+            v-model="justification"
+            label="Justification"
+            rows="3"
+            counter="2000"
+          />
+          <div>
+            <VBtn
+              color="error"
+              variant="tonal"
+              prepend-icon="tabler-message"
+              :loading="acting"
+              :disabled="!justification.trim()"
+              @click="justify"
+            >
+              Enregistrer
+            </VBtn>
+          </div>
+        </VCardText>
+      </VCard>
 
       <VAlert
         v-if="errorMessage"
@@ -292,6 +358,7 @@ onMounted(load)
                 <template #append>
                   <div class="d-flex align-center gap-2">
                     <VBtn
+                      v-if="['validee', 'prete_a_transmettre', 'transmise', 'cloturee'].includes(item.status)"
                       size="small"
                       variant="tonal"
                       @click="classify(file.id)"
@@ -320,8 +387,11 @@ onMounted(load)
               />
               <div>Aucun fichier déposé</div>
             </div>
-            <VDivider />
-            <VCardText class="d-flex flex-wrap align-end gap-3">
+            <VDivider v-if="canDeposit" />
+            <VCardText
+              v-if="canDeposit"
+              class="d-flex flex-wrap align-end gap-3"
+            >
               <VFileInput
                 v-model="fileInput"
                 label="Ajouter un fichier"
@@ -392,82 +462,95 @@ onMounted(load)
           <VCard class="mb-4">
             <VCardItem>
               <VCardTitle class="text-h6">
-                Actions
+                Prochaine étape
               </VCardTitle>
               <VCardSubtitle>
-                Dépôt, validation et transmission
+                {{ nextStep }}
               </VCardSubtitle>
             </VCardItem>
             <VDivider />
             <VCardText class="d-flex flex-column gap-3">
+              <template v-if="canDeposit">
+                <VBtn
+                  variant="text"
+                  prepend-icon="tabler-file-type-docx"
+                  :loading="acting"
+                  @click="createOffice"
+                >
+                  Créer un document
+                </VBtn>
+                <VBtn
+                  v-if="item.obligation?.submit_to_parapheur"
+                  variant="text"
+                  prepend-icon="tabler-writing"
+                  :loading="acting"
+                  @click="submitParapheur"
+                >
+                  Envoyer au parapheur
+                </VBtn>
+                <VBtn
+                  color="primary"
+                  prepend-icon="tabler-send"
+                  :loading="acting"
+                  :disabled="!item.files?.length"
+                  @click="submit"
+                >
+                  Soumettre
+                </VBtn>
+              </template>
+
+              <template v-else-if="awaitingDecision && $can('validate', 'Production')">
+                <AppSelect
+                  v-model="decision"
+                  label="Décision"
+                  :items="[
+                    { title: 'Approuver', value: 'approved' },
+                    { title: 'Demander une correction', value: 'correction' },
+                    { title: 'Rejeter', value: 'rejected' },
+                  ]"
+                />
+                <AppTextarea
+                  v-model="motif"
+                  label="Motif"
+                  rows="2"
+                />
+                <VBtn
+                  color="success"
+                  prepend-icon="tabler-checks"
+                  :loading="acting"
+                  @click="decide"
+                >
+                  Enregistrer la décision
+                </VBtn>
+              </template>
+
               <VBtn
+                v-else-if="readyToSend && $can('transmit', 'Production')"
                 color="primary"
-                variant="tonal"
-                prepend-icon="tabler-file-type-docx"
-                :loading="acting"
-                @click="createOffice"
-              >
-                Créer dans ONLYOFFICE
-              </VBtn>
-              <VBtn
-                color="primary"
-                variant="tonal"
-                prepend-icon="tabler-send"
-                :loading="acting"
-                @click="submit"
-              >
-                Soumettre
-              </VBtn>
-              <VBtn
-                v-if="item.obligation?.submit_to_parapheur"
-                color="secondary"
-                variant="tonal"
-                prepend-icon="tabler-writing"
-                :loading="acting"
-                @click="submitParapheur"
-              >
-                Soumettre au parapheur
-              </VBtn>
-              <AppSelect
-                v-model="decision"
-                label="Décision"
-                :items="[
-                  { title: 'Approuver', value: 'approved' },
-                  { title: 'Rejeter', value: 'rejected' },
-                  { title: 'Demander une correction', value: 'correction' },
-                ]"
-              />
-              <AppTextarea
-                v-model="motif"
-                label="Motif"
-                rows="2"
-              />
-              <VBtn
-                color="success"
-                variant="tonal"
-                prepend-icon="tabler-checks"
-                :loading="acting"
-                @click="decide"
-              >
-                Enregistrer la décision
-              </VBtn>
-              <VBtn
-                color="info"
                 prepend-icon="tabler-mail-forward"
                 :loading="acting"
                 @click="transmit(false)"
               >
                 Transmettre
               </VBtn>
+
               <VBtn
-                v-if="item.status === 'transmise'"
-                variant="outlined"
+                v-else-if="item.status === 'transmise' && $can('transmit', 'Production')"
+                color="primary"
+                variant="tonal"
                 prepend-icon="tabler-refresh"
                 :loading="acting"
                 @click="transmit(true)"
               >
-                Transmission rectificative
+                Envoyer une rectification
               </VBtn>
+
+              <p
+                v-else
+                class="text-body-2 text-medium-emphasis mb-0"
+              >
+                Cette étape est entre les mains d’un autre acteur.
+              </p>
             </VCardText>
           </VCard>
 

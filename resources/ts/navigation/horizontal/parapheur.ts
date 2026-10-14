@@ -63,6 +63,18 @@ export default [
         subject: 'Production',
       },
       {
+        title: 'À valider',
+        to: { name: 'productions-occurrences', query: { view: 'validate' } },
+        action: 'validate',
+        subject: 'Production',
+      },
+      {
+        title: 'Dossiers',
+        to: 'productions-dossiers',
+        action: 'read',
+        subject: 'Production',
+      },
+      {
         title: 'Obligations',
         to: 'productions-obligations',
         action: 'manage',
@@ -71,7 +83,7 @@ export default [
       {
         title: 'Pilotage DG',
         to: 'productions-direction',
-        action: 'read',
+        action: 'pilot',
         subject: 'Production',
       },
     ],

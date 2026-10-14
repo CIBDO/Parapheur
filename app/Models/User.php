@@ -181,6 +181,14 @@ class User extends Authenticatable
             $rules[] = ['action' => 'validate', 'subject' => 'Production'];
         }
 
+        if ($this->can('production.transmit') || $this->can('production.manage')) {
+            $rules[] = ['action' => 'transmit', 'subject' => 'Production'];
+        }
+
+        if ($this->can('production.view_all') || $this->can('production.manage') || $this->can('dashboard.dg')) {
+            $rules[] = ['action' => 'pilot', 'subject' => 'Production'];
+        }
+
         if ($this->can('announcement.view')) {
             $rules[] = ['action' => 'read', 'subject' => 'Announcement'];
         }

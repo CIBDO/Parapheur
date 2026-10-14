@@ -3,7 +3,7 @@ import ParapheurPageHeader from '@/components/parapheur/ParapheurPageHeader.vue'
 
 definePage({
   meta: {
-    action: 'read',
+    action: 'pilot',
     subject: 'Production',
   },
 })

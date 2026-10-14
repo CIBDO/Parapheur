@@ -11,6 +11,7 @@ definePage({
 
 const router = useRouter()
 const loading = ref(false)
+const errorMessage = ref('')
 const stats = ref<Record<string, number>>({})
 const recent = ref<any[]>([])
 
@@ -57,15 +58,9 @@ const cards = [
   },
 ]
 
-const quickActions = [
-  { title: 'Occurrences', icon: 'tabler-calendar-event', color: 'primary', to: '/productions/occurrences' },
-  { title: 'Dossiers', icon: 'tabler-folder', color: 'info', to: '/productions/dossiers' },
-  { title: 'Obligations', icon: 'tabler-settings', color: 'secondary', to: '/productions/obligations' },
-  { title: 'Pilotage DG', icon: 'tabler-chart-dots', color: 'success', to: '/productions/direction' },
-]
-
 const load = async () => {
   loading.value = true
+  errorMessage.value = ''
   try {
     const [dashboard, list] = await Promise.all([
       $api('/productions/dashboard/my-work'),
@@ -73,6 +68,11 @@ const load = async () => {
     ])
     stats.value = dashboard
     recent.value = list.data ?? list
+  }
+  catch (error: any) {
+    stats.value = {}
+    recent.value = []
+    errorMessage.value = error?.data?.message || 'Impossible de charger vos productions.'
   }
   finally {
     loading.value = false
@@ -109,21 +109,14 @@ onMounted(load)
       </template>
     </ParapheurPageHeader>
 
-    <VCard class="mb-4">
-      <VCardText class="d-flex flex-wrap gap-2 py-3">
-        <VBtn
-          v-for="action in quickActions"
-          :key="action.title"
-          size="small"
-          variant="tonal"
-          :color="action.color"
-          :prepend-icon="action.icon"
-          @click="router.push(action.to)"
-        >
-          {{ action.title }}
-        </VBtn>
-      </VCardText>
-    </VCard>
+    <VAlert
+      v-if="errorMessage"
+      type="error"
+      variant="tonal"
+      class="mb-4"
+    >
+      {{ errorMessage }}
+    </VAlert>
 
     <div
       v-if="loading && !Object.keys(stats).length"
