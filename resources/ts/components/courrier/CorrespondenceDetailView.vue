@@ -1934,7 +1934,12 @@ async function archiveCorrespondence() {
                 États de sortie
               </div>
               <p class="text-body-2 text-medium-emphasis mb-4">
-                Documents administratifs DGTCP : fiche de circulation, fiche d’imputation, bordereau d’envoi, accusé de réception.
+                <template v-if="isSortant">
+                  Documents administratifs DGTCP : bordereau d’envoi, accusé de réception.
+                </template>
+                <template v-else>
+                  Documents administratifs DGTCP : fiche de circulation, fiche d’imputation, bordereau d’envoi, accusé de réception.
+                </template>
                 Le bordereau de transmission interne reste disponible dans
                 <RouterLink :to="{ name: 'courrier-bordereaux' }">
                   Bordereaux
@@ -1964,7 +1969,10 @@ async function archiveCorrespondence() {
             </div>
 
             <!-- Fiche de circulation -->
-            <div class="parapheur-form-section mb-6">
+            <div
+              v-if="!isSortant"
+              class="parapheur-form-section mb-6"
+            >
               <div class="parapheur-form-section__title mb-2">
                 <VIcon
                   icon="tabler-file-invoice"
@@ -2060,7 +2068,10 @@ async function archiveCorrespondence() {
             </div>
 
             <!-- Fiche d'imputation -->
-            <div class="parapheur-form-section mb-6">
+            <div
+              v-if="!isSortant"
+              class="parapheur-form-section mb-6"
+            >
               <div class="parapheur-form-section__title mb-2">
                 <VIcon
                   icon="tabler-user-share"

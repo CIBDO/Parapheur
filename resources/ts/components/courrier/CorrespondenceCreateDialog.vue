@@ -129,7 +129,7 @@ async function createOrigin() {
 async function submit() {
   errorMsg.value = ''
   if (!form.value.subject.trim()) {
-    errorMsg.value = 'Renseignez l’objet.'
+    errorMsg.value = isArrival.value ? 'Renseignez l’objet.' : 'Renseignez la désignation.'
 
     return
   }
@@ -411,7 +411,7 @@ onMounted(async () => {
             <VCol cols="12">
               <AppTextarea
                 v-model="form.subject"
-                label="Objet *"
+                :label="isArrival ? 'Objet *' : 'Désignation *'"
                 rows="3"
               />
             </VCol>

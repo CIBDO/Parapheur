@@ -34,6 +34,8 @@ const structureItems = computed(() =>
   })),
 )
 
+const isSortant = computed(() => props.item?.direction === 'sortant')
+
 async function printCirculationSheet() {
   printing.value = true
   try {
@@ -108,6 +110,7 @@ async function confirmAssign() {
 
 <template>
   <div
+    v-if="!isSortant"
     class="d-flex justify-end gap-1"
     @click.stop
   >
