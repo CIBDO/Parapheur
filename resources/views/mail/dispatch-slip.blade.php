@@ -11,16 +11,16 @@
     @font-face { font-family: 'Times New Roman'; font-style: italic; font-weight: normal; src: url('{{ $fontDir }}/timesi.ttf') format('truetype'); }
     @font-face { font-family: 'Times New Roman'; font-style: italic; font-weight: bold; src: url('{{ $fontDir }}/timesbi.ttf') format('truetype'); }
     @font-face { font-family: 'Kunstler Script'; font-style: normal; font-weight: normal; src: url('{{ $fontDir }}/KUNSTLER.TTF') format('truetype'); }
-    @page { margin: 12mm 14mm 18mm; }
+    @page { margin: 2.5cm; }
     body { font-family: 'Times New Roman', serif; color: #111; font-size: 12pt; }
     table.banner { width: 100%; border-collapse: collapse; }
     table.banner td { border: none; vertical-align: top; }
-    .head-block { text-align: left; margin-bottom: 7px; }
-    .ministry, .direction { font-family: 'Times New Roman', serif; font-weight: bold; font-size: 12pt; text-align: left; text-transform: uppercase; line-height: 1.15; }
-    .rule { width: 38mm; border-bottom: 1px solid #000; margin: 2px 0 0; height: 0; }
-    .republic { font-family: 'Times New Roman', serif; font-weight: bold; font-size: 13pt; text-align: center; text-transform: uppercase; }
-    .motto { font-family: 'Times New Roman', serif; text-align: center; font-size: 11pt; margin-top: 3px; }
-    .date-line { text-align: right; font-family: 'Kunstler Script', cursive; font-size: 24pt; margin: 16px 6px 4px 0; line-height: 1; }
+    .head-block { text-align: left; margin-bottom: 8px; }
+    .ministry, .direction { display: inline-block; font-family: 'Times New Roman', serif; font-weight: bold; font-size: 12pt; text-align: center; text-transform: uppercase; line-height: 1.15; }
+    .rule { width: 68%; border-bottom: 1px solid #000; margin: 3px auto 0; height: 0; }
+    .republic { font-family: 'Times New Roman', serif; font-weight: bold; font-size: 13pt; text-align: right; text-transform: uppercase; }
+    .motto { font-family: 'Times New Roman', serif; text-align: right; font-size: 11pt; margin-top: 3px; }
+    .date-line { text-align: right; font-family: 'Kunstler Script', cursive; font-size: 24pt; margin: 18px 0 0; line-height: 1; }
     table.intro { width: 100%; border-collapse: collapse; margin-top: 2px; }
     table.intro td { border: none; vertical-align: middle; }
     .sender { text-align: center; font-family: 'Kunstler Script', cursive; font-size: 24pt; line-height: 1.05; margin: 0 8px; }
@@ -30,7 +30,7 @@
     table.slip-title { width: 100%; border-collapse: separate; border-spacing: 0; margin: 14px 0 8px; }
     table.slip-title td { font-family: 'Times New Roman', serif; font-weight: bold; font-size: 22pt; border: none; padding: 0; vertical-align: bottom; white-space: nowrap; }
     td.title-gap { width: 100%; border-bottom: 1.2pt solid #000; }
-    .frame { border: 2.5px solid #000; }
+    .frame { border: 2.5pt solid #000; width: 100%; }
     table.grid { width: 100%; border-collapse: collapse; table-layout: fixed; }
     table.grid th, table.grid td { border: 1px solid #000; padding: 7px 8px; font-family: 'Times New Roman', serif; font-size: 12pt; vertical-align: middle; word-wrap: break-word; }
     table.grid th { text-align: center; font-weight: bold; height: 26px; }
@@ -43,7 +43,7 @@
     .sign-role { font-weight: bold; text-transform: uppercase; font-size: 13pt; }
     .sign-name { font-weight: bold; font-size: 13pt; }
     .sign-grade { font-style: italic; font-size: 12pt; }
-    .bottom { position: fixed; bottom: 6mm; left: 10mm; right: 10mm; text-align: center; font-family: 'Times New Roman', serif; font-size: 8pt; border-top: 1px solid #000; padding-top: 3px; line-height: 1.35; }
+    .bottom { position: fixed; bottom: 1.1cm; left: 2.5cm; right: 2.5cm; text-align: center; font-family: 'Times New Roman', serif; font-size: 8pt; border-top: 1px solid #000; padding-top: 3px; line-height: 1.35; }
   </style>
 </head>
 <body>
@@ -89,22 +89,19 @@
     <tr>
       <td width="56%">
         <div class="head-block">
-          <div class="ministry">{!! nl2br(e($ministryText)) !!}</div>
-          <div class="rule"></div>
+          <div class="ministry">{!! nl2br(e($ministryText)) !!}<div class="rule"></div></div>
         </div>
         <div class="head-block">
-          <div class="direction">{!! nl2br(e($directionText)) !!}</div>
-          <div class="rule"></div>
+          <div class="direction">{!! nl2br(e($directionText)) !!}<div class="rule"></div></div>
         </div>
       </td>
       <td width="44%">
         <div class="republic">{{ $republicText }}</div>
         <div class="motto">{{ $mottoText }}</div>
+        <div class="date-line">{{ $placeName }}, le</div>
       </td>
     </tr>
   </table>
-
-  <div class="date-line">{{ $placeName }}, le</div>
 
   <table class="intro">
     <tr>
