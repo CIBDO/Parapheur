@@ -74,7 +74,7 @@ class CorrespondenceAssignmentService
                         'structure_id' => $toStructureId,
                         'title' => 'Instruction pour courrier : '.$correspondence->subject,
                         'body' => $assignmentData['instruction_text'],
-                        'priority' => $correspondence->priority?->value ?? 'normale',
+                        'priority' => $correspondence->priorityCode() ?? 'normale',
                         'source_kind' => \App\Enums\TaskSource::Courrier->value,
                         'source_type' => Correspondence::class,
                         'source_id' => $correspondence->id,

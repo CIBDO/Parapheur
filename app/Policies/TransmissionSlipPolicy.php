@@ -4,6 +4,7 @@ namespace App\Policies;
 
 use App\Models\TransmissionSlip;
 use App\Models\User;
+use App\Services\Organization\OrganizationalContextResolver;
 
 class TransmissionSlipPolicy
 {
@@ -14,24 +15,17 @@ class TransmissionSlipPolicy
 
     public function view(User $user, TransmissionSlip $slip): bool
     {
-        if ($user->can('admin.access') || $user->can('mail.view_all')) {
-            return true;
-        }
-
-        // Créateur, structure émettrice ou destinataire
         if ($slip->created_by === $user->id) {
             return true;
         }
 
-        if ($slip->from_structure_id && $user->structure_id === $slip->from_structure_id) {
+        $ids = app(OrganizationalContextResolver::class)->resolve($user)->structureIds;
+
+        if ($slip->from_structure_id && in_array((int) $slip->from_structure_id, $ids, true)) {
             return true;
         }
 
-        if ($slip->to_structure_id && $user->structure_id === $slip->to_structure_id) {
-            return true;
-        }
-
-        return false;
+        return $slip->to_structure_id && in_array((int) $slip->to_structure_id, $ids, true);
     }
 
     public function create(User $user): bool

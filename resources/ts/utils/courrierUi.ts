@@ -1,3 +1,5 @@
+import { reactive } from 'vue'
+
 export const correspondenceDirectionLabels: Record<string, string> = {
   entrant: 'Entrant',
   sortant: 'Sortant',
@@ -60,19 +62,27 @@ export const correspondenceStatusColors: Record<string, string> = {
   annule: 'error',
 }
 
-export const correspondencePriorityLabels: Record<string, string> = {
+export const correspondencePriorityLabels = reactive<Record<string, string>>({
   normale: 'Normale',
   importante: 'Importante',
   urgente: 'Urgente',
   tres_urgente: 'Très urgente',
+})
+
+export function applyMailPriorities(items: Array<{ code: string, name: string, color?: string | null }>) {
+  for (const item of items) {
+    correspondencePriorityLabels[item.code] = item.name
+    if (item.color)
+      correspondencePriorityColors[item.code] = item.color
+  }
 }
 
-export const correspondencePriorityColors: Record<string, string> = {
+export const correspondencePriorityColors = reactive<Record<string, string>>({
   normale: 'info',
   importante: 'warning',
   urgente: 'error',
   tres_urgente: 'error',
-}
+})
 
 export const correspondenceConfidentialityLabels: Record<string, string> = {
   normal: 'Normal',

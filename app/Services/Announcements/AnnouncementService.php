@@ -136,8 +136,10 @@ final class AnnouncementService
     {
         return DB::transaction(function () use ($actor, $data) {
             $category = AnnouncementCategory::query()->findOrFail($data['category_id']);
-            $importance = AnnouncementImportance::query()->find($data['importance_id'] ?? $category->default_importance_id);
-            $data['importance_id'] = $data['importance_id'] ?? $category->default_importance_id;
+            $data['importance_id'] = $data['importance_id']
+                ?? $category->default_importance_id
+                ?? AnnouncementImportance::query()->where('is_active', true)->orderBy('rank')->value('id');
+            $importance = AnnouncementImportance::query()->find($data['importance_id']);
             $data['confidentiality'] = $data['confidentiality'] ?? $category->default_confidentiality;
             $data['acknowledgement_required'] = $data['acknowledgement_required'] ?? $category->acknowledgement_required;
             $data['banner_enabled'] = $data['banner_enabled'] ?? (bool) $importance?->banner_default;
@@ -171,15 +173,10 @@ final class AnnouncementService
             $announcement = Announcement::query()->lockForUpdate()->findOrFail($announcement->id);
             $announcement->load('category', 'audiences');
             $substantial = $this->isSubstantial($announcement, $data);
-            $revalidate = (bool) $announcement->category?->revalidate_on_change;
 
             if ($announcement->status === AnnouncementStatus::Published && $substantial) {
                 $this->storeRevision($announcement, $actor, 'Modification après publication');
                 $announcement->current_version = (int) $announcement->current_version + 1;
-                if ($revalidate && $announcement->category?->validation_circuit !== AnnouncementCircuit::Direct) {
-                    $announcement->status = AnnouncementStatus::PendingValidation;
-                    $announcement->approval_step = 1;
-                }
             } elseif (in_array($announcement->status, [AnnouncementStatus::Published, AnnouncementStatus::Expired], true) && ! $substantial) {
                 if ($announcement->status === AnnouncementStatus::Expired && $this->prolongs($data)) {
                     if (! $this->access->canPublish($actor, $announcement)) {
@@ -193,13 +190,9 @@ final class AnnouncementService
             $announcement->save();
             $this->syncRelations($actor, $announcement, $data);
 
-            if ($announcement->status === AnnouncementStatus::Published && $substantial && (! $revalidate || $announcement->category?->validation_circuit === AnnouncementCircuit::Direct)) {
+            if ($announcement->status === AnnouncementStatus::Published && $substantial) {
                 $this->snapshot($announcement);
                 $this->notifications->published($announcement);
-            }
-
-            if ($announcement->status === AnnouncementStatus::PendingValidation && $substantial) {
-                $this->notifications->validationRequested($announcement);
             }
 
             $this->event($announcement, $actor, $substantial ? 'revised' : 'updated');
@@ -313,9 +306,15 @@ final class AnnouncementService
                 abort(403);
             }
 
-            $circuit = $locked->category?->validation_circuit;
-            if (! $fromScheduler && $circuit !== AnnouncementCircuit::Direct && ! in_array($locked->status, [AnnouncementStatus::Approved, AnnouncementStatus::Scheduled], true)) {
-                throw ValidationException::withMessages(['status' => 'L\'annonce doit être approuvée avant publication.']);
+            if (! $fromScheduler && ! in_array($locked->status, [
+                AnnouncementStatus::Draft,
+                AnnouncementStatus::ToCorrect,
+                AnnouncementStatus::Rejected,
+                AnnouncementStatus::Approved,
+                AnnouncementStatus::Scheduled,
+                AnnouncementStatus::PendingValidation,
+            ], true)) {
+                throw ValidationException::withMessages(['status' => 'Cette annonce ne peut pas être publiée.']);
             }
 
             if (! $fromScheduler && $locked->publish_at && $locked->publish_at->isFuture()) {
@@ -804,6 +803,9 @@ final class AnnouncementService
 
         if (array_key_exists('body', $data)) {
             $announcement->body = $this->sanitizer->clean($data['body']);
+        }
+        if (! $announcement->summary && $announcement->body) {
+            $announcement->summary = mb_substr($this->plainText($announcement->body), 0, 240);
         }
         foreach (['publish_at', 'expires_at', 'banner_starts_at', 'banner_ends_at'] as $field) {
             if (array_key_exists($field, $data)) {

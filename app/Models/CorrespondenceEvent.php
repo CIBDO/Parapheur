@@ -20,6 +20,7 @@ class CorrespondenceEvent extends Model
         'new_status',
         'metadata',
         'comment',
+        'visibility',
         'created_at',
     ];
 

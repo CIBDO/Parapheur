@@ -85,7 +85,7 @@ class CorrespondenceController extends Controller
             'received_at' => 'nullable|date',
             'due_date' => 'nullable|date',
             'medium' => 'required|in:physique,electronique,hybride',
-            'priority' => 'nullable|string',
+            'priority' => 'nullable|string|exists:correspondence_priorities,code',
             'confidentiality' => 'nullable|string',
             'structure_id' => 'nullable|exists:structures,id',
             'channel_id' => 'nullable|exists:correspondence_channels,id',
@@ -145,7 +145,7 @@ class CorrespondenceController extends Controller
             'correspondence_date' => 'nullable|date',
             'due_date' => 'nullable|date',
             'medium' => 'sometimes|in:physique,electronique,hybride',
-            'priority' => 'nullable|string',
+            'priority' => 'nullable|string|exists:correspondence_priorities,code',
             'confidentiality' => 'nullable|string',
             'structure_id' => 'nullable|exists:structures,id',
             'channel_id' => 'nullable|exists:correspondence_channels,id',
@@ -209,7 +209,7 @@ class CorrespondenceController extends Controller
             'subject' => 'nullable|string|max:500',
             'summary' => 'nullable|string',
             'medium' => 'nullable|in:physique,electronique,hybride',
-            'priority' => 'nullable|string',
+            'priority' => 'nullable|string|exists:correspondence_priorities,code',
             'confidentiality' => 'nullable|string',
         ]);
 

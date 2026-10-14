@@ -9,15 +9,24 @@
       @endif
     </td>
     <td class="identity" align="center" valign="middle">
-      <div class="ministry">MINISTÈRE DE L'ÉCONOMIE ET DES FINANCES.</div>
+      <div class="ministry">{{ $ministry ?? "MINISTÈRE DE L'ÉCONOMIE ET DES FINANCES." }}</div>
       <div class="direction">{{ $structureEntete ?? 'DIRECTION GÉNÉRALE DU TRÉSOR ET DE LA COMPTABILITÉ PUBLIQUE' }}</div>
+      @if(!empty($structureLine))
+        <div class="direction">{{ $structureLine }}</div>
+      @endif
+      @if(!empty($headerExtra))
+        <div style="margin-top:3px;font-size:9px;">{{ $headerExtra }}</div>
+      @endif
     </td>
     <td class="republic" width="190" align="center" valign="middle">
-      <div class="republic-title">République du Mali</div>
+      <div class="republic-title">{{ $republic ?? 'République du Mali' }}</div>
       <div style="margin:3px 0 2px;">
         <img src="{{ str_replace('\\', '/', public_path('images/drapeau-mali.png')) }}" width="78" height="16" alt="">
       </div>
-      <div class="motto">Un Peuple – Un But – Une Foi</div>
+      <div class="motto">{{ $motto ?? 'Un Peuple – Un But – Une Foi' }}</div>
     </td>
   </tr>
 </table>
+@if(!empty($footer))
+  <div style="text-align:center;font-size:9px;margin:-4px 0 8px;">{{ $footer }}</div>
+@endif

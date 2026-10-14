@@ -141,6 +141,7 @@ class StructureController extends Controller
             'structure_type_id' => ['nullable', 'exists:structure_types,id'],
             'parent_id' => ['nullable', 'exists:structures,id'],
             'is_active' => ['nullable', 'boolean'],
+            'is_access_boundary' => ['nullable', 'boolean'],
             'sort_order' => ['nullable', 'integer', 'min:0'],
         ]);
 
@@ -148,6 +149,11 @@ class StructureController extends Controller
         $data['is_active'] = array_key_exists('is_active', $data)
             ? (bool) $data['is_active']
             : ($structure?->is_active ?? true);
+        if (array_key_exists('is_access_boundary', $data)) {
+            $data['is_access_boundary'] = (bool) $data['is_access_boundary'];
+        } elseif ($structure) {
+            unset($data['is_access_boundary']);
+        }
         $data['sort_order'] = $data['sort_order'] ?? ($structure?->sort_order ?? 0);
 
         return $data;

@@ -24,6 +24,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'role_or_permission' => RoleOrPermissionMiddleware::class,
             'password.changed' => EnsurePasswordChanged::class,
             'auth.idle' => EnsureNotIdle::class,
+            'mail.context' => \App\Http\Middleware\EnsureMailOrganizationalContext::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

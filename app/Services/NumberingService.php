@@ -29,23 +29,34 @@ class NumberingService
         'DPR' => ['production_folders', 'reference'],
     ];
 
+    private const MAIL_CODES = ['ARR', 'DEP', 'BT', 'FC', 'BE', 'AR'];
+
     /**
-     * Prochain numéro transactionnel. Format : PREFIX/YEAR/000001
-     * Les compteurs MVP sont globaux (structure_id ignoré pour l'unicité).
+     * Prochain numéro transactionnel.
+     * Courrier : PREFIX/CODE_STRUCTURE/ANNEE/000001, compteur isolé par frontière.
+     * Autres modules, ou appel sans structure : PREFIX/ANNEE/000001, compteur global.
      */
     public function nextNumber(string|NumberingSequenceCode $code, ?int $year = null, ?int $structureId = null): string
     {
         $codeValue = $code instanceof NumberingSequenceCode ? $code->value : $code;
         $prefix = $code instanceof NumberingSequenceCode ? $code->prefix() : $codeValue;
         $year ??= (int) now()->format('Y');
+        $boundaryId = $this->mailBoundaryId($codeValue, $structureId);
+        $structureCode = $boundaryId ? $this->structureCode($boundaryId) : null;
+        $numberPrefix = $structureCode ? $prefix.'/'.$structureCode : $prefix;
 
-        return DB::transaction(function () use ($codeValue, $prefix, $year) {
-            $sequence = NumberingSequence::query()
+        return DB::transaction(function () use ($codeValue, $prefix, $year, $boundaryId, $numberPrefix) {
+            $sequenceQuery = NumberingSequence::query()
                 ->where('code', $codeValue)
-                ->where('year', $year)
-                ->whereNull('structure_id')
-                ->lockForUpdate()
-                ->first();
+                ->where('year', $year);
+
+            if ($boundaryId) {
+                $sequenceQuery->where('structure_id', $boundaryId);
+            } else {
+                $sequenceQuery->whereNull('structure_id');
+            }
+
+            $sequence = $sequenceQuery->lockForUpdate()->first();
 
             if (! $sequence) {
                 $sequence = NumberingSequence::query()->create([
@@ -55,7 +66,7 @@ class NumberingService
                     'padding' => 6,
                     'last_value' => 0,
                     'reset_yearly' => true,
-                    'structure_id' => null,
+                    'structure_id' => $boundaryId,
                 ]);
 
                 $sequence = NumberingSequence::query()
@@ -64,7 +75,7 @@ class NumberingService
                     ->firstOrFail();
             }
 
-            $existingMax = $this->maxExistingValue($sequence->code, $sequence->prefix, $sequence->year);
+            $existingMax = $this->maxExistingValue($sequence->code, $numberPrefix, $sequence->year);
             if ($existingMax > (int) $sequence->last_value) {
                 $sequence->last_value = $existingMax;
             }
@@ -74,17 +85,40 @@ class NumberingService
 
             return sprintf(
                 '%s/%d/%s',
-                $sequence->prefix,
+                $numberPrefix,
                 $sequence->year,
                 str_pad((string) $sequence->last_value, (int) $sequence->padding, '0', STR_PAD_LEFT)
             );
         });
     }
 
+    private function mailBoundaryId(string $code, ?int $structureId): ?int
+    {
+        if (! $structureId || ! in_array($code, self::MAIL_CODES, true)) {
+            return null;
+        }
+
+        $structure = \App\Models\Structure::query()->find($structureId);
+        if (! $structure) {
+            return null;
+        }
+
+        return (int) ($structure->boundary_structure_id ?: $structure->id);
+    }
+
+    private function structureCode(int $structureId): string
+    {
+        $code = (string) \App\Models\Structure::query()->whereKey($structureId)->value('code');
+        $code = strtoupper(preg_replace('/[^A-Z0-9]/', '', $code) ?? '');
+
+        return $code !== '' ? $code : 'S'.$structureId;
+    }
+
     /**
      * Plus grand suffixe numérique déjà attribué pour ce préfixe/année (évite les collisions unique).
+     * @param  string  $numberPrefix  Préfixe affiché, par exemple ARR ou ARR/DSI.
      */
-    private function maxExistingValue(string $code, string $prefix, int $year): int
+    private function maxExistingValue(string $code, string $numberPrefix, int $year): int
     {
         $source = self::SEQUENCE_SOURCES[$code] ?? null;
         if ($source === null) {
@@ -96,10 +130,10 @@ class NumberingService
             return 0;
         }
 
-        $pattern = $prefix.'/'.$year.'/';
+        $pattern = str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $numberPrefix.'/'.$year.'/').'%';
         $values = DB::table($table)
             ->whereNotNull($column)
-            ->where($column, 'like', $pattern.'%')
+            ->whereRaw($column.' like ? escape ?', [$pattern, '\\'])
             ->pluck($column);
 
         $max = 0;

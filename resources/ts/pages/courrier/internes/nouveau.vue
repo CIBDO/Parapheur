@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useCorrespondence } from '@/composables/useCorrespondence'
 import {
+  applyMailPriorities,
   correspondenceConfidentialityLabels,
   correspondenceMediumLabels,
   correspondencePriorityLabels,
@@ -19,6 +20,7 @@ const userData = useCookie<Record<string, any> | null>('userData')
 const errorMsg = ref('')
 
 const structures = ref<any[]>([])
+const priorities = ref<any[]>([])
 
 const form = ref({
   direction: 'interne',
@@ -45,12 +47,25 @@ onMounted(async () => {
     ?? null
 
   try {
-    const structs = await $api('/meta/structures')
+    const [structs, priorityList] = await Promise.all([
+      $api('/meta/structures'),
+      $api('/mail/meta/priorities'),
+    ])
     structures.value = Array.isArray(structs) ? structs : []
+    priorities.value = Array.isArray(priorityList) ? priorityList : []
+    applyMailPriorities(priorities.value)
   }
   catch {
     structures.value = []
   }
+})
+
+const priorityItems = computed(() => {
+  const active = priorities.value.filter(item => item.is_active !== false)
+  if (!active.length)
+    return Object.entries(correspondencePriorityLabels).map(([value, title]) => ({ value, title }))
+
+  return active.map(item => ({ value: item.code, title: item.name }))
 })
 
 async function submit() {
@@ -175,7 +190,7 @@ async function submit() {
             >
               <AppSelect
                 v-model="form.priority"
-                :items="Object.entries(correspondencePriorityLabels).map(([value, title]) => ({ value, title }))"
+                :items="priorityItems"
                 label="Priorité"
               />
             </VCol>

@@ -13,6 +13,7 @@ declare global {
   const actionLabels: typeof import('./resources/ts/utils/parapheurUi')['actionLabels']
   const alphaDashValidator: typeof import('./resources/ts/@core/utils/validators')['alphaDashValidator']
   const alphaValidator: typeof import('./resources/ts/@core/utils/validators')['alphaValidator']
+  const applyMailPriorities: typeof import('./resources/ts/utils/courrierUi')['applyMailPriorities']
   const appointmentStatusColor: typeof import('./resources/ts/utils/appointmentsUi')['appointmentStatusColor']
   const appointmentStatusLabel: typeof import('./resources/ts/utils/appointmentsUi')['appointmentStatusLabel']
   const archiveStatusLabels: typeof import('./resources/ts/utils/gedUi')['archiveStatusLabels']
@@ -515,6 +516,7 @@ declare module 'vue' {
     readonly actionLabels: UnwrapRef<typeof import('./resources/ts/utils/parapheurUi')['actionLabels']>
     readonly alphaDashValidator: UnwrapRef<typeof import('./resources/ts/@core/utils/validators')['alphaDashValidator']>
     readonly alphaValidator: UnwrapRef<typeof import('./resources/ts/@core/utils/validators')['alphaValidator']>
+    readonly applyMailPriorities: UnwrapRef<typeof import('./resources/ts/utils/courrierUi')['applyMailPriorities']>
     readonly appointmentStatusColor: UnwrapRef<typeof import('./resources/ts/utils/appointmentsUi')['appointmentStatusColor']>
     readonly appointmentStatusLabel: UnwrapRef<typeof import('./resources/ts/utils/appointmentsUi')['appointmentStatusLabel']>
     readonly archiveStatusLabels: UnwrapRef<typeof import('./resources/ts/utils/gedUi')['archiveStatusLabels']>

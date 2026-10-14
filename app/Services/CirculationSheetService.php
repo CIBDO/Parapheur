@@ -19,6 +19,7 @@ class CirculationSheetService
         private readonly DocumentTemplateRenderer $renderer,
         private readonly DocumentService $documentService,
         private readonly MailSheetPdfService $pdf,
+        private readonly MailIdentityService $identity,
         private readonly AuditLogger $audit,
     ) {}
 
@@ -79,9 +80,13 @@ class CirculationSheetService
         return $this->findOrCreate($correspondence, $user, $data)['sheet'];
     }
 
-    public function list(array $filters = [])
+    public function list(\App\Models\User $user, array $filters = [])
     {
         $query = CirculationSheet::query()->with(['correspondence', 'creator', 'document']);
+
+        $query->whereHas('correspondence', function ($correspondence) use ($user) {
+            app(MailVisibilityScope::class)->apply($correspondence, $user);
+        });
 
         if (! empty($filters['correspondence_id'])) {
             $query->where('correspondence_id', $filters['correspondence_id']);
@@ -110,6 +115,8 @@ class CirculationSheetService
             'assignments.toStructure',
             'assignments.action',
         ])->firstOrFail();
+
+        $this->identity->freeze($correspondence, force: ! $correspondence->dispatches()->exists());
 
         $variables = $this->buildVariables($sheet, $correspondence);
 
@@ -241,7 +248,7 @@ class CirculationSheetService
             }
         }
 
-        $priority = $correspondence->priority?->value;
+        $priority = $correspondence->priorityCode();
         $annotations = array_map(function (array $item) use ($priority, $selectedActions, $dbAnnotations) {
             $label = $dbAnnotations[$item['code']]->name ?? $item['label'];
             $checked = in_array($item['code'], $selectedActions, true)
@@ -281,12 +288,16 @@ class CirculationSheetService
             default => 'ORDINAIRE',
         };
 
-        $priorityLabel = match ($correspondence->priority?->value) {
-            'importante' => 'Importante',
-            'urgente' => 'Urgente',
-            'tres_urgente' => 'Très urgente',
-            default => 'Normale',
-        };
+        $priorityCode = $correspondence->priorityCode();
+        $priorityLabel = \App\Models\CorrespondencePriority::query()->where('code', $priorityCode)->value('name')
+            ?? match ($priorityCode) {
+                'importante' => 'Importante',
+                'urgente' => 'Urgente',
+                'tres_urgente' => 'Très urgente',
+                default => 'Normale',
+            };
+
+        $identity = $this->identity->forCorrespondence($correspondence);
 
         return [
             'numero_fiche' => $sheet->number,
@@ -332,13 +343,15 @@ class CirculationSheetService
                 default => 'ARRIVEE',
             },
             'numero_ministere' => $correspondence->ministry_number ?? '',
-            'structure_entete' => mb_strtoupper(
-                $correspondence->structure?->name
-                    ?: 'Direction Générale du Trésor et de la Comptabilité Publique',
-                'UTF-8'
-            ),
-            'signataire_gauche' => $this->pdf->signatories($correspondence->structure)[0],
-            'signataire_droite' => $this->pdf->signatories($correspondence->structure)[1],
+            'structure_entete' => $identity['header'],
+            'structure_line' => $identity['structure_line'],
+            'ministry' => $identity['ministry'],
+            'header_extra' => $identity['extra'],
+            'footer' => $identity['footer'],
+            'republic' => $identity['republic'],
+            'motto' => $identity['motto'],
+            'signataire_gauche' => $identity['signatory_left'],
+            'signataire_droite' => $identity['signatory_right'],
             'services_imputation' => $this->imputationColumns($correspondence),
             'annotations_grille' => $this->annotationGrid($correspondence, $selectedActions),
             'emblem' => MailSheetPdfService::emblemPath(),
@@ -430,7 +443,7 @@ class CirculationSheetService
             }
         }
 
-        $priority = $correspondence->priority?->value;
+        $priority = $correspondence->priorityCode();
         if (in_array($priority, ['urgente', 'importante'], true)) {
             $checked['Urgent'] = true;
         }

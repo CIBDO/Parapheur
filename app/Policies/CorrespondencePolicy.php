@@ -56,6 +56,11 @@ class CorrespondencePolicy
         return $this->accessService->canProcess($user, $correspondence);
     }
 
+    public function process(User $user, Correspondence $correspondence): bool
+    {
+        return $this->takeCharge($user, $correspondence);
+    }
+
     public function reply(User $user, Correspondence $correspondence): bool
     {
         if (! $this->accessService->canView($user, $correspondence)) {

@@ -20,6 +20,7 @@ class TransmissionSlipController extends Controller
         $this->authorize('viewAny', TransmissionSlip::class);
 
         $query = TransmissionSlip::query()->with(['fromStructure', 'toStructure', 'creator', 'items.correspondence']);
+        app(\App\Services\MailVisibilityScope::class)->applyToSlips($query, $request->user());
 
         if ($request->filled('status')) {
             $query->where('status', $request->string('status'));

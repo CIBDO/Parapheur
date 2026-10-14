@@ -5,53 +5,33 @@ namespace App\Services;
 use App\Enums\DocumentConfidentiality;
 use App\Models\Correspondence;
 use App\Models\User;
+use App\Services\Organization\OrganizationalContextResolver;
 
 class CorrespondenceAccessService
 {
+    public function __construct(
+        private readonly MailVisibilityScope $visibility,
+        private readonly OrganizationalContextResolver $contexts,
+    ) {}
+
     /**
      * Vérifie si l'utilisateur peut consulter la correspondance.
      */
     public function canView(User $user, Correspondence $correspondence): bool
     {
-        // Admin a tous les droits
-        if ($user->can('admin.access')) {
-            return true;
-        }
-
-        // Permission générale (consultation limitée ou vue globale)
-        if (! $user->can('mail.view') && ! $user->can('mail.view_all')) {
+        if (! $user->is_active) {
             return false;
         }
 
-        // Vérifier la confidentialité (même avec view_all)
+        if (! $this->contexts->allowsPermission($user, 'mail.view') && ! $this->contexts->allowsPermission($user, 'mail.view_all')) {
+            return false;
+        }
+
         if (! $this->canAccessConfidentiality($user, $correspondence)) {
             return false;
         }
 
-        if ($user->can('mail.view_all')) {
-            return true;
-        }
-
-        if ($correspondence->owner_user_id === $user->id) {
-            return true;
-        }
-
-        if ($correspondence->registered_by === $user->id) {
-            return true;
-        }
-
-        $restricted = in_array($correspondence->confidentiality, [
-            DocumentConfidentiality::Confidentiel,
-            DocumentConfidentiality::TresConfidentiel,
-        ], true);
-
-        if (! $restricted && $correspondence->structure_id && $user->structure_id === $correspondence->structure_id) {
-            return true;
-        }
-
-        return $correspondence->assignments()
-            ->where('to_user_id', $user->id)
-            ->exists();
+        return $this->visibility->allows($user, $correspondence);
     }
 
     /**
@@ -66,11 +46,12 @@ class CorrespondenceAccessService
         }
 
         if ($confidentiality === DocumentConfidentiality::Confidentiel) {
-            return $user->can('mail.view_confidential') || $user->can('admin.access');
+            return $this->contexts->allowsPermission($user, 'mail.view_confidential')
+                || $this->contexts->allowsPermission($user, 'mail.view_very_confidential');
         }
 
         if ($confidentiality === DocumentConfidentiality::TresConfidentiel) {
-            return $user->can('mail.view_very_confidential') || $user->can('admin.access');
+            return $this->contexts->allowsPermission($user, 'mail.view_very_confidential');
         }
 
         return true;
@@ -82,7 +63,7 @@ class CorrespondenceAccessService
             return false;
         }
 
-        return $user->can('mail.update') || $user->can('admin.access');
+        return $this->contexts->allowsPermission($user, 'mail.update');
     }
 
     public function canAssign(User $user, Correspondence $correspondence): bool
@@ -91,7 +72,7 @@ class CorrespondenceAccessService
             return false;
         }
 
-        return $user->can('mail.assign') || $user->can('admin.access');
+        return $this->contexts->allowsPermission($user, 'mail.assign');
     }
 
     public function canProcess(User $user, Correspondence $correspondence): bool
@@ -106,6 +87,6 @@ class CorrespondenceAccessService
             ->whereIn('status', ['transmis', 'recu', 'pris_en_charge'])
             ->exists();
 
-        return $hasActiveAssignment && $user->can('mail.process');
+        return $hasActiveAssignment && $this->contexts->allowsPermission($user, 'mail.process');
     }
 }

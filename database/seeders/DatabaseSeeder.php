@@ -140,6 +140,14 @@ class DatabaseSeeder extends Seeder
             'mail.update_transmission_slip',
             'mail.delete_transmission_slip',
             'mail.validate_transmission_slip',
+            'mail.register',
+            'mail.transmit',
+            'mail.validate',
+            'mail.sign',
+            'mail.close',
+            'mail.download',
+            'mail.export',
+            'mail.manage_registers',
             'document_template.view',
             'document_template.view_all',
             'document_template.create',
@@ -200,14 +208,16 @@ class DatabaseSeeder extends Seeder
         ]);
 
         $mailBasic = [
-            'mail.view', 'mail.create', 'mail.process',
+            'mail.view', 'mail.create', 'mail.process', 'mail.register', 'mail.download',
         ];
         $mailManage = array_merge($mailBasic, [
             'mail.view_all', 'mail.update', 'mail.assign', 'mail.reply', 'mail.dispatch', 'mail.archive',
+            'mail.transmit', 'mail.validate', 'mail.sign', 'mail.close', 'mail.export',
             'mail.create_transmission_slip', 'mail.update_transmission_slip', 'mail.validate_transmission_slip',
         ]);
         $mailAdmin = array_merge($mailManage, [
             'mail.view_confidential', 'mail.view_very_confidential', 'mail.delete', 'mail.admin',
+            'mail.manage_registers',
             'mail.delete_transmission_slip', 'document_template.view', 'document_template.view_all',
             'document_template.create', 'document_template.update', 'document_template.delete', 'document_template.publish',
         ]);
@@ -404,6 +414,9 @@ class DatabaseSeeder extends Seeder
                 'sort_order' => 4,
             ]
         );
+
+        app(\App\Services\Organization\StructureBoundaryService::class)->markDefaultBoundaries();
+        app(\App\Services\Organization\StructureBoundaryService::class)->refreshAll();
 
         $docTypes = [
             ['code' => 'NOTE', 'name' => 'Note', 'sort_order' => 1],

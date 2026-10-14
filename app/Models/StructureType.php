@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class StructureType extends Model
 {
@@ -16,5 +17,10 @@ class StructureType extends Model
     public function structures(): HasMany
     {
         return $this->hasMany(Structure::class);
+    }
+
+    public function documentProfile(): HasOne
+    {
+        return $this->hasOne(StructureTypeDocumentProfile::class);
     }
 }

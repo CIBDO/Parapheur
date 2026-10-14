@@ -7,6 +7,7 @@ use App\Models\Correspondent;
 use App\Models\CorrespondenceAssignmentAction;
 use App\Models\CorrespondenceCategory;
 use App\Models\CorrespondenceChannel;
+use App\Models\CorrespondencePriority;
 use App\Models\CorrespondenceQualification;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -41,6 +42,13 @@ class MailMetaController extends Controller
             ->get();
 
         return response()->json($qualifications);
+    }
+
+    public function priorities(): JsonResponse
+    {
+        return response()->json(
+            CorrespondencePriority::query()->where('is_active', true)->orderBy('sort_order')->orderBy('name')->get()
+        );
     }
 
     public function actions(): JsonResponse

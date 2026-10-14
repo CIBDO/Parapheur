@@ -94,6 +94,7 @@ declare module 'vue-router/auto-routes' {
     'parapheur-agenda-nouveau': RouteRecordInfo<'parapheur-agenda-nouveau', '/parapheur/agenda/nouveau', Record<never, never>, Record<never, never>>,
     'parapheur-appointment-types': RouteRecordInfo<'parapheur-appointment-types', '/parapheur/appointment-types', Record<never, never>, Record<never, never>>,
     'parapheur-audit': RouteRecordInfo<'parapheur-audit', '/parapheur/audit', Record<never, never>, Record<never, never>>,
+    'parapheur-courrier-parametres': RouteRecordInfo<'parapheur-courrier-parametres', '/parapheur/courrier-parametres', Record<never, never>, Record<never, never>>,
     'parapheur-delegations': RouteRecordInfo<'parapheur-delegations', '/parapheur/delegations', Record<never, never>, Record<never, never>>,
     'parapheur-dg': RouteRecordInfo<'parapheur-dg', '/parapheur/dg', Record<never, never>, Record<never, never>>,
     'parapheur-document-types': RouteRecordInfo<'parapheur-document-types', '/parapheur/document-types', Record<never, never>, Record<never, never>>,

@@ -13,15 +13,15 @@ const loading = ref(true)
 
 const labels: Record<string, string> = {
   draft: 'Brouillon',
-  pending_validation: 'En validation',
-  to_correct: 'À corriger',
-  approved: 'Approuvée',
+  pending_validation: 'Brouillon',
+  to_correct: 'Brouillon',
+  approved: 'Prête',
   scheduled: 'Programmée',
   published: 'Publiée',
-  expired: 'Expirée',
+  expired: 'Terminée',
   archived: 'Archivée',
-  rejected: 'Rejetée',
-  cancelled: 'Annulée',
+  rejected: 'Brouillon',
+  cancelled: 'Retirée',
 }
 
 onMounted(async () => {
@@ -34,7 +34,7 @@ onMounted(async () => {
 <template>
   <ParapheurPageHeader
     title="Gestion des annonces"
-    subtitle="Brouillons, validation et publication"
+    subtitle="Les annonces que vous avez rédigées"
     icon="tabler-edit"
   >
     <template #actions>

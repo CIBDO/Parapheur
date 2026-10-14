@@ -42,6 +42,8 @@ class CorrespondenceDispatchService
                 ]);
             }
 
+            app(MailIdentityService::class)->freeze($correspondence, force: true);
+
             $dispatch = CorrespondenceDispatch::query()->create([
                 'correspondence_id' => $correspondence->id,
                 'dispatched_at' => $data['dispatched_at'] ?? now(),

@@ -95,7 +95,7 @@ final class AnnouncementAccess
 
     public function canPublish(User $user, Announcement $announcement): bool
     {
-        if (! $user->can('announcement.publish') && ! $user->can('announcement.schedule')) {
+        if (! $user->can('announcement.publish') && ! $user->can('announcement.schedule') && ! $user->can('announcement.create')) {
             return false;
         }
 
@@ -103,17 +103,10 @@ final class AnnouncementAccess
             return false;
         }
 
-        $circuit = $announcement->category?->validation_circuit?->value ?? 'direct';
-        if ($circuit === 'direct') {
-            return (int) $announcement->author_id === (int) $user->id
-                || $this->isInstitutionalActor($user)
-                || $user->can('announcement.manage');
-        }
-
-        return $announcement->status === AnnouncementStatus::Approved
-            && ($this->isInstitutionalActor($user)
-                || (int) $announcement->structure_id === (int) $user->structure_id
-                || (int) $announcement->author_id === (int) $user->id);
+        return (int) $announcement->author_id === (int) $user->id
+            || $this->isInstitutionalActor($user)
+            || $user->can('announcement.manage')
+            || (int) $announcement->structure_id === (int) $user->structure_id;
     }
 
     public function canViewReceipts(User $user, Announcement $announcement): bool

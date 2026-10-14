@@ -6,7 +6,6 @@ use App\Enums\CorrespondenceDirection;
 use App\Enums\CorrespondenceMedium;
 use App\Enums\CorrespondenceStatus;
 use App\Enums\DocumentConfidentiality;
-use App\Enums\DocumentPriority;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -41,7 +40,22 @@ class Correspondence extends Model
         'priority',
         'confidentiality',
         'structure_id',
+        'unit_structure_id',
         'registered_by',
+        'owner_user_id',
+        'piece_count',
+        'keywords',
+        'requires_reply',
+        'is_registered',
+        'reply_to_correspondence_id',
+        'parapheur_document_id',
+        'letterhead_snapshot',
+        'signatory_left',
+        'signatory_right',
+        'signatory_user_id',
+        'signatory_function',
+        'signatory_capacity',
+        'letterhead_frozen_at',
         'owner_user_id',
         'piece_count',
         'keywords',
@@ -57,7 +71,7 @@ class Correspondence extends Model
             'direction' => CorrespondenceDirection::class,
             'medium' => CorrespondenceMedium::class,
             'status' => CorrespondenceStatus::class,
-            'priority' => DocumentPriority::class,
+            'priority' => 'string',
             'confidentiality' => DocumentConfidentiality::class,
             'received_at' => 'datetime',
             'correspondence_date' => 'date',
@@ -66,7 +80,20 @@ class Correspondence extends Model
             'keywords' => 'array',
             'requires_reply' => 'boolean',
             'is_registered' => 'boolean',
+            'letterhead_snapshot' => 'array',
+            'letterhead_frozen_at' => 'datetime',
         ];
+    }
+
+    public function priorityCode(): ?string
+    {
+        $priority = $this->priority;
+
+        if ($priority instanceof \BackedEnum) {
+            return $priority->value;
+        }
+
+        return is_string($priority) && $priority !== '' ? $priority : null;
     }
 
     protected static function boot(): void
@@ -105,6 +132,11 @@ class Correspondence extends Model
         return $this->belongsTo(Structure::class);
     }
 
+    public function unit(): BelongsTo
+    {
+        return $this->belongsTo(Structure::class, 'unit_structure_id');
+    }
+
     public function registeredBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'registered_by');
@@ -133,6 +165,11 @@ class Correspondence extends Model
     public function assignments(): HasMany
     {
         return $this->hasMany(CorrespondenceAssignment::class);
+    }
+
+    public function participants(): HasMany
+    {
+        return $this->hasMany(CorrespondenceParticipant::class);
     }
 
     public function events(): HasMany

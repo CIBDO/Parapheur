@@ -20,8 +20,10 @@ use App\Http\Controllers\Api\Mail\CorrespondentController;
 use App\Http\Controllers\Api\Mail\DocumentTemplateController;
 use App\Http\Controllers\Api\Mail\MailAdminController;
 use App\Http\Controllers\Api\Mail\MailDashboardController;
+use App\Http\Controllers\Api\Mail\MailLetterheadProfileController;
 use App\Http\Controllers\Api\Mail\MailMetaController;
 use App\Http\Controllers\Api\Mail\MailRegisterController;
+use App\Http\Controllers\Api\Mail\MailWorkContextController;
 use App\Http\Controllers\Api\Mail\TransmissionSlipController;
 use App\Http\Controllers\Api\Workspace\WorkspaceBridgeController;
 use App\Http\Controllers\Api\Workspace\WorkspaceController;
@@ -571,7 +573,9 @@ Route::middleware(['auth:sanctum', 'auth.idle', 'password.changed'])->group(func
     });
 
     // ——— Module Courrier ———
-    Route::middleware('permission:mail.view|admin.access')->prefix('mail')->group(function () {
+    Route::middleware(['permission:mail.view|admin.access', 'mail.context'])->prefix('mail')->group(function () {
+        Route::get('/work-context', [MailWorkContextController::class, 'show']);
+        Route::post('/work-context', [MailWorkContextController::class, 'update']);
         // Dashboards
         Route::get('/dashboard/order-office', [MailDashboardController::class, 'orderOffice']);
         Route::get('/dashboard/dg', [MailDashboardController::class, 'dg']);
@@ -581,6 +585,7 @@ Route::middleware(['auth:sanctum', 'auth.idle', 'password.changed'])->group(func
         Route::get('/meta/channels', [MailMetaController::class, 'channels']);
         Route::get('/meta/categories', [MailMetaController::class, 'categories']);
         Route::get('/meta/qualifications', [MailMetaController::class, 'qualifications']);
+        Route::get('/meta/priorities', [MailMetaController::class, 'priorities']);
         Route::get('/meta/actions', [MailMetaController::class, 'actions']);
         Route::get('/meta/correspondents', [MailMetaController::class, 'correspondents']);
 
@@ -692,6 +697,9 @@ Route::middleware(['auth:sanctum', 'auth.idle', 'password.changed'])->group(func
 
         // Administration des référentiels
         Route::middleware('permission:mail.admin|admin.access')->prefix('admin')->group(function () {
+            Route::get('/letterhead-profiles', [MailLetterheadProfileController::class, 'index']);
+            Route::put('/letterhead-profiles/{structureType}', [MailLetterheadProfileController::class, 'update']);
+
             Route::get('/channels', [MailAdminController::class, 'channelsIndex']);
             Route::post('/channels', [MailAdminController::class, 'channelsStore']);
             Route::put('/channels/{channel}', [MailAdminController::class, 'channelsUpdate']);
@@ -709,6 +717,12 @@ Route::middleware(['auth:sanctum', 'auth.idle', 'password.changed'])->group(func
             Route::put('/qualifications/{qualification}', [MailAdminController::class, 'qualificationsUpdate']);
             Route::post('/qualifications/{qualification}/toggle', [MailAdminController::class, 'qualificationsToggle']);
             Route::delete('/qualifications/{qualification}', [MailAdminController::class, 'qualificationsDestroy']);
+
+            Route::get('/priorities', [MailAdminController::class, 'prioritiesIndex']);
+            Route::post('/priorities', [MailAdminController::class, 'prioritiesStore']);
+            Route::put('/priorities/{mailPriority}', [MailAdminController::class, 'prioritiesUpdate']);
+            Route::post('/priorities/{mailPriority}/toggle', [MailAdminController::class, 'prioritiesToggle']);
+            Route::delete('/priorities/{mailPriority}', [MailAdminController::class, 'prioritiesDestroy']);
 
             Route::get('/actions', [MailAdminController::class, 'actionsIndex']);
             Route::post('/actions', [MailAdminController::class, 'actionsStore']);

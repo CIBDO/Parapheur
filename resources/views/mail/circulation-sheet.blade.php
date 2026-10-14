@@ -33,6 +33,12 @@
   @include('mail.partials.letterhead', [
     'saisiPar' => $saisi_par ?? '',
     'structureEntete' => $structure_entete ?? '',
+    'structureLine' => $structure_line ?? null,
+    'ministry' => $ministry ?? null,
+    'headerExtra' => $header_extra ?? null,
+    'footer' => $footer ?? null,
+    'republic' => $republic ?? null,
+    'motto' => $motto ?? null,
     'emblem' => $emblem ?? null,
   ])
 

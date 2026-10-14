@@ -20,7 +20,7 @@ class CirculationSheetController extends Controller
 
     public function index(Request $request): JsonResponse
     {
-        return response()->json($this->service->list($request->only(['correspondence_id', 'status', 'per_page'])));
+        return response()->json($this->service->list($request->user(), $request->only(['correspondence_id', 'status', 'per_page'])));
     }
 
     public function store(Request $request): JsonResponse
@@ -44,6 +44,7 @@ class CirculationSheetController extends Controller
 
     public function show(CirculationSheet $circulationSheet): JsonResponse
     {
+        $this->authorize('view', $circulationSheet->correspondence);
         $circulationSheet->load(['correspondence', 'document', 'creator', 'templateVersion']);
 
         return response()->json($circulationSheet);
@@ -51,6 +52,7 @@ class CirculationSheetController extends Controller
 
     public function generateDocument(Request $request, CirculationSheet $circulationSheet): JsonResponse
     {
+        $this->authorize('view', $circulationSheet->correspondence);
         try {
             $sheet = $this->service->generateDocument($circulationSheet, $request->user());
 

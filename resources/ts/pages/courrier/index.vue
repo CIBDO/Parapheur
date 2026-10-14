@@ -6,7 +6,7 @@ import CorrespondenceListActions from '@/components/courrier/CorrespondenceListA
 import { $api } from '@/utils/api'
 import { useCorrespondence } from '@/composables/useCorrespondence'
 import { listItems } from '@/utils/listItems'
-import { correspondenceDirectionLabels, correspondencePriorityColors, correspondencePriorityLabels, correspondenceStatusColors, correspondenceStatusLabels, detailRouteName, formatCorrespondenceNumber, formatCourrierDate, formatCourrierDateTime, isCorrespondenceAssigned, partiesByRole, partyDisplayName, statusLabel } from '@/utils/courrierUi'
+import { applyMailPriorities, correspondenceDirectionLabels, correspondencePriorityColors, correspondencePriorityLabels, correspondenceStatusColors, correspondenceStatusLabels, detailRouteName, formatCorrespondenceNumber, formatCourrierDate, formatCourrierDateTime, isCorrespondenceAssigned, partiesByRole, partyDisplayName, statusLabel } from '@/utils/courrierUi'
 
 definePage({
   meta: {
@@ -111,6 +111,9 @@ async function onCreated() {
 }
 
 onMounted(async () => {
+  $api('/mail/meta/priorities')
+    .then(items => applyMailPriorities(Array.isArray(items) ? items : []))
+    .catch(() => undefined)
   await Promise.all([loadDashboard(), loadRecentIncoming()])
 })
 

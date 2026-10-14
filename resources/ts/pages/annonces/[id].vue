@@ -11,6 +11,8 @@ definePage({
 
 const route = useRoute()
 const store = useAnnouncementStore()
+const userData = useCookie<Record<string, any> | null>('userData')
+const userId = computed(() => userData.value?.id ?? null)
 const item = ref<any>(null)
 const error = ref('')
 const loading = ref(true)
@@ -58,12 +60,16 @@ onMounted(load)
   <div v-else-if="item">
     <ParapheurPageHeader
       :title="item.title"
-      :subtitle="`${item.reference} · ${item.category?.name ?? ''}`"
+      :subtitle="[item.category?.name, item.author?.name].filter(Boolean).join(' · ')"
       icon="tabler-speakerphone"
     >
       <template #actions>
-        <VBtn variant="tonal" @click="favorite">
-          {{ item.favorite ? 'Retirer des favoris' : 'Favori' }}
+        <VBtn
+          v-if="item.author?.id && item.author.id === userId"
+          variant="tonal"
+          :to="{ name: 'annonces-gestion-id', params: { id: item.id } }"
+        >
+          Modifier
         </VBtn>
         <VBtn variant="text" @click="copyLink">
           Copier le lien
@@ -89,10 +95,7 @@ onMounted(load)
       <VCol cols="12" md="8">
         <VCard>
           <VCardText>
-            <p v-if="item.summary" class="text-body-1 mb-4">
-              {{ item.summary }}
-            </p>
-            <div class="announcement-body" v-html="item.body" />
+            <div class="announcement-body text-body-1" v-html="item.body || item.content" />
           </VCardText>
         </VCard>
         <VCard v-if="item.attachments?.length" class="mt-4">
@@ -121,26 +124,11 @@ onMounted(load)
       <VCol cols="12" md="4">
         <VCard>
           <VCardText class="d-flex flex-column gap-2">
-            <div><strong>Importance :</strong> {{ item.importance?.name }}</div>
-            <div><strong>Structure :</strong> {{ item.structure?.name }}</div>
-            <div><strong>Auteur :</strong> {{ item.author?.name }}</div>
-            <div><strong>Statut :</strong> {{ item.status }}</div>
-            <VBtn
-              v-if="$can('create', 'Announcement')"
-              variant="tonal"
-              :to="{ name: 'annonces-gestion-id', params: { id: item.id } }"
-            >
-              Gestion
+            <div v-if="item.author?.name"><strong>Publié par</strong><br>{{ item.author.name }}</div>
+            <div v-if="item.structure?.name"><strong>Structure</strong><br>{{ item.structure.name }}</div>
+            <VBtn variant="text" class="align-self-start px-0" @click="favorite">
+              {{ item.favorite ? 'Retirer des favoris' : 'Ajouter aux favoris' }}
             </VBtn>
-          </VCardText>
-        </VCard>
-        <VCard v-if="item.events?.length" class="mt-4">
-          <VCardTitle>Historique</VCardTitle>
-          <VCardText>
-            <div v-for="event in item.events" :key="event.created_at + event.event" class="mb-2">
-              <div class="font-weight-medium">{{ event.event }}</div>
-              <div class="text-caption">{{ event.actor }} · {{ event.created_at }}</div>
-            </div>
           </VCardText>
         </VCard>
       </VCol>

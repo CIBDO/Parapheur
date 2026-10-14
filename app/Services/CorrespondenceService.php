@@ -9,6 +9,7 @@ use App\Enums\NumberingSequenceCode;
 use App\Models\Correspondence;
 use App\Models\Structure;
 use App\Models\User;
+use App\Services\Organization\OrganizationalContextResolver;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
@@ -21,6 +22,7 @@ class CorrespondenceService
         private readonly CorrespondenceEventService $eventService,
         private readonly DocumentService $documentService,
         private readonly AuditLogger $audit,
+        private readonly OrganizationalContextResolver $contexts,
     ) {}
 
     /**
@@ -33,7 +35,7 @@ class CorrespondenceService
         return DB::transaction(function () use ($user, $data, $scanFile) {
             $documentData = is_array($data['document_data'] ?? null) ? $data['document_data'] : [];
             [$data, $parties] = $this->extractPartiesInput($data);
-            $data['structure_id'] = $data['structure_id'] ?? $user->structure_id;
+            $data = $this->bindOwnerStructure($user, $data);
 
             $arrivalNumber = $this->numberingService->nextNumber(
                 NumberingSequenceCode::Arrival->value,
@@ -80,7 +82,7 @@ class CorrespondenceService
     {
         return DB::transaction(function () use ($user, $data) {
             [$data, $parties] = $this->extractPartiesInput($data);
-            $data['structure_id'] = $data['structure_id'] ?? $user->structure_id;
+            $data = $this->bindOwnerStructure($user, $data);
 
             $correspondence = Correspondence::query()->create([
                 ...$data,
@@ -116,8 +118,8 @@ class CorrespondenceService
             $senderStructureId = $data['sender_structure_id'] ?? null;
             [$data, $parties] = $this->extractPartiesInput($data);
 
-            // Structure de rattachement = structure émettrice interne si fournie
             $data['structure_id'] = $data['structure_id'] ?? $senderStructureId ?? $user->structure_id;
+            $data = $this->bindOwnerStructure($user, $data);
 
             $correspondence = Correspondence::query()->create([
                 ...$data,
@@ -156,6 +158,11 @@ class CorrespondenceService
                 'confidentiality', 'structure_id', 'channel_id', 'category_id', 'qualification_id',
                 'piece_count', 'keywords', 'requires_reply',
             ];
+
+            if (array_key_exists('structure_id', $data)) {
+                $requested = $data['structure_id'] !== null ? (int) $data['structure_id'] : null;
+                $data['structure_id'] = $this->contexts->resolveOwnerStructureId($user, $requested);
+            }
 
             foreach ($fillable as $field) {
                 if (array_key_exists($field, $data)) {
@@ -201,7 +208,8 @@ class CorrespondenceService
                 'object' => $correspondence->subject,
                 'summary' => $correspondence->summary,
                 'structure_id' => $correspondence->structure_id,
-                'priority' => $correspondence->priority?->value,
+                'priority' => \App\Enums\DocumentPriority::tryFrom((string) $correspondence->priorityCode())?->value
+                    ?? \App\Enums\DocumentPriority::Normale->value,
                 'confidentiality' => $correspondence->confidentiality?->value,
             ],
             mainFile: $file
@@ -234,17 +242,7 @@ class CorrespondenceService
                 'assignments.toUser:id,name', 'assignments.toStructure:id,name,code',
             ]);
 
-        // Filtre de base : accès selon permissions
-        if (! $user->can('admin.access') && ! $user->can('mail.view_all')) {
-            $query->where(function ($q) use ($user) {
-                $q->where('owner_user_id', $user->id)
-                    ->orWhere('registered_by', $user->id)
-                    ->orWhere('structure_id', $user->structure_id)
-                    ->orWhereHas('assignments', function ($subQ) use ($user) {
-                        $subQ->where('to_user_id', $user->id);
-                    });
-            });
-        }
+        app(MailVisibilityScope::class)->apply($query, $user);
 
         if (! empty($filters['direction'])) {
             $query->where('direction', $filters['direction']);
@@ -255,7 +253,13 @@ class CorrespondenceService
         }
 
         if (! empty($filters['structure_id'])) {
-            $query->where('structure_id', $filters['structure_id']);
+            $requested = (int) $filters['structure_id'];
+            $allowed = $this->contexts->resolve($user)->structureIds;
+            if (! in_array($requested, $allowed, true)) {
+                $query->whereRaw('1 = 0');
+            } else {
+                $query->where('structure_id', $requested);
+            }
         }
 
         if (! empty($filters['channel_id'])) {
@@ -371,7 +375,7 @@ class CorrespondenceService
             'subject' => $correspondence->subject,
             'summary' => $correspondence->summary,
             'observations' => $correspondence->observations,
-            'priority' => $correspondence->priority?->value,
+            'priority' => $correspondence->priorityCode(),
             'confidentiality' => $correspondence->confidentiality?->value,
             'piece_count' => $correspondence->piece_count,
             'keywords' => $correspondence->keywords,
@@ -553,6 +557,28 @@ class CorrespondenceService
         );
 
         return [$data, $parties];
+    }
+
+    /**
+     * Impose la structure propriétaire dans le périmètre de l'utilisateur.
+     *
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    private function bindOwnerStructure(User $user, array $data): array
+    {
+        $requested = isset($data['structure_id']) && $data['structure_id'] !== null
+            ? (int) $data['structure_id']
+            : null;
+
+        $data['structure_id'] = $this->contexts->resolveOwnerStructureId($user, $requested);
+
+        if (empty($data['unit_structure_id'])) {
+            $context = $this->contexts->resolve($user);
+            $data['unit_structure_id'] = $context->unitStructureId ?? $data['structure_id'];
+        }
+
+        return $data;
     }
 
     /**

@@ -227,6 +227,7 @@ class AuthController extends Controller
             'role' => $user->getRoleNames()->first() ?? 'agent',
             'roles' => $user->getRoleNames(),
             'structure' => $user->structure?->only(['id', 'code', 'name']),
+            'mailContext' => app(\App\Services\Organization\OrganizationalContextResolver::class)->present($user),
             'position_title' => $user->position_title,
             'mustChangePassword' => (bool) $user->must_change_password,
             'avatar' => null,

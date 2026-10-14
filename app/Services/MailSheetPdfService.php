@@ -79,13 +79,17 @@ class MailSheetPdfService
             $imputations[] = ['date' => '', 'prenom' => '', 'nom' => '', 'annotation' => ''];
         }
 
+        $identity = app(MailIdentityService::class)->forCorrespondence($correspondence);
+
         return [
             'saisiPar' => $correspondence->registeredBy?->name ?: $saisiPar,
-            'structureEntete' => mb_strtoupper(
-                $correspondence->structure?->name
-                    ?: 'Direction Générale du Trésor et de la Comptabilité Publique',
-                'UTF-8'
-            ),
+            'structureEntete' => $identity['header'],
+            'structureLine' => $identity['structure_line'],
+            'ministry' => $identity['ministry'],
+            'headerExtra' => $identity['extra'],
+            'footer' => $identity['footer'],
+            'republic' => $identity['republic'],
+            'motto' => $identity['motto'],
             'emblem' => self::emblemPath(),
             'numeroCourrier' => $correspondence->arrival_number ?: $correspondence->departure_number,
             'numeroMinistere' => $correspondence->ministry_number,
@@ -99,49 +103,15 @@ class MailSheetPdfService
     }
 
     /**
-     * Direction : Directeur général Adjoint et Directeur Général. Trésorerie : le payeur et le fondé.
-     * Service rattaché : le responsable du poste et le fondé.
+     * Signataires de la structure émettrice, résolus depuis son identité documentaire.
      *
      * @return array{0: string, 1: string}
      */
     public function signatories(?\App\Models\Structure $structure): array
     {
-        $structure?->loadMissing('type');
-        $type = strtoupper((string) ($structure?->type?->code ?? ''));
-        $blob = mb_strtolower(
-            ($structure?->name ?? '').' '.($structure?->code ?? '').' '.($structure?->type?->name ?? ''),
-            'UTF-8'
-        );
+        $identity = app(MailIdentityService::class)->forStructure($structure);
 
-        $isDirection = in_array($type, ['DG', 'DIR', 'DGA'], true)
-            || str_contains($blob, 'direction');
-
-        if ($isDirection) {
-            return ['Directeur général Adjoint', 'Directeur Général'];
-        }
-
-        $isTreasury = in_array($type, ['TRESORERIE', 'PAIERIE', 'RECETTE'], true)
-            || str_contains($blob, 'trésor')
-            || str_contains($blob, 'tresor')
-            || str_contains($blob, 'paier')
-            || str_contains($blob, 'recette')
-            || str_contains($blob, 'perception');
-
-        if ($isTreasury) {
-            $payeur = str_contains($blob, 'paier') ? 'Payeur spécialisé' : 'Le Payeur';
-
-            return [$payeur, 'Le Fondé de Pouvoir'];
-        }
-
-        $isAttached = in_array($type, ['SERVICE', 'RATTACHE', 'POSTE'], true)
-            || str_contains($blob, 'rattach')
-            || (str_contains($blob, 'service') && ! str_contains($blob, 'direction'));
-
-        if ($isAttached) {
-            return ['Le responsable du poste', 'Le Fondé de Pouvoir'];
-        }
-
-        return ['Directeur général Adjoint', 'Directeur Général'];
+        return [$identity['signatory_left'], $identity['signatory_right']];
     }
 
     public static function safeFilename(string $name): string

@@ -1,5 +1,6 @@
 import { ref } from 'vue'
 import { $api } from '@/utils/api'
+import { applyMailPriorities } from '@/utils/courrierUi'
 
 export interface Correspondence {
   id: number
@@ -173,13 +174,17 @@ export function useCorrespondence() {
   }
 
   async function fetchMeta() {
-    const [channels, categories, qualifications, actions] = await Promise.all([
+    const [channels, categories, qualifications, actions, priorities] = await Promise.all([
       $api('/mail/meta/channels'),
       $api('/mail/meta/categories'),
       $api('/mail/meta/qualifications'),
       $api('/mail/meta/actions'),
+      $api('/mail/meta/priorities'),
     ])
-    return { channels, categories, qualifications, actions }
+    const priorityList = Array.isArray(priorities) ? priorities : (priorities?.data || [])
+    applyMailPriorities(priorityList)
+
+    return { channels, categories, qualifications, actions, priorities: priorityList }
   }
 
   async function requestComplement(id: number, assignmentId: number, observation: string) {
@@ -244,31 +249,31 @@ export function useCorrespondence() {
   }
 
   // Admin CRUD helpers
-  async function adminList(type: 'channels' | 'categories' | 'qualifications' | 'actions') {
+  async function adminList(type: 'channels' | 'categories' | 'qualifications' | 'actions' | 'priorities') {
     return $api(`/mail/admin/${type}`)
   }
 
-  async function adminStore(type: 'channels' | 'categories' | 'qualifications' | 'actions', data: Record<string, any>) {
+  async function adminStore(type: 'channels' | 'categories' | 'qualifications' | 'actions' | 'priorities', data: Record<string, any>) {
     return $api(`/mail/admin/${type}`, {
       method: 'POST',
       body: data,
     })
   }
 
-  async function adminUpdate(type: 'channels' | 'categories' | 'qualifications' | 'actions', id: number, data: Record<string, any>) {
+  async function adminUpdate(type: 'channels' | 'categories' | 'qualifications' | 'actions' | 'priorities', id: number, data: Record<string, any>) {
     return $api(`/mail/admin/${type}/${id}`, {
       method: 'PUT',
       body: data,
     })
   }
 
-  async function adminToggle(type: 'channels' | 'categories' | 'qualifications' | 'actions', id: number) {
+  async function adminToggle(type: 'channels' | 'categories' | 'qualifications' | 'actions' | 'priorities', id: number) {
     return $api(`/mail/admin/${type}/${id}/toggle`, {
       method: 'POST',
     })
   }
 
-  async function adminDelete(type: 'channels' | 'categories' | 'qualifications' | 'actions', id: number) {
+  async function adminDelete(type: 'channels' | 'categories' | 'qualifications' | 'actions' | 'priorities', id: number) {
     return $api(`/mail/admin/${type}/${id}`, {
       method: 'DELETE',
     })

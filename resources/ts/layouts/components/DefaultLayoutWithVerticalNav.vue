@@ -6,6 +6,7 @@ import Footer from '@/layouts/components/Footer.vue'
 import NavBarNotifications from '@/layouts/components/NavBarNotifications.vue'
 import NavbarThemeSwitcher from '@/layouts/components/NavbarThemeSwitcher.vue'
 import UserProfile from '@/layouts/components/UserProfile.vue'
+import MailWorkContextSwitcher from '@/components/courrier/MailWorkContextSwitcher.vue'
 import { VerticalNavLayout } from '@layouts'
 </script>
 
@@ -26,6 +27,7 @@ import { VerticalNavLayout } from '@layouts'
 
         <VSpacer />
 
+        <MailWorkContextSwitcher />
         <NavbarThemeSwitcher />
         <NavBarNotifications class="me-1" />
         <UserProfile />

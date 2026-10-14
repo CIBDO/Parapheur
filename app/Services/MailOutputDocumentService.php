@@ -184,10 +184,18 @@ class MailOutputDocumentService
         try {
             $existing = $this->resolveExistingDocument($existingDocumentId, $reference);
 
+            $correspondence->loadMissing('structure');
+            $boundaryId = $correspondence->structure?->boundary_structure_id ?: $correspondence->structure_id;
+
             $template = DocumentTemplate::query()
                 ->where('kind', $kind->value)
                 ->where('is_active', true)
                 ->whereNotNull('current_published_version_id')
+                ->where(function ($query) use ($boundaryId) {
+                    $query->where('structure_id', $boundaryId)
+                        ->orWhereNull('structure_id');
+                })
+                ->orderByRaw('case when structure_id is null then 1 else 0 end')
                 ->first();
 
             // Régénération : nouvelle version sur le document GED existant (évite le conflit de référence unique)

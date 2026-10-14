@@ -174,7 +174,7 @@ class MailModuleFoundationTest extends TestCase
         $this->assertFalse($accessService->canView($agent, $correspondence));
     }
 
-    public function test_mail_view_all_can_open_other_structure_correspondence(): void
+    public function test_mail_view_all_does_not_open_another_structure(): void
     {
         $admin = User::query()->where('email', 'admin@dgtcp.local')->firstOrFail();
         $directeur = User::query()->where('email', 'directeur.dsi@dgtcp.local')->firstOrFail();
@@ -198,8 +198,7 @@ class MailModuleFoundationTest extends TestCase
 
         $this->actingAs($directeur, 'sanctum')
             ->getJson("/api/mail/correspondences/{$correspondence->id}")
-            ->assertOk()
-            ->assertJsonPath('id', $correspondence->id);
+            ->assertForbidden();
     }
 
     public function test_prepare_reply_creates_linked_outgoing(): void

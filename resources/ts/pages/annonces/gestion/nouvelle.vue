@@ -13,7 +13,7 @@ definePage({
 <template>
   <ParapheurPageHeader
     title="Nouvelle annonce"
-    subtitle="Brouillon, aperçu d'audience et publication"
+    subtitle="Un titre, un message, les destinataires"
     icon="tabler-speakerphone"
   />
   <AnnouncementForm />

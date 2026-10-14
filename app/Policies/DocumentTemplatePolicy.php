@@ -4,6 +4,7 @@ namespace App\Policies;
 
 use App\Models\DocumentTemplate;
 use App\Models\User;
+use App\Services\Organization\OrganizationalContextResolver;
 
 class DocumentTemplatePolicy
 {
@@ -14,21 +15,21 @@ class DocumentTemplatePolicy
 
     public function view(User $user, DocumentTemplate $template): bool
     {
-        if ($user->can('admin.access') || $user->can('document_template.view_all')) {
+        $can = $user->can('document_template.view')
+            || $user->can('document_template.view_all')
+            || $user->can('admin.access');
+
+        if (! $can) {
+            return false;
+        }
+
+        if (! $template->structure_id) {
             return true;
         }
 
-        // Modèles publics (sans structure) accessibles à tous
-        if (! $template->structure_id) {
-            return $user->can('document_template.view');
-        }
+        $ids = app(OrganizationalContextResolver::class)->resolve($user)->structureIds;
 
-        // Modèles de la structure de l'utilisateur
-        if ($template->structure_id && $user->structure_id === $template->structure_id) {
-            return $user->can('document_template.view');
-        }
-
-        return false;
+        return in_array((int) $template->structure_id, $ids, true);
     }
 
     public function create(User $user): bool
@@ -48,7 +49,7 @@ class DocumentTemplatePolicy
         }
 
         // Modèles de la structure de l'utilisateur
-        if ($template->structure_id && $user->structure_id === $template->structure_id) {
+        if ($template->structure_id && in_array((int) $template->structure_id, app(OrganizationalContextResolver::class)->resolve($user)->structureIds, true)) {
             return $user->can('document_template.update');
         }
 

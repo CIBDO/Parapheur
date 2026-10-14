@@ -32,7 +32,7 @@ class CorrespondenceReplyService
                 'subject' => $extra['subject'] ?? ('Réponse : '.$original->subject),
                 'summary' => $extra['summary'] ?? null,
                 'medium' => $extra['medium'] ?? $original->medium?->value ?? 'hybride',
-                'priority' => $extra['priority'] ?? $original->priority?->value,
+                'priority' => $extra['priority'] ?? $original->priorityCode(),
                 'confidentiality' => $extra['confidentiality'] ?? $original->confidentiality?->value,
                 'structure_id' => $extra['structure_id'] ?? $original->structure_id ?? $user->structure_id,
                 'channel_id' => $extra['channel_id'] ?? $original->channel_id,
@@ -131,7 +131,7 @@ class CorrespondenceReplyService
                     'object' => $correspondence->subject,
                     'summary' => $correspondence->summary,
                     'structure_id' => $correspondence->structure_id,
-                    'priority' => $correspondence->priority?->value,
+                    'priority' => $correspondence->priorityCode(),
                     'confidentiality' => $correspondence->confidentiality?->value,
                 ]);
                 $correspondence->document_id = $document->id;

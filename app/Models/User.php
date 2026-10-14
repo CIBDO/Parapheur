@@ -49,6 +49,21 @@ class User extends Authenticatable
         return $this->belongsTo(Structure::class);
     }
 
+    public function structureAssignments(): HasMany
+    {
+        return $this->hasMany(UserStructureAssignment::class);
+    }
+
+    public function organizationalRoleAssignments(): HasMany
+    {
+        return $this->hasMany(OrganizationalRoleAssignment::class);
+    }
+
+    public function workContext(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(UserWorkContext::class);
+    }
+
     public function announcementAcknowledgements(): HasMany
     {
         return $this->hasMany(AnnouncementAcknowledgement::class);
@@ -291,6 +306,10 @@ class User extends Authenticatable
 
         if ($this->can('mail.view_all') || $this->can('mail.assign') || $this->can('mail.delete')) {
             $rules[] = ['action' => 'manage', 'subject' => 'CourrierAdmin'];
+        }
+
+        if ($this->can('mail.admin')) {
+            $rules[] = ['action' => 'manage', 'subject' => 'MailSettings'];
         }
 
         if ($this->can('document_template.view') || $this->can('document_template.view_all')) {

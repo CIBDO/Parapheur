@@ -83,15 +83,7 @@ class UnifiedSearchService
         // Courrier
         if ($user->can('mail.view') || $user->can('admin.access')) {
             $mailQuery = Correspondence::query()->with(['structure:id,name,code']);
-
-            if (! $user->can('admin.access') && ! $user->can('mail.view_all')) {
-                $mailQuery->where(function ($q) use ($user) {
-                    $q->where('owner_user_id', $user->id)
-                        ->orWhere('registered_by', $user->id)
-                        ->orWhere('structure_id', $user->structure_id)
-                        ->orWhereHas('assignments', fn ($a) => $a->where('to_user_id', $user->id));
-                });
-            }
+            app(MailVisibilityScope::class)->apply($mailQuery, $user);
 
             if ($q !== '') {
                 $like = '%'.$q.'%';

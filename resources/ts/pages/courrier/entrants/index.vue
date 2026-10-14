@@ -5,7 +5,8 @@ import CorrespondenceCreateDialog from '@/components/courrier/CorrespondenceCrea
 import CorrespondenceListActions from '@/components/courrier/CorrespondenceListActions.vue'
 import { useCorrespondence } from '@/composables/useCorrespondence'
 import { listItems } from '@/utils/listItems'
-import { correspondencePriorityColors, correspondencePriorityLabels, correspondenceStatusColors, formatCorrespondenceNumber, formatCourrierDateTime, isCorrespondenceAssigned, partiesByRole, partyDisplayName, statusLabel } from '@/utils/courrierUi'
+import { $api } from '@/utils/api'
+import { applyMailPriorities, correspondencePriorityColors, correspondencePriorityLabels, correspondenceStatusColors, formatCorrespondenceNumber, formatCourrierDateTime, isCorrespondenceAssigned, partiesByRole, partyDisplayName, statusLabel } from '@/utils/courrierUi'
 
 definePage({
   meta: {
@@ -51,6 +52,9 @@ function rowProps({ item }: { item: any }) {
 }
 
 onMounted(() => {
+  $api('/mail/meta/priorities')
+    .then(items => applyMailPriorities(Array.isArray(items) ? items : []))
+    .catch(() => undefined)
   load()
   if (route.query.nouveau)
     showCreate.value = true

@@ -20,6 +20,13 @@ class DocumentTemplateController extends Controller
         $this->authorize('viewAny', DocumentTemplate::class);
 
         $query = DocumentTemplate::query()->with(['currentPublishedVersion', 'structure']);
+        $ids = app(\App\Services\Organization\OrganizationalContextResolver::class)->resolve($request->user())->structureIds;
+        $query->where(function ($q) use ($ids) {
+            $q->whereNull('structure_id');
+            if ($ids !== []) {
+                $q->orWhereIn('structure_id', $ids);
+            }
+        });
 
         if ($request->filled('kind')) {
             $query->where('kind', $request->string('kind'));

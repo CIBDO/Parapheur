@@ -23,6 +23,7 @@ const userData = useCookie<Record<string, any> | null>('userData')
 const errorMsg = ref('')
 const structures = ref<any[]>([])
 const categories = ref<any[]>([])
+const priorities = ref<any[]>([])
 const correspondents = ref<any[]>([])
 const searching = ref(false)
 const showOriginDialog = ref(false)
@@ -65,6 +66,14 @@ const structureItems = computed(() =>
 const categoryItems = computed(() =>
   categories.value.map(c => ({ value: c.id, title: c.name || c.code })),
 )
+
+const priorityItems = computed(() => {
+  const active = priorities.value.filter(item => item.is_active !== false)
+  if (!active.length)
+    return Object.entries(correspondencePriorityLabels).map(([value, title]) => ({ value, title }))
+
+  return active.map(item => ({ value: item.code, title: item.name }))
+})
 
 const correspondentItems = computed(() =>
   correspondents.value.map(c => ({
@@ -224,6 +233,7 @@ onMounted(async () => {
     ])
     structures.value = Array.isArray(structs) ? structs : []
     categories.value = Array.isArray(meta.categories) ? meta.categories : (meta.categories?.data || [])
+    priorities.value = Array.isArray(meta.priorities) ? meta.priorities : []
   }
   catch {
     structures.value = []
@@ -384,7 +394,7 @@ onMounted(async () => {
             >
               <AppSelect
                 v-model="form.priority"
-                :items="Object.entries(correspondencePriorityLabels).map(([value, title]) => ({ value, title }))"
+                :items="priorityItems"
                 label="Priorité"
               />
             </VCol>

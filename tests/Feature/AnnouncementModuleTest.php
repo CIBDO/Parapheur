@@ -288,7 +288,7 @@ class AnnouncementModuleTest extends TestCase
         $this->postJson('/api/announcements/'.$id.'/publish')->assertOk();
 
         Sanctum::actingAs($author);
-        $this->putJson('/api/announcements/'.$id, ['title' => 'Version rectifiée'])->assertOk()->assertJsonPath('status', 'pending_validation');
+        $this->putJson('/api/announcements/'.$id, ['title' => 'Version rectifiée'])->assertOk()->assertJsonPath('status', 'published');
         $this->assertSame(1, AnnouncementRevision::query()->where('announcement_id', $id)->count());
         $this->assertSame(2, Announcement::query()->findOrFail($id)->current_version);
     }
