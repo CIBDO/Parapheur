@@ -160,6 +160,9 @@ function openCorrespondence(item: any) {
       :title="slip.number || `Brouillon #${slip.id}`"
       subtitle="Bordereau de transmission interne"
     >
+      <template #back>
+        <CourrierBackButton to="courrier-bordereaux" />
+      </template>
       <template #actions>
         <VBtn
           variant="tonal"

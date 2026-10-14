@@ -155,7 +155,11 @@ async function deleteCorrespondent(id: number) {
     <ParapheurPageHeader
       title="Administration Courrier"
       subtitle="Référentiels et annuaire"
-    />
+    >
+      <template #back>
+        <CourrierBackButton to="courrier" />
+      </template>
+    </ParapheurPageHeader>
 
     <div
       v-if="loading"

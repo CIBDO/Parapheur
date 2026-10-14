@@ -35,7 +35,8 @@
     table.grid th, table.grid td { border: 1px solid #000; padding: 7px 8px; font-family: 'Times New Roman', serif; font-size: 12pt; vertical-align: middle; word-wrap: break-word; }
     table.grid th { text-align: center; font-weight: bold; height: 26px; }
     td.qty, th.qty { text-align: center; width: 16%; }
-    td.obs, th.obs { width: 30%; text-align: center; }
+    th.obs { width: 30%; }
+    td.obs { width: 30%; text-align: left; vertical-align: top; white-space: pre-wrap; }
     td.designation { text-align: left; height: 28px; }
     tr.total td { font-weight: bold; text-align: center; height: 30px; }
     table.sign { border-collapse: collapse; margin-top: 22px; margin-left: auto; }
@@ -146,7 +147,7 @@
         </tr>
       </thead>
       <tbody>
-        @foreach($rows as $line)
+        @foreach($rows as $index => $line)
           @php
             $label = trim((string) ($line['designation'] ?? ''));
             if ($label !== '' && ! str_starts_with($label, '-')) {
@@ -156,13 +157,17 @@
           <tr>
             <td class="designation">{{ $label }}</td>
             <td class="qty">{{ $line['quantity'] !== '' && $line['quantity'] !== null ? $line['quantity'] : '' }}</td>
-            <td class="obs">{{ $line['observation'] ?? '' }}</td>
+            @if($index === 0)
+              <td class="obs" rowspan="{{ count($rows) + 1 }}">{{ $observations ?? '' }}</td>
+            @endif
           </tr>
         @endforeach
         <tr class="total">
           <td>TOTAL</td>
           <td class="qty">{{ $total }}</td>
-          <td></td>
+          @if(count($rows) === 0)
+            <td class="obs">{{ $observations ?? '' }}</td>
+          @endif
         </tr>
       </tbody>
     </table>

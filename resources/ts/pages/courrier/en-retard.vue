@@ -20,7 +20,11 @@ const items = computed(() => listItems(correspondences.value))
     <ParapheurPageHeader
       title="Courriers en retard"
       subtitle="Échéances dépassées"
-    />
+    >
+      <template #back>
+        <CourrierBackButton to="courrier" />
+      </template>
+    </ParapheurPageHeader>
     <VAlert
       type="warning"
       variant="tonal"

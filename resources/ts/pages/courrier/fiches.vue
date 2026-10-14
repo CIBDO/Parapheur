@@ -51,7 +51,11 @@ function viewCorrespondence(correspondenceId: number) {
     <ParapheurPageHeader
       title="Fiches de circulation"
       subtitle="Fiches d'imputation générées"
-    />
+    >
+      <template #back>
+        <CourrierBackButton to="courrier" />
+      </template>
+    </ParapheurPageHeader>
     <VCard>
       <VDataTable
         :headers="[

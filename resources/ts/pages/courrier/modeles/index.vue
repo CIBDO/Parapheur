@@ -82,6 +82,9 @@ async function publishLatest(item: any) {
       title="Modèles documentaires"
       subtitle="Templates DOCX versionnés"
     >
+      <template #back>
+        <CourrierBackButton to="courrier" />
+      </template>
       <template #actions>
         <VBtn
           color="primary"

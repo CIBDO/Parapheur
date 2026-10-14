@@ -20,7 +20,11 @@ const items = computed(() => listItems(correspondences.value))
     <ParapheurPageHeader
       title="Archives courrier"
       subtitle="Courriers classés / archivés"
-    />
+    >
+      <template #back>
+        <CourrierBackButton to="courrier" />
+      </template>
+    </ParapheurPageHeader>
     <VCard>
       <VDataTable
         :headers="[

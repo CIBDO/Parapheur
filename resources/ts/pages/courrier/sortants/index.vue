@@ -43,6 +43,9 @@ const items = computed(() => listItems(correspondences.value))
       title="Courriers de départs"
       subtitle="Projets et registre de départ (DEP)"
     >
+      <template #back>
+        <CourrierBackButton to="courrier" />
+      </template>
       <template #actions>
         <VBtn
           color="primary"

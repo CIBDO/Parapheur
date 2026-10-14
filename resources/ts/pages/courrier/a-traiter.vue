@@ -29,7 +29,11 @@ async function doTakeCharge(item: any) {
     <ParapheurPageHeader
       title="À traiter"
       subtitle="Courriers qui me sont affectés"
-    />
+    >
+      <template #back>
+        <CourrierBackButton to="courrier" />
+      </template>
+    </ParapheurPageHeader>
     <VCard>
       <VDataTable
         :headers="[

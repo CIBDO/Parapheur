@@ -277,6 +277,7 @@ class MailOutputDocumentService
             'structureCode' => $code,
             'lines' => $lines,
             'total' => $total,
+            'observations' => trim((string) ($dispatch->observations ?? '')),
             'signatoryRole' => trim((string) ($presentation['signatory_post'] ?? '')),
             'signatoryName' => array_key_exists('signatory_name', $presentation)
                 ? trim((string) $presentation['signatory_name'])

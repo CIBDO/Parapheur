@@ -206,6 +206,14 @@ const latestAcknowledgement = computed(() => {
 
 const isSortant = computed(() => (props.direction || props.correspondence.direction) === 'sortant')
 const isInterne = computed(() => (props.direction || props.correspondence.direction) === 'interne')
+const backRoute = computed(() => {
+  if (isSortant.value)
+    return 'courrier-sortants'
+  if (isInterne.value)
+    return 'courrier-internes'
+
+  return 'courrier-entrants'
+})
 
 const canRegisterDeparture = computed(() =>
   isSortant.value && !props.correspondence.departure_number
@@ -881,6 +889,9 @@ async function archiveCorrespondence() {
       :title="formatCorrespondenceNumber({ ...correspondence, direction: direction || correspondence.direction })"
       :subtitle="correspondence.subject"
     >
+      <template #back>
+        <CourrierBackButton :to="backRoute" />
+      </template>
       <template #actions>
         <VBtn
           v-if="direction === 'entrant'"
@@ -2710,12 +2721,6 @@ async function archiveCorrespondence() {
               type="number"
               min="0"
               style="max-inline-size: 110px;"
-            />
-            <AppTextField
-              v-model="line.observation"
-              label="Observation"
-              class="flex-grow-1"
-              style="min-inline-size: 160px;"
             />
             <VBtn
               icon

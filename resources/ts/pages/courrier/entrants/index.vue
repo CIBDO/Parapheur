@@ -78,6 +78,9 @@ const headers = [
       title="Courriers arrivés"
       subtitle="Registre d'arrivée"
     >
+      <template #back>
+        <CourrierBackButton to="courrier" />
+      </template>
       <template #actions>
         <VBtn
           color="primary"

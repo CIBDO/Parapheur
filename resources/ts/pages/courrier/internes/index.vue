@@ -29,6 +29,9 @@ const items = computed(() => listItems(correspondences.value))
       title="Courriers internes"
       subtitle="Correspondance entre structures"
     >
+      <template #back>
+        <CourrierBackButton to="courrier" />
+      </template>
       <template #actions>
         <VBtn
           color="primary"

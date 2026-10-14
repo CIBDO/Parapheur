@@ -38,6 +38,7 @@ declare module 'vue' {
     CorrespondenceCreateDialog: typeof import('./resources/ts/components/courrier/CorrespondenceCreateDialog.vue')['default']
     CorrespondenceDetailView: typeof import('./resources/ts/components/courrier/CorrespondenceDetailView.vue')['default']
     CorrespondenceListActions: typeof import('./resources/ts/components/courrier/CorrespondenceListActions.vue')['default']
+    CourrierBackButton: typeof import('./resources/ts/components/courrier/CourrierBackButton.vue')['default']
     CreateAppDialog: typeof import('./resources/ts/components/dialogs/CreateAppDialog.vue')['default']
     CreateTaskDialog: typeof import('./resources/ts/components/tasks/CreateTaskDialog.vue')['default']
     CustomCheckboxes: typeof import('./resources/ts/@core/components/app-form-elements/CustomCheckboxes.vue')['default']

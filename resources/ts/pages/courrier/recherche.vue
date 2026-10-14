@@ -45,7 +45,11 @@ async function performSearch() {
     <ParapheurPageHeader
       title="Recherche avancée"
       subtitle="Courriers entrants, sortants et internes"
-    />
+    >
+      <template #back>
+        <CourrierBackButton to="courrier" />
+      </template>
+    </ParapheurPageHeader>
 
     <VCard class="mb-4">
       <VCardText>

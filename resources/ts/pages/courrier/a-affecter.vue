@@ -68,7 +68,11 @@ async function confirmAssign() {
     <ParapheurPageHeader
       title="À affecter"
       subtitle="Courriers sans imputation"
-    />
+    >
+      <template #back>
+        <CourrierBackButton to="courrier" />
+      </template>
+    </ParapheurPageHeader>
 
     <VCard>
       <VDataTable

@@ -108,7 +108,11 @@ async function submit() {
     <ParapheurPageHeader
       title="Nouveau courrier interne"
       subtitle="Transmission entre structures / services"
-    />
+    >
+      <template #back>
+        <CourrierBackButton to="courrier-internes" />
+      </template>
+    </ParapheurPageHeader>
 
     <VAlert
       type="info"

@@ -9,6 +9,7 @@ defineProps<{
 <template>
   <div class="parapheur-page-header d-flex flex-wrap justify-space-between align-start gap-4 mb-6">
     <div class="d-flex align-start gap-3 min-w-0">
+      <slot name="back" />
       <VAvatar
         v-if="icon"
         color="primary"

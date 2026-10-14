@@ -183,6 +183,9 @@ async function createSlip() {
       title="Bordereaux de transmission"
       subtitle="Transfert interne de courriers entre structures"
     >
+      <template #back>
+        <CourrierBackButton to="courrier" />
+      </template>
       <template #actions>
         <VBtn
           color="primary"
