@@ -11,16 +11,16 @@
     @font-face { font-family: 'Times New Roman'; font-style: italic; font-weight: normal; src: url('{{ $fontDir }}/timesi.ttf') format('truetype'); }
     @font-face { font-family: 'Times New Roman'; font-style: italic; font-weight: bold; src: url('{{ $fontDir }}/timesbi.ttf') format('truetype'); }
     @font-face { font-family: 'Kunstler Script'; font-style: normal; font-weight: normal; src: url('{{ $fontDir }}/KUNSTLER.TTF') format('truetype'); }
-    @page { margin: 2.5cm; }
+    @page { margin: 1.2cm 2.5cm 1.5cm; }
     body { font-family: 'Times New Roman', serif; color: #111; font-size: 12pt; }
     table.banner { width: 100%; border-collapse: collapse; }
     table.banner td { border: none; vertical-align: top; }
     .head-block { text-align: left; margin-bottom: 8px; }
     .ministry, .direction { display: inline-block; font-family: 'Times New Roman', serif; font-weight: bold; font-size: 12pt; text-align: center; text-transform: uppercase; line-height: 1.15; }
     .rule { width: 68%; border-bottom: 1px solid #000; margin: 3px auto 0; height: 0; }
-    .republic { font-family: 'Times New Roman', serif; font-weight: bold; font-size: 13pt; text-align: right; text-transform: uppercase; }
-    .motto { font-family: 'Times New Roman', serif; text-align: right; font-size: 11pt; margin-top: 3px; }
-    .date-line { text-align: right; font-family: 'Kunstler Script', cursive; font-size: 24pt; margin: 18px 0 0; line-height: 1; }
+    .republic { font-family: 'Times New Roman', serif; font-weight: bold; font-size: 13pt; text-align: right; text-transform: uppercase; line-height: 1.15; }
+    .motto { font-family: 'Times New Roman', serif; text-align: right; font-size: 11pt; margin-top: 2px; line-height: 1.15; }
+    .date-line { text-align: right; font-family: 'Kunstler Script', cursive; font-size: 24pt; margin: 16px 0 0; line-height: 1; }
     table.intro { width: 100%; border-collapse: collapse; margin-top: 2px; }
     table.intro td { border: none; vertical-align: middle; }
     .sender { text-align: center; font-family: 'Kunstler Script', cursive; font-size: 24pt; line-height: 1.05; margin: 0 8px; }
@@ -39,11 +39,11 @@
     td.designation { text-align: left; height: 28px; }
     tr.total td { font-weight: bold; text-align: center; height: 30px; }
     table.sign { width: 100%; border-collapse: collapse; margin-top: 26px; }
-    table.sign td { border: none; text-align: right; padding: 0 8mm 0 0; font-family: 'Times New Roman', serif; }
+    table.sign td { border: none; text-align: right; padding: 0; font-family: 'Times New Roman', serif; }
     .sign-role { font-weight: bold; text-transform: uppercase; font-size: 13pt; }
     .sign-name { font-weight: bold; font-size: 13pt; }
     .sign-grade { font-style: italic; font-size: 12pt; }
-    .bottom { position: fixed; bottom: 1.1cm; left: 2.5cm; right: 2.5cm; text-align: center; font-family: 'Times New Roman', serif; font-size: 8pt; border-top: 1px solid #000; padding-top: 3px; line-height: 1.35; }
+    .bottom { position: fixed; bottom: 0.35cm; left: 2.5cm; right: 2.5cm; text-align: center; font-family: 'Times New Roman', serif; font-size: 8pt; border-top: 1px solid #000; padding-top: 3px; line-height: 1.35; }
   </style>
 </head>
 <body>
@@ -53,7 +53,7 @@
     $ministryText = preg_replace('/(ECONOMIE|ÉCONOMIE)\s+(ET\b)/u', "$1\n$2", $ministryText) ?? $ministryText;
     $directionText = preg_replace('/(TRESOR|TRÉSOR)\s+(ET\b)/u', "$1\n$2", $directionText) ?? $directionText;
     $republicText = trim((string) ($republic ?? 'REPUBLIQUE DU MALI'));
-    $mottoText = trim((string) ($motto ?? 'Un Peuple - Un But - Une Foi'));
+    $mottoText = trim((string) ($motto ?? 'Un Peuple – Un But – Une Foi'));
     $recipient = trim((string) ($recipientTitle ?? ''));
     $code = trim((string) ($structureCode ?? ''));
     $suffix = ($code === '' || preg_match('/^DGTCP$/i', $code)) ? 'DGTCP - DG' : $code;
@@ -66,11 +66,15 @@
         $formulaLines = [trim($formulaMatch[1]), trim($formulaMatch[2])];
     } else {
         $words = preg_split('/\s+/u', $formula) ?: [$formula];
-        $cut = max(1, (int) ceil(count($words) / 2));
-        $formulaLines = [
-            implode(' ', array_slice($words, 0, $cut)),
-            implode(' ', array_slice($words, $cut)),
-        ];
+        if (count($words) < 5) {
+            $formulaLines = [$formula, ''];
+        } else {
+            $cut = max(1, (int) ceil(count($words) / 2));
+            $formulaLines = [
+                implode(' ', array_slice($words, 0, $cut)),
+                implode(' ', array_slice($words, $cut)),
+            ];
+        }
     }
     $contact = trim((string) ($footer ?? ''));
     if ($contact === '') {
@@ -95,7 +99,7 @@
           <div class="direction">{!! nl2br(e($directionText)) !!}<div class="rule"></div></div>
         </div>
       </td>
-      <td width="44%">
+      <td width="44%" align="right">
         <div class="republic">{{ $republicText }}</div>
         <div class="motto">{{ $mottoText }}</div>
         <div class="date-line">{{ $placeName }}, le</div>
@@ -112,8 +116,7 @@
       </td>
       <td width="78%">
         <div class="sender">
-          {{ $formulaLines[0] }}<br>
-          {{ $formulaLines[1] }}
+          {{ $formulaLines[0] }}@if(($formulaLines[1] ?? '') !== '')<br>{{ $formulaLines[1] }}@endif
         </div>
         <div class="a">A</div>
         <div class="recipient">{{ $recipient !== '' ? $recipient : 'Madame/Monsieur le ............' }}</div>
@@ -164,17 +167,23 @@
 
   <table class="sign">
     <tr>
-      <td class="sign-role">{{ $signatoryRole ?: 'LE DIRECTEUR GENERAL' }}</td>
+      <td class="sign-role">{{ $signatoryRole }}</td>
     </tr>
-    <tr>
-      <td style="height:32px;">&nbsp;</td>
-    </tr>
-    <tr>
-      <td class="sign-name">{{ ($signatoryName ?? '') !== '' ? $signatoryName : 'Prénoms et Noms' }}</td>
-    </tr>
-    <tr>
-      <td class="sign-grade">{{ ($signatoryGrade ?? '') !== '' ? $signatoryGrade : 'Grade ou titre honorifique' }}</td>
-    </tr>
+    @if(($signatoryName ?? '') !== '' || ($signatoryGrade ?? '') !== '')
+      <tr>
+        <td style="height:28px;">&nbsp;</td>
+      </tr>
+    @endif
+    @if(($signatoryName ?? '') !== '')
+      <tr>
+        <td class="sign-name">{{ $signatoryName }}</td>
+      </tr>
+    @endif
+    @if(($signatoryGrade ?? '') !== '')
+      <tr>
+        <td class="sign-grade">{{ $signatoryGrade }}</td>
+      </tr>
+    @endif
   </table>
 
   <div class="bottom">{{ $contact }}</div>

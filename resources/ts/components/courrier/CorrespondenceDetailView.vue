@@ -108,6 +108,9 @@ const dispatchForm = ref({
   recipient_title: '',
   recipient_city: '',
   structure_code: '',
+  signatory_post: '',
+  signatory_name: '',
+  signatory_grade: '',
   lines: [{ designation: '', quantity: 1, observation: '' }] as { designation: string; quantity: number; observation: string }[],
 })
 const printingDispatch = ref(false)
@@ -702,6 +705,9 @@ async function openDispatchDialog() {
     recipient_title: '',
     recipient_city: '',
     structure_code: '',
+    signatory_post: '',
+    signatory_name: '',
+    signatory_grade: '',
     lines: [{ designation: props.correspondence.subject || 'Courrier', quantity: Number(props.correspondence.piece_count) || 1, observation: '' }],
   }
   showDispatchDialog.value = true
@@ -713,6 +719,9 @@ async function openDispatchDialog() {
     dispatchForm.value.recipient_title = presentation.recipient_title || ''
     dispatchForm.value.recipient_city = presentation.recipient_city || ''
     dispatchForm.value.structure_code = presentation.structure_code || ''
+    dispatchForm.value.signatory_post = presentation.signatory_post || ''
+    dispatchForm.value.signatory_name = presentation.signatory_name || ''
+    dispatchForm.value.signatory_grade = presentation.signatory_grade || ''
     if (Array.isArray(preview?.lines) && preview.lines.length) {
       dispatchForm.value.lines = preview.lines.map((line: any) => ({
         designation: line.designation || '',
@@ -793,6 +802,9 @@ async function handleDispatch() {
         recipient_title: dispatchForm.value.recipient_title,
         recipient_city: dispatchForm.value.recipient_city,
         structure_code: dispatchForm.value.structure_code,
+        signatory_post: dispatchForm.value.signatory_post,
+        signatory_name: dispatchForm.value.signatory_name,
+        signatory_grade: dispatchForm.value.signatory_grade,
       },
       lines,
       generate: true,
@@ -2634,7 +2646,30 @@ async function archiveCorrespondence() {
               />
             </VCol>
           </VRow>
-          <div class="d-flex align-center justify-space-between mt-2 mb-2">
+          <div class="text-subtitle-2 mt-4 mb-2">
+            Signataire
+          </div>
+          <VRow>
+            <VCol cols="12">
+              <AppTextField
+                v-model="dispatchForm.signatory_post"
+                label="Poste du signataire"
+              />
+            </VCol>
+            <VCol cols="12" sm="6">
+              <AppTextField
+                v-model="dispatchForm.signatory_name"
+                label="Prénoms et Noms"
+              />
+            </VCol>
+            <VCol cols="12" sm="6">
+              <AppTextField
+                v-model="dispatchForm.signatory_grade"
+                label="Grade ou titre honorifique"
+              />
+            </VCol>
+          </VRow>
+          <div class="d-flex align-center justify-space-between mt-4 mb-2">
             <div class="text-subtitle-2">
               Pièces — total {{ dispatchTotal }}
             </div>

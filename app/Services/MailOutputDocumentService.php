@@ -93,7 +93,7 @@ class MailOutputDocumentService
     /**
      * Valeurs proposées pour le bordereau, toutes remplaçables à la saisie.
      *
-     * @return array{presentation: array{place: string, sender_title: string, recipient_title: string, recipient_city: string, structure_code: string}, lines: list<array{designation: string, quantity: int, observation: string}>}
+     * @return array{presentation: array{place: string, sender_title: string, recipient_title: string, recipient_city: string, structure_code: string, signatory_post: string, signatory_name: string, signatory_grade: string}, lines: list<array{designation: string, quantity: int, observation: string}>}
      */
     public function suggestSlip(Correspondence $correspondence): array
     {
@@ -109,10 +109,14 @@ class MailOutputDocumentService
         $organization = trim((string) ($toParty?->organization ?: $toParty?->correspondent?->organization ?: ''));
         $city = $organization !== '' && mb_strtolower($organization) !== mb_strtolower($recipient) ? $organization : '';
 
-        $sender = trim((string) ($identity['signatory_left'] ?? ''));
+        $sender = trim((string) ($identity['signatory_right'] ?? ''));
+        if ($sender === '' || $sender === '—') {
+            $sender = trim((string) ($identity['signatory_left'] ?? ''));
+        }
         if ($sender === '' || $sender === '—') {
             $sender = $correspondence->structure?->name ?? '';
         }
+        $person = $this->identity->personForSignatory($identity);
 
         return [
             'presentation' => [
@@ -121,6 +125,9 @@ class MailOutputDocumentService
                 'recipient_title' => $recipient,
                 'recipient_city' => $city,
                 'structure_code' => (string) ($identity['structure_code'] ?? $correspondence->structure?->code ?? ''),
+                'signatory_post' => $this->signatoryRole($identity),
+                'signatory_name' => $person['name'],
+                'signatory_grade' => $person['grade'],
             ],
             'lines' => [[
                 'designation' => trim((string) ($correspondence->subject ?: 'Courrier')),
@@ -237,6 +244,8 @@ class MailOutputDocumentService
 
         $date = $dispatch->dispatched_at ?? now();
 
+        $person = $this->identity->personForSignatory($identity);
+
         return [
             'saisiPar' => $dispatch->dispatchedBy?->name ?? $correspondence->registeredBy?->name ?? '',
             'structureEntete' => $identity['header'] ?? '',
@@ -256,9 +265,15 @@ class MailOutputDocumentService
             'structureCode' => $presentation['structure_code'] ?? '',
             'lines' => $lines,
             'total' => $total,
-            'signatoryRole' => $this->signatoryRole($identity),
-            'signatoryName' => $this->signatoryName($identity),
-            'signatoryGrade' => $this->signatoryGrade($identity),
+            'signatoryRole' => array_key_exists('signatory_post', $presentation)
+                ? trim((string) $presentation['signatory_post'])
+                : $this->signatoryRole($identity),
+            'signatoryName' => array_key_exists('signatory_name', $presentation)
+                ? trim((string) $presentation['signatory_name'])
+                : $person['name'],
+            'signatoryGrade' => array_key_exists('signatory_grade', $presentation)
+                ? trim((string) $presentation['signatory_grade'])
+                : $person['grade'],
         ];
     }
 
@@ -274,17 +289,12 @@ class MailOutputDocumentService
      */
     private function signatoryRole(array $identity): string
     {
-        $label = trim((string) ($identity['signatory_left'] ?? ''));
+        $label = trim((string) ($identity['signatory_right'] ?? ''));
         if ($label === '' || $label === '—') {
-            return 'LE DIRECTEUR GENERAL';
+            $label = trim((string) ($identity['signatory_left'] ?? ''));
         }
 
-        $upper = mb_strtoupper($label, 'UTF-8');
-        if (! str_starts_with($upper, 'LE ') && ! str_starts_with($upper, 'LA ')) {
-            $upper = 'LE '.$upper;
-        }
-
-        return $upper;
+        return $label === '—' ? '' : $label;
     }
 
     /**
@@ -293,11 +303,18 @@ class MailOutputDocumentService
      */
     private function senderFormula(array $presentation, array $identity): string
     {
-        $annex = 'Le Directeur Général du Trésor et de la Comptabilité Publique';
         $title = trim((string) ($presentation['sender_title'] ?? ''));
-        $short = trim((string) ($identity['signatory_left'] ?? ''));
-        if ($title === '' || $title === '—' || $this->sameLabel($title, $short) || $this->sameLabel($title, 'Le '.$short)) {
-            return $annex;
+        $principal = $this->signatoryRole($identity);
+        $annex = 'Le Directeur Général du Trésor et de la Comptabilité Publique';
+        $usesProfile = $title === ''
+            || $title === '—'
+            || $this->sameLabel($title, $principal)
+            || $this->sameLabel($title, 'Le '.$principal)
+            || $this->sameLabel($title, $annex)
+            || $this->sameLabel($title, trim((string) ($identity['signatory_left'] ?? '')));
+
+        if ($usesProfile) {
+            return $principal !== '' ? $principal : 'Le responsable';
         }
 
         return $title;
@@ -333,41 +350,6 @@ class MailOutputDocumentService
         $b = $fold($right);
 
         return $a !== '' && $a === $b;
-    }
-
-    /**
-     * @param  array<string, mixed>  $identity
-     */
-    private function signatoryName(array $identity): string
-    {
-        $userId = $identity['signatory_user_id'] ?? null;
-        if (! $userId) {
-            return '';
-        }
-
-        return trim((string) User::query()->whereKey($userId)->value('name'));
-    }
-
-    /**
-     * @param  array<string, mixed>  $identity
-     */
-    private function signatoryGrade(array $identity): string
-    {
-        $grade = trim((string) ($identity['signatory_function'] ?? ''));
-        $left = trim((string) ($identity['signatory_left'] ?? ''));
-        $right = trim((string) ($identity['signatory_right'] ?? ''));
-        $sameAsRole = $grade === ''
-            || $grade === '—'
-            || mb_strtolower($grade) === mb_strtolower($left)
-            || mb_strtolower($grade) === mb_strtolower($right);
-        if ($sameAsRole) {
-            $userId = $identity['signatory_user_id'] ?? null;
-            $grade = $userId
-                ? trim((string) User::query()->whereKey($userId)->value('position_title'))
-                : '';
-        }
-
-        return $grade === '—' ? '' : $grade;
     }
 
     public function generateAcknowledgementDocument(CorrespondenceAcknowledgement $ack, User $user): CorrespondenceAcknowledgement

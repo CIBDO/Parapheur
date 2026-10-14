@@ -195,6 +195,86 @@ class MailIdentityService
     }
 
     /**
+     * Personne qui porte la fonction de signature du type de structure.
+     *
+     * @param  array<string, mixed>  $identity
+     * @return array{name: string, grade: string}
+     */
+    public function personForSignatory(array $identity): array
+    {
+        $role = trim((string) ($identity['signatory_right'] ?? ''));
+        if ($role === '' || $role === '—') {
+            $role = trim((string) ($identity['signatory_left'] ?? ''));
+        }
+
+        $userId = $identity['signatory_user_id'] ?? null;
+        if ($userId) {
+            $user = User::query()->find($userId, ['id', 'name', 'position_title']);
+
+            return [
+                'name' => trim((string) $user?->name),
+                'grade' => $this->distinctGrade(trim((string) $user?->position_title), $role),
+            ];
+        }
+
+        $structureId = $identity['structure_id'] ?? null;
+        $structure = $structureId ? Structure::query()->find($structureId) : null;
+        if (! $structure) {
+            return ['name' => '', 'grade' => ''];
+        }
+
+        foreach ($this->fromPositions($structure) as $position) {
+            if ($role !== '' && ! $this->labelsMatch($position['function'], $role) && ! $this->labelsMatch($position['label'], $role)) {
+                continue;
+            }
+
+            $name = '';
+            if (! empty($position['user_id'])) {
+                $name = trim((string) User::query()->whereKey($position['user_id'])->value('name'));
+            }
+
+            return [
+                'name' => $name,
+                'grade' => $this->distinctGrade($position['function'], $role),
+            ];
+        }
+
+        return ['name' => '', 'grade' => ''];
+    }
+
+    private function distinctGrade(string $grade, string $role): string
+    {
+        $grade = trim($grade);
+        if ($grade === '' || $grade === '—' || $this->labelsMatch($grade, $role)) {
+            return '';
+        }
+
+        return $grade;
+    }
+
+    private function labelsMatch(string $left, string $right): bool
+    {
+        $fold = static function (string $value): string {
+            $value = mb_strtolower(trim($value), 'UTF-8');
+            $value = strtr($value, [
+                'à' => 'a', 'á' => 'a', 'â' => 'a', 'ä' => 'a',
+                'é' => 'e', 'è' => 'e', 'ê' => 'e', 'ë' => 'e',
+                'í' => 'i', 'î' => 'i', 'ï' => 'i',
+                'ô' => 'o', 'ö' => 'o',
+                'ù' => 'u', 'û' => 'u', 'ü' => 'u',
+                'ç' => 'c',
+            ]);
+
+            return preg_replace('/[^a-z0-9]+/', '', $value) ?? '';
+        };
+
+        $a = $fold($left);
+        $b = $fold($right);
+
+        return $a !== '' && $b !== '' && ($a === $b || str_contains($a, $b) || str_contains($b, $a));
+    }
+
+    /**
      * @return list<array{label: string, user_id: int, function: string, capacity: string}>
      */
     private function fromUsers(Structure $boundary): array
