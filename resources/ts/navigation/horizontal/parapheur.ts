@@ -25,6 +25,12 @@ export default [
         subject: 'Task',
       },
       {
+        title: 'Kanban',
+        to: 'taches-kanban',
+        action: 'read',
+        subject: 'Task',
+      },
+      {
         title: 'Instructions',
         to: 'taches-instructions',
         action: 'read',
@@ -51,37 +57,37 @@ export default [
     subject: 'Production',
     children: [
       {
-        title: 'Tableau de bord',
+        title: 'Aujourd’hui',
         to: 'productions',
         action: 'read',
         subject: 'Production',
       },
       {
-        title: 'Occurrences',
-        to: 'productions-occurrences',
+        title: 'Reçues',
+        to: 'productions-recues',
         action: 'read',
         subject: 'Production',
       },
       {
-        title: 'À valider',
-        to: { name: 'productions-occurrences', query: { view: 'validate' } },
-        action: 'validate',
-        subject: 'Production',
-      },
-      {
-        title: 'Dossiers',
+        title: 'Dossier du jour',
         to: 'productions-dossiers',
         action: 'read',
         subject: 'Production',
       },
       {
-        title: 'Obligations',
+        title: 'À produire',
+        to: 'productions-occurrences',
+        action: 'read',
+        subject: 'Production',
+      },
+      {
+        title: 'Modèles d’envoi',
         to: 'productions-obligations',
         action: 'manage',
         subject: 'Production',
       },
       {
-        title: 'Pilotage DG',
+        title: 'Suivi',
         to: 'productions-direction',
         action: 'pilot',
         subject: 'Production',

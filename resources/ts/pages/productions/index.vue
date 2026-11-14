@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import ParapheurPageHeader from '@/components/parapheur/ParapheurPageHeader.vue'
+import { useProductions } from '@/composables/useProductions'
 import { formatTaskDue, productionStatusColor, productionStatusLabels } from '@/utils/tasksUi'
 
 definePage({
@@ -10,6 +11,7 @@ definePage({
 })
 
 const router = useRouter()
+const { loadMyDashboard, listOccurrences } = useProductions()
 const loading = ref(false)
 const errorMessage = ref('')
 const stats = ref<Record<string, number>>({})
@@ -18,11 +20,11 @@ const recent = ref<any[]>([])
 const cards = [
   {
     key: 'expected',
-    title: 'Attendues',
-    hint: 'À produire ou compléter',
+    title: 'À produire',
+    hint: 'À déposer ou compléter',
     color: 'warning',
     icon: 'tabler-file-time',
-    to: '/productions/occurrences',
+    to: '/productions/occurrences?view=mine',
   },
   {
     key: 'overdue',
@@ -33,28 +35,20 @@ const cards = [
     to: '/productions/occurrences?view=overdue',
   },
   {
-    key: 'to_validate',
-    title: 'À valider',
-    hint: 'Décision attendue',
-    color: 'primary',
-    icon: 'tabler-checks',
-    to: '/productions/occurrences?view=validate',
-  },
-  {
     key: 'to_transmit',
-    title: 'À transmettre',
-    hint: 'Prêtes à l’envoi',
+    title: 'Prêtes à envoyer',
+    hint: 'Fichier déposé',
     color: 'info',
     icon: 'tabler-send',
     to: '/productions/occurrences?view=transmit',
   },
   {
     key: 'transmitted',
-    title: 'Transmises',
+    title: 'Envoyées',
     hint: 'Sur 7 jours',
     color: 'success',
     icon: 'tabler-circle-check',
-    to: '/productions/occurrences',
+    to: '/productions/occurrences?view=mine',
   },
 ]
 
@@ -63,8 +57,8 @@ const load = async () => {
   errorMessage.value = ''
   try {
     const [dashboard, list] = await Promise.all([
-      $api('/productions/dashboard/my-work'),
-      $api('/productions/occurrences', { query: { mine: 1, per_page: 8 } }),
+      loadMyDashboard(),
+      listOccurrences({ mine: 1, per_page: 8 }),
     ])
     stats.value = dashboard
     recent.value = list.data ?? list
@@ -85,9 +79,9 @@ onMounted(load)
 <template>
   <div>
     <ParapheurPageHeader
-      title="Productions & Transmissions"
-      subtitle="Synthèse de vos obligations documentaires"
-      icon="tabler-file-time"
+      title="Aujourd’hui"
+      subtitle="Déposez et envoyez vos situations aux destinataires"
+      icon="tabler-calendar-event"
     >
       <template #actions>
         <VBtn
@@ -100,11 +94,18 @@ onMounted(load)
           Actualiser
         </VBtn>
         <VBtn
-          color="primary"
-          prepend-icon="tabler-calendar-event"
-          @click="router.push('/productions/occurrences')"
+          variant="tonal"
+          prepend-icon="tabler-inbox"
+          @click="router.push('/productions/recues')"
         >
-          Mes occurrences
+          Reçues
+        </VBtn>
+        <VBtn
+          color="primary"
+          prepend-icon="tabler-list"
+          @click="router.push('/productions/occurrences?view=mine')"
+        >
+          À produire
         </VBtn>
       </template>
     </ParapheurPageHeader>

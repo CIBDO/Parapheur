@@ -124,6 +124,7 @@ declare module 'vue-router/auto-routes' {
     'productions-obligations-id': RouteRecordInfo<'productions-obligations-id', '/productions/obligations/:id', { id: ParamValue<true> }, { id: ParamValue<false> }>,
     'productions-occurrences': RouteRecordInfo<'productions-occurrences', '/productions/occurrences', Record<never, never>, Record<never, never>>,
     'productions-occurrences-id': RouteRecordInfo<'productions-occurrences-id', '/productions/occurrences/:id', { id: ParamValue<true> }, { id: ParamValue<false> }>,
+    'productions-recues': RouteRecordInfo<'productions-recues', '/productions/recues', Record<never, never>, Record<never, never>>,
     'profil': RouteRecordInfo<'profil', '/profil', Record<never, never>, Record<never, never>>,
     'register': RouteRecordInfo<'register', '/register', Record<never, never>, Record<never, never>>,
     'reset-password': RouteRecordInfo<'reset-password', '/reset-password', Record<never, never>, Record<never, never>>,

@@ -69,6 +69,7 @@ use App\Http\Controllers\Api\InstructionController;
 use App\Http\Controllers\Api\MyWorkController;
 use App\Http\Controllers\Api\ProductionDashboardController;
 use App\Http\Controllers\Api\ProductionFolderController;
+use App\Http\Controllers\Api\ProductionInboxController;
 use App\Http\Controllers\Api\ProductionObligationController;
 use App\Http\Controllers\Api\ProductionOccurrenceController;
 use App\Http\Controllers\Api\TaskController;
@@ -380,6 +381,10 @@ Route::middleware(['auth:sanctum', 'auth.idle', 'password.changed'])->group(func
     Route::get('/productions/dashboard/my-work', [ProductionDashboardController::class, 'myWork']);
     Route::get('/productions/dashboard/structure', [ProductionDashboardController::class, 'structure']);
     Route::get('/productions/dashboard/direction', [ProductionDashboardController::class, 'direction']);
+
+    Route::get('/productions/recues', [ProductionInboxController::class, 'index']);
+    Route::get('/productions/recues/{transmission}', [ProductionInboxController::class, 'show']);
+    Route::post('/productions/recues/{transmission}/opinion', [ProductionInboxController::class, 'opinion']);
 
     Route::get('/productions/calendars', [ProductionObligationController::class, 'calendars']);
     Route::get('/productions/obligations', [ProductionObligationController::class, 'index']);

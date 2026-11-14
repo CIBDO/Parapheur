@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import ParapheurPageHeader from '@/components/parapheur/ParapheurPageHeader.vue'
+import { useProductions } from '@/composables/useProductions'
 import { productionFrequencyLabels } from '@/utils/tasksUi'
 
 definePage({
@@ -11,8 +12,34 @@ definePage({
 
 const route = useRoute()
 const router = useRouter()
+const {
+  getObligation,
+  updateObligation,
+  setObligationActive,
+  suspendObligation,
+} = useProductions()
+
 const item = ref<any>(null)
 const loading = ref(false)
+const saving = ref(false)
+const errorMessage = ref('')
+const editing = ref(false)
+const showSuspend = ref(false)
+
+const editForm = ref({
+  label: '',
+  description: '',
+  deadline_time: '',
+  validation_required: true,
+  auto_transmit: false,
+  submit_to_parapheur: false,
+})
+
+const suspendForm = ref({
+  starts_on: new Date().toISOString().slice(0, 10),
+  ends_on: '',
+  reason: '',
+})
 
 const actorLabel = (actor: any) => {
   const labels: Record<string, string> = {
@@ -34,13 +61,96 @@ const reminderLabel = (rule: any) => {
   return `${when} → ${rule.target}${rule.escalate ? ' (escalade)' : ''}`
 }
 
+const syncEditForm = () => {
+  if (!item.value)
+    return
+  editForm.value = {
+    label: item.value.label || '',
+    description: item.value.description || '',
+    deadline_time: item.value.deadline_time || '',
+    validation_required: Boolean(item.value.validation_required),
+    auto_transmit: Boolean(item.value.auto_transmit),
+    submit_to_parapheur: Boolean(item.value.submit_to_parapheur),
+  }
+}
+
 const load = async () => {
   loading.value = true
+  errorMessage.value = ''
   try {
-    item.value = await $api(`/productions/obligations/${route.params.id}`)
+    item.value = await getObligation(route.params.id as string)
+    syncEditForm()
+  }
+  catch (error: any) {
+    errorMessage.value = error?.data?.message || 'Impossible de charger l’obligation.'
   }
   finally {
     loading.value = false
+  }
+}
+
+const save = async () => {
+  saving.value = true
+  errorMessage.value = ''
+  try {
+    item.value = await updateObligation(route.params.id as string, {
+      label: editForm.value.label,
+      description: editForm.value.description || null,
+      deadline_time: editForm.value.deadline_time || null,
+      validation_required: editForm.value.validation_required,
+      auto_transmit: editForm.value.auto_transmit,
+      submit_to_parapheur: editForm.value.submit_to_parapheur,
+    })
+    editing.value = false
+    syncEditForm()
+  }
+  catch (error: any) {
+    errorMessage.value = error?.data?.message
+      || Object.values(error?.data?.errors || {})?.[0]?.[0]
+      || 'Enregistrement impossible.'
+  }
+  finally {
+    saving.value = false
+  }
+}
+
+const toggleActive = async () => {
+  if (!item.value)
+    return
+  saving.value = true
+  errorMessage.value = ''
+  try {
+    item.value = await setObligationActive(item.value.id, !item.value.is_active)
+  }
+  catch (error: any) {
+    errorMessage.value = error?.data?.message || 'Changement d’état impossible.'
+  }
+  finally {
+    saving.value = false
+  }
+}
+
+const submitSuspend = async () => {
+  if (!suspendForm.value.starts_on)
+    return
+  saving.value = true
+  errorMessage.value = ''
+  try {
+    await suspendObligation(route.params.id as string, {
+      starts_on: suspendForm.value.starts_on,
+      ends_on: suspendForm.value.ends_on || null,
+      reason: suspendForm.value.reason || null,
+    })
+    showSuspend.value = false
+    await load()
+  }
+  catch (error: any) {
+    errorMessage.value = error?.data?.message
+      || Object.values(error?.data?.errors || {})?.[0]?.[0]
+      || 'Suspension impossible.'
+  }
+  finally {
+    saving.value = false
   }
 }
 
@@ -55,6 +165,34 @@ onMounted(load)
       icon="tabler-settings"
     >
       <template #actions>
+        <VBtn
+          v-if="item && !editing"
+          color="primary"
+          variant="tonal"
+          prepend-icon="tabler-edit"
+          @click="editing = true"
+        >
+          Modifier
+        </VBtn>
+        <VBtn
+          v-if="item"
+          :color="item.is_active ? 'warning' : 'success'"
+          variant="tonal"
+          :prepend-icon="item.is_active ? 'tabler-player-pause' : 'tabler-player-play'"
+          :loading="saving"
+          @click="toggleActive"
+        >
+          {{ item.is_active ? 'Désactiver' : 'Activer' }}
+        </VBtn>
+        <VBtn
+          v-if="item"
+          color="error"
+          variant="tonal"
+          prepend-icon="tabler-calendar-off"
+          @click="showSuspend = true"
+        >
+          Suspendre
+        </VBtn>
         <VBtn
           variant="tonal"
           color="primary"
@@ -73,6 +211,17 @@ onMounted(load)
         </VBtn>
       </template>
     </ParapheurPageHeader>
+
+    <VAlert
+      v-if="errorMessage"
+      type="warning"
+      variant="tonal"
+      class="mb-4"
+      closable
+      @click:close="errorMessage = ''"
+    >
+      {{ errorMessage }}
+    </VAlert>
 
     <div
       v-if="loading && !item"
@@ -114,15 +263,72 @@ onMounted(load)
                 {{ item.deadline_time || '—' }} · {{ item.timezone }}
               </VChip>
             </div>
-            <div class="text-body-1 text-high-emphasis mb-1">
-              Description
-            </div>
-            <div
-              class="text-body-2"
-              :class="{ 'text-medium-emphasis': !item.description }"
-            >
-              {{ item.description || 'Aucune description renseignée.' }}
-            </div>
+
+            <template v-if="editing">
+              <div class="d-flex flex-column gap-3">
+                <AppTextField
+                  v-model="editForm.label"
+                  label="Libellé *"
+                />
+                <AppTextarea
+                  v-model="editForm.description"
+                  label="Description"
+                  rows="3"
+                />
+                <AppTextField
+                  v-model="editForm.deadline_time"
+                  label="Heure limite"
+                  placeholder="HH:MM:SS"
+                />
+                <div class="d-flex flex-wrap gap-4">
+                  <VSwitch
+                    v-model="editForm.validation_required"
+                    label="Validation obligatoire"
+                    color="primary"
+                    hide-details
+                  />
+                  <VSwitch
+                    v-model="editForm.auto_transmit"
+                    label="Transmission automatique"
+                    color="primary"
+                    hide-details
+                  />
+                  <VSwitch
+                    v-model="editForm.submit_to_parapheur"
+                    label="Soumettre au parapheur"
+                    color="primary"
+                    hide-details
+                  />
+                </div>
+                <div class="d-flex gap-2">
+                  <VBtn
+                    color="primary"
+                    :loading="saving"
+                    :disabled="!editForm.label.trim()"
+                    @click="save"
+                  >
+                    Enregistrer
+                  </VBtn>
+                  <VBtn
+                    variant="tonal"
+                    @click="editing = false; syncEditForm()"
+                  >
+                    Annuler
+                  </VBtn>
+                </div>
+              </div>
+            </template>
+            <template v-else>
+              <div class="text-body-1 text-high-emphasis mb-1">
+                Description
+              </div>
+              <div
+                class="text-body-2"
+                :class="{ 'text-medium-emphasis': !item.description }"
+              >
+                {{ item.description || 'Aucune description renseignée.' }}
+              </div>
+            </template>
           </VCardText>
         </VCard>
 
@@ -231,6 +437,10 @@ onMounted(load)
               :subtitle="item.auto_transmit ? 'Automatique' : 'Manuelle'"
             />
             <VListItem
+              title="Parapheur"
+              :subtitle="item.submit_to_parapheur ? 'Oui' : 'Non'"
+            />
+            <VListItem
               title="Formats"
               :subtitle="(item.allowed_formats || []).join(', ') || '—'"
             />
@@ -238,5 +448,44 @@ onMounted(load)
         </VCard>
       </VCol>
     </VRow>
+
+    <VDialog
+      v-model="showSuspend"
+      max-width="480"
+    >
+      <VCard title="Suspendre l’obligation">
+        <VCardText class="d-flex flex-column gap-3">
+          <AppTextField
+            v-model="suspendForm.starts_on"
+            label="Début *"
+            type="date"
+          />
+          <AppTextField
+            v-model="suspendForm.ends_on"
+            label="Fin (optionnel)"
+            type="date"
+          />
+          <AppTextarea
+            v-model="suspendForm.reason"
+            label="Motif"
+            rows="3"
+          />
+        </VCardText>
+        <VCardActions>
+          <VSpacer />
+          <VBtn @click="showSuspend = false">
+            Annuler
+          </VBtn>
+          <VBtn
+            color="error"
+            :loading="saving"
+            :disabled="!suspendForm.starts_on"
+            @click="submitSuspend"
+          >
+            Suspendre
+          </VBtn>
+        </VCardActions>
+      </VCard>
+    </VDialog>
   </div>
 </template>

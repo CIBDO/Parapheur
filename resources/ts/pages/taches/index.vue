@@ -24,6 +24,7 @@ const { loading, items, meta, dashboard, list, loadDashboard } = useTasks()
 
 const showCreateDialog = ref(false)
 const showAdvanced = ref(false)
+const page = ref(1)
 const filters = ref({
   q: '',
   status: '',
@@ -84,12 +85,25 @@ const reload = async () => {
       to_validate: filters.value.to_validate ? 1 : undefined,
       overdue: filters.value.overdue ? 1 : undefined,
       team: filters.value.team ? 1 : undefined,
+      page: page.value,
+      per_page: 20,
     }),
   ])
 }
 
-watch(() => route.query.view, reload)
-watch(() => route.query.instruction_id, reload)
+const changePage = (value: number) => {
+  page.value = value
+  reload()
+}
+
+watch(() => route.query.view, () => {
+  page.value = 1
+  reload()
+})
+watch(() => route.query.instruction_id, () => {
+  page.value = 1
+  reload()
+})
 onMounted(reload)
 </script>
 
@@ -197,7 +211,7 @@ onMounted(reload)
           >
             <VBtn
               color="primary"
-              @click="reload"
+              @click="page = 1; reload()"
             >
               Filtrer
             </VBtn>
@@ -312,9 +326,16 @@ onMounted(reload)
       </VTable>
       <VCardText
         v-if="meta.total"
-        class="text-caption"
+        class="d-flex flex-wrap align-center justify-space-between gap-3"
       >
-        {{ meta.total }} résultat(s)
+        <span class="text-caption">{{ meta.total }} résultat(s)</span>
+        <VPagination
+          v-if="(meta.last_page || 1) > 1"
+          :model-value="meta.current_page || 1"
+          :length="meta.last_page || 1"
+          total-visible="5"
+          @update:model-value="changePage"
+        />
       </VCardText>
     </VCard>
 

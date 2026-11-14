@@ -4,14 +4,18 @@ namespace App\Services\Productions;
 
 use App\Enums\NumberingSequenceCode;
 use App\Enums\ProductionOccurrenceStatus;
+use App\Enums\TaskStatus;
 use App\Models\ProductionOccurrence;
 use App\Models\ProductionTransmission;
 use App\Models\ProductionTransmissionFile;
 use App\Models\ProductionTransmissionRecipient;
+use App\Models\Task;
 use App\Models\User;
+use App\Notifications\ProductionOpinionNotification;
 use App\Notifications\ProductionTransmissionNotification;
 use App\Services\DelegationResolver;
 use App\Services\NumberingService;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -30,37 +34,11 @@ class ProductionTransmissionService
         ?int $previousTransmissionId = null,
     ): ProductionOccurrence {
         $this->occurrences->assertCanUpdate($actor, $occurrence);
-
-        $allowed = [
-            ProductionOccurrenceStatus::Validee,
-            ProductionOccurrenceStatus::PreteATransmettre,
-            ProductionOccurrenceStatus::Transmise,
-        ];
-
-        if (! $rectificative && ! in_array($occurrence->status, $allowed, true)
-            && $occurrence->status !== ProductionOccurrenceStatus::Deposee
-            && $occurrence->obligation?->validation_required !== false) {
-            // Allow transmit when validation not required and files deposited
-            if (! ($occurrence->obligation?->validation_required === false
-                && in_array($occurrence->status, [
-                    ProductionOccurrenceStatus::Deposee,
-                    ProductionOccurrenceStatus::PreteATransmettre,
-                ], true))) {
-                throw ValidationException::withMessages([
-                    'status' => 'La production doit être validée avant transmission.',
-                ]);
-            }
-        }
-
-        if ($rectificative && $occurrence->status !== ProductionOccurrenceStatus::Transmise) {
-            throw ValidationException::withMessages([
-                'status' => 'Transmission rectificative uniquement après une première transmission.',
-            ]);
-        }
+        $this->assertCanTransmit($occurrence, $rectificative);
 
         $files = $occurrence->files()->with('documentVersion')->get();
         if ($files->isEmpty()) {
-            throw ValidationException::withMessages(['files' => 'Aucun fichier à transmettre.']);
+            throw ValidationException::withMessages(['files' => 'Aucun fichier à transmettre. Déposez d’abord le document.']);
         }
 
         return DB::transaction(function () use ($actor, $occurrence, $rectificative, $previousTransmissionId, $files) {
@@ -90,6 +68,12 @@ class ProductionTransmissionService
             }
 
             $recipients = $this->resolveRecipients($occurrence);
+            if ($recipients === []) {
+                throw ValidationException::withMessages([
+                    'recipients' => 'Aucun destinataire configuré sur ce modèle d’envoi.',
+                ]);
+            }
+
             foreach ($recipients as $recipient) {
                 ProductionTransmissionRecipient::query()->create([
                     'production_transmission_id' => $transmission->id,
@@ -104,6 +88,7 @@ class ProductionTransmissionService
             $occurrence->transmitted_at = now();
             $occurrence->save();
 
+            $this->syncLinkedTask($occurrence);
             $this->notifyRecipients($transmission, $occurrence);
             $this->occurrences->recordEvent($occurrence, $actor, $rectificative ? 'rectificative_transmitted' : 'transmitted', [
                 'transmission_id' => $transmission->id,
@@ -112,6 +97,151 @@ class ProductionTransmissionService
 
             return $this->occurrences->find($actor, $occurrence);
         });
+    }
+
+    /**
+     * Boîte « Reçues » : transmissions adressées à l’utilisateur.
+     *
+     * @param  array<string, mixed>  $filters
+     */
+    public function inbox(User $actor, array $filters = []): LengthAwarePaginator
+    {
+        $query = ProductionTransmission::query()
+            ->with([
+                'occurrence.obligation:id,code,label',
+                'occurrence.structure:id,code,name',
+                'occurrence.responsible:id,name',
+                'transmitter:id,name',
+                'files.productionFile.document:id,object,title',
+                'recipients' => fn ($q) => $q->where('user_id', $actor->id),
+            ])
+            ->whereHas('recipients', fn ($q) => $q->where('user_id', $actor->id))
+            ->orderByDesc('transmitted_at');
+
+        if (! empty($filters['unread'])) {
+            $query->whereHas('recipients', fn ($q) => $q
+                ->where('user_id', $actor->id)
+                ->whereNull('viewed_at'));
+        }
+
+        if (! empty($filters['today'])) {
+            $query->whereDate('transmitted_at', now()->toDateString());
+        }
+
+        if (! empty($filters['q'])) {
+            $q = '%'.$filters['q'].'%';
+            $query->where(function ($builder) use ($q) {
+                $builder->where('reference', 'like', $q)
+                    ->orWhereHas('occurrence', fn ($oq) => $oq
+                        ->where('reference', 'like', $q)
+                        ->orWhereHas('obligation', fn ($ob) => $ob
+                            ->where('label', 'like', $q)
+                            ->orWhere('code', 'like', $q)));
+            });
+        }
+
+        return $query->paginate((int) ($filters['per_page'] ?? 20));
+    }
+
+    public function recordOpinion(
+        User $actor,
+        ProductionTransmission $transmission,
+        string $opinion,
+        ?string $comment = null,
+    ): ProductionTransmissionRecipient {
+        $recipient = $transmission->recipients()->where('user_id', $actor->id)->first();
+        if (! $recipient) {
+            abort(403, 'Cette transmission ne vous est pas adressée.');
+        }
+
+        if (! in_array($opinion, ['favorable', 'reserve', 'a_revoir'], true)) {
+            throw ValidationException::withMessages(['opinion' => 'Avis invalide.']);
+        }
+
+        $recipient->opinion = $opinion;
+        $recipient->opinion_comment = $comment;
+        $recipient->opinion_at = now();
+        if (! $recipient->viewed_at) {
+            $recipient->viewed_at = now();
+        }
+        $recipient->save();
+
+        $transmission->loadMissing('occurrence.obligation.producer', 'occurrence.responsible');
+        $occurrence = $transmission->occurrence;
+        $notifyUser = $occurrence?->responsible ?? $occurrence?->obligation?->producer;
+        if ($notifyUser && (int) $notifyUser->id !== (int) $actor->id) {
+            $notifyUser->notify(new ProductionOpinionNotification(
+                $occurrence,
+                $transmission,
+                $opinion,
+                $actor->name,
+                $comment,
+            ));
+        }
+
+        return $recipient->fresh(['user:id,name']);
+    }
+
+    private function assertCanTransmit(ProductionOccurrence $occurrence, bool $rectificative): void
+    {
+        if ($rectificative) {
+            if ($occurrence->status !== ProductionOccurrenceStatus::Transmise) {
+                throw ValidationException::withMessages([
+                    'status' => 'Transmission rectificative uniquement après une première transmission.',
+                ]);
+            }
+
+            return;
+        }
+
+        $validationRequired = (bool) ($occurrence->obligation?->validation_required);
+
+        if (! $validationRequired) {
+            $allowed = [
+                ProductionOccurrenceStatus::AProduire,
+                ProductionOccurrenceStatus::Deposee,
+                ProductionOccurrenceStatus::EnPreparation,
+                ProductionOccurrenceStatus::ACompleter,
+                ProductionOccurrenceStatus::Rejetee,
+                ProductionOccurrenceStatus::PreteATransmettre,
+                ProductionOccurrenceStatus::Validee,
+            ];
+            if (! in_array($occurrence->status, $allowed, true)) {
+                throw ValidationException::withMessages([
+                    'status' => 'Déposez d’abord le document avant de l’envoyer.',
+                ]);
+            }
+
+            return;
+        }
+
+        $allowed = [
+            ProductionOccurrenceStatus::Validee,
+            ProductionOccurrenceStatus::PreteATransmettre,
+        ];
+        if (! in_array($occurrence->status, $allowed, true)) {
+            throw ValidationException::withMessages([
+                'status' => 'La production doit être validée avant transmission.',
+            ]);
+        }
+    }
+
+    private function syncLinkedTask(ProductionOccurrence $occurrence): void
+    {
+        if (! $occurrence->task_id) {
+            return;
+        }
+
+        $task = Task::query()->find($occurrence->task_id);
+        if (! $task || in_array($task->status, [TaskStatus::Validee, TaskStatus::Annulee], true)) {
+            return;
+        }
+
+        $task->status = TaskStatus::Validee;
+        $task->progress = 100;
+        $task->completed_at = $task->completed_at ?? now();
+        $task->validated_at = now();
+        $task->save();
     }
 
     /**

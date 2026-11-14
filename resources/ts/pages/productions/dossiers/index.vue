@@ -15,9 +15,10 @@ const saving = ref(false)
 const items = ref<any[]>([])
 const total = ref(0)
 const search = ref('')
+const todayOnly = ref(true)
 const errorMessage = ref('')
 const dialog = ref(false)
-const form = ref({ title: '', period_date: '' })
+const form = ref({ title: '', period_date: new Date().toISOString().slice(0, 10) })
 
 const folderStatusColor = (status?: string) => {
   if (status === 'closed' || status === 'cloture')
@@ -41,7 +42,12 @@ const load = async () => {
   loading.value = true
   errorMessage.value = ''
   try {
-    const res = await $api('/productions/folders', { query: { q: search.value || undefined } })
+    const res = await $api('/productions/folders', {
+      query: {
+        q: search.value || undefined,
+        period_date: todayOnly.value ? new Date().toISOString().slice(0, 10) : undefined,
+      },
+    })
     items.value = res.data ?? res
     total.value = res.total ?? items.value.length
   }
@@ -91,8 +97,8 @@ onMounted(load)
 <template>
   <div>
     <ParapheurPageHeader
-      title="Dossiers de production"
-      subtitle="Regroupements d’occurrences, sans copie des fichiers"
+      title="Dossier du jour"
+      subtitle="Pack des situations transmises ou attendues pour la Direction"
       icon="tabler-folder"
     >
       <template #actions>
@@ -152,8 +158,16 @@ onMounted(load)
           <VCol
             cols="12"
             md="4"
-            class="d-flex align-center"
+            class="d-flex align-center gap-3"
           >
+            <VSwitch
+              v-model="todayOnly"
+              label="Aujourd’hui"
+              color="primary"
+              hide-details
+              density="compact"
+              @update:model-value="load"
+            />
             <VBtn
               color="primary"
               @click="load"

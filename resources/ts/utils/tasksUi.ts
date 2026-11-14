@@ -165,6 +165,7 @@ export const taskSourceLabels: Record<string, string> = {
   affaire: 'Affaire',
   appointment: 'RDV',
   instruction: 'Instruction',
+  production: 'Production',
   other: 'Autre',
 }
 

@@ -9,12 +9,12 @@ class RemindProductionDeadlines extends Command
 {
     protected $signature = 'parapheur:remind-productions';
 
-    protected $description = 'Envoie les rappels et escalades des productions (idempotent)';
+    protected $description = 'Rappel unique du matin (07:30) — email aux producteurs des éléments non encore envoyés';
 
     public function handle(ProductionReminderService $reminders): int
     {
-        $result = $reminders->processDue();
-        $this->info(sprintf('Rappels productions — envoyés: %d, ignorés: %d', $result['sent'], $result['skipped']));
+        $result = $reminders->processMorningDigest();
+        $this->info(sprintf('Digest productions 07:30 — emails: %d, ignorés: %d', $result['sent'], $result['skipped']));
 
         return self::SUCCESS;
     }

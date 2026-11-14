@@ -15,6 +15,9 @@ class ProductionTransmissionRecipient extends Model
         'delivery_status',
         'notified_at',
         'viewed_at',
+        'opinion',
+        'opinion_comment',
+        'opinion_at',
     ];
 
     protected function casts(): array
@@ -22,6 +25,7 @@ class ProductionTransmissionRecipient extends Model
         return [
             'notified_at' => 'datetime',
             'viewed_at' => 'datetime',
+            'opinion_at' => 'datetime',
         ];
     }
 

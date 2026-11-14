@@ -59,7 +59,7 @@ Schedule::command('parapheur:generate-productions --sync')
     ->appendOutputTo(storage_path('logs/production-generation.log'));
 
 Schedule::command('parapheur:remind-productions')
-    ->everyFifteenMinutes()
+    ->dailyAt('07:30')
     ->withoutOverlapping()
     ->appendOutputTo(storage_path('logs/production-reminders.log'));
 

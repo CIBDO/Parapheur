@@ -22,7 +22,7 @@ const users = ref<{ id: number; name: string }[]>([])
 const structures = ref<{ id: number; name: string; code?: string }[]>([])
 const calendars = ref<{ id: number; name: string; code?: string }[]>([])
 
-const wizardSteps = ['Général', 'Acteurs', 'Périodicité', 'Livrables', 'Rappels', 'Récapitulatif']
+const wizardSteps = ['Général', 'Acteurs', 'Périodicité', 'Livrables', 'Rappel', 'Récapitulatif']
 
 const frequencies = Object.entries(productionFrequencyLabels).map(([value, title]) => ({ title, value }))
 
@@ -47,18 +47,16 @@ const emptyForm = () => ({
   allowed_formats: ['pdf', 'xlsx', 'docx', 'csv'],
   min_files: 1,
   max_files: 10,
-  validation_required: true,
+  validation_required: false,
   validation_mode: 'sequential',
   auto_transmit: false,
   submit_to_parapheur: false,
   validators: [] as { user_id: number | null; step_order: number }[],
   recipient_user_id: null as number | null,
+  include_dg: true,
+  include_dga: true,
   recipients: [] as { role_name?: string; user_id?: number | null }[],
-  reminder_rules: [
-    { offset_type: 'before', offset_minutes: 90, target: 'producer' },
-    { offset_type: 'before', offset_minutes: 30, target: 'producer' },
-    { offset_type: 'after', offset_minutes: 30, target: 'hierarchy', escalate: true },
-  ],
+  reminder_rules: [] as { offset_type: string; offset_minutes: number; target: string; escalate?: boolean }[],
 })
 
 const form = ref(emptyForm())
@@ -119,19 +117,28 @@ const scheduleConfig = () => {
 const create = async () => {
   creating.value = true
   try {
-    const { schedule_weekday, schedule_day, schedule_month, schedule_days, once_date, recipient_user_id, ...payload } = form.value
+    const {
+      schedule_weekday, schedule_day, schedule_month, schedule_days, once_date,
+      recipient_user_id, include_dg, include_dga, ...payload
+    } = form.value
+    const recipients: { role_name?: string; user_id?: number | null }[] = []
+    if (recipient_user_id)
+      recipients.push({ user_id: recipient_user_id })
+    if (include_dg)
+      recipients.push({ role_name: 'Directeur Général' })
+    if (include_dga)
+      recipients.push({ role_name: 'DGA' })
+    if (!recipients.length)
+      recipients.push({ role_name: 'Directeur Général' })
+
     await $api('/productions/obligations', {
       method: 'POST',
       body: {
         ...payload,
         schedule_config: scheduleConfig(),
         validators: form.value.validators.filter(v => v.user_id),
-        recipients: recipient_user_id
-          ? [{ user_id: recipient_user_id }, { role_name: 'Directeur Général' }, { role_name: 'Directeur Général' }]
-          : [
-              { role_name: 'Directeur Général' },
-              { role_name: 'Directeur Général Adjoint' },
-            ],
+        recipients,
+        reminder_rules: [],
       },
     })
     showWizard.value = false
@@ -352,18 +359,26 @@ onMounted(async () => {
               label="Suppléant"
             />
             <UserAutocomplete
-              :model-value="form.validators[0]?.user_id ?? null"
-              :items="users"
-              label="Validateur"
-              @update:model-value="(v: number | number[] | null) => { form.validators = [{ user_id: typeof v === 'number' ? v : null, step_order: 1 }] }"
-            />
-            <UserAutocomplete
               v-model="form.recipient_user_id"
               :items="users"
-              label="Destinataire nominatif"
+              label="Destinataire nominatif (optionnel)"
+            />
+            <VSwitch
+              v-model="form.include_dg"
+              label="Envoyer au Directeur Général"
+              color="primary"
+              inset
+              hide-details
+            />
+            <VSwitch
+              v-model="form.include_dga"
+              label="Envoyer au DGA"
+              color="primary"
+              inset
+              hide-details
             />
             <div class="text-caption text-medium-emphasis">
-              Le Directeur Général et le DGA restent destinataires par leur rôle. Une délégation active élargit la transmission.
+              Cochez uniquement les destinataires concernés. L’envoi est direct, sans validation interne.
             </div>
           </div>
 
@@ -482,22 +497,16 @@ onMounted(async () => {
             class="text-body-1"
           >
             <div class="text-medium-emphasis mb-3">
-              Règles appliquées à la création
+              Rappel quotidien unique
             </div>
-            <VList density="compact">
-              <VListItem
-                title="Rappel 90 minutes avant l’échéance"
-                prepend-icon="tabler-bell"
-              />
-              <VListItem
-                title="Rappel 30 minutes avant l’échéance"
-                prepend-icon="tabler-bell"
-              />
-              <VListItem
-                title="Escalade hiérarchique 30 minutes après"
-                prepend-icon="tabler-alert-triangle"
-              />
-            </VList>
+            <VAlert
+              type="info"
+              variant="tonal"
+              icon="tabler-mail"
+            >
+              Chaque jour à 07:30, un email est envoyé aux producteurs dont les éléments du jour
+              n’ont pas encore été transmis. Aucun autre rappel automatique.
+            </VAlert>
           </div>
 
           <VList

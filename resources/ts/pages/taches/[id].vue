@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import UserAutocomplete from '@/components/common/UserAutocomplete.vue'
 import OnlyOfficeEditor from '@/components/parapheur/OnlyOfficeEditor.vue'
 import ParapheurPageHeader from '@/components/parapheur/ParapheurPageHeader.vue'
 import { useTasks } from '@/composables/useTasks'
@@ -34,8 +35,21 @@ const returnMotif = ref('')
 const showComplete = ref(false)
 const showReturn = ref(false)
 const showCancel = ref(false)
+const showWait = ref(false)
+const showEscalate = ref(false)
+const showReassign = ref(false)
 const cancelReason = ref('')
+const waitComment = ref('')
+const escalateReason = ref('')
+const escalateLevel = ref(1)
+const reassignUserId = ref<number | null>(null)
+const reassignMotif = ref('')
+const users = ref<{ id: number; name: string }[]>([])
 const subtaskTitle = ref('')
+const attachmentFile = ref<File[] | null>(null)
+const uploadingAttachment = ref(false)
+const auditItems = ref<any[]>([])
+const loadingAudit = ref(false)
 
 const depRelation = ref('depends_on')
 const depRelatedId = ref<number | null>(null)
@@ -107,6 +121,19 @@ const commentsCount = computed(() => (task.value?.comments || []).length)
 const subtasksCount = computed(() => (task.value?.subtasks || []).length)
 const depsCount = computed(() => (task.value?.dependencies || []).length)
 const docsCount = computed(() => (task.value?.document_links || []).length)
+const attachmentsCount = computed(() => (task.value?.attachments || []).length)
+const historyCount = computed(() => (task.value?.histories || []).length)
+
+const productionLink = computed(() => {
+  if (task.value?.source_kind !== 'production' || !task.value?.source_id)
+    return null
+
+  return `/productions/occurrences/${task.value.source_id}`
+})
+
+const canManageAssignment = computed(() =>
+  !['validee', 'annulee'].includes(String(task.value?.status || '')),
+)
 
 watch(
   () => [task.value?.status, task.value?.progress],
@@ -149,6 +176,29 @@ const loadRelatedOptions = async () => {
   relatedOptions.value = (res.data ?? res).filter((t: any) => String(t.id) !== taskId.value)
 }
 
+const loadUsers = async () => {
+  try {
+    const res = await $api('/meta/users')
+    users.value = res.data ?? res ?? []
+  }
+  catch {
+    users.value = []
+  }
+}
+
+const loadAudit = async () => {
+  loadingAudit.value = true
+  try {
+    auditItems.value = await $api(`/tasks/${taskId.value}/audit`)
+  }
+  catch {
+    auditItems.value = []
+  }
+  finally {
+    loadingAudit.value = false
+  }
+}
+
 const loadClassification = async () => {
   try {
     const res = await $api('/ged/classification-nodes')
@@ -183,7 +233,52 @@ const run = async (path: string, body?: Record<string, any>) => {
     showComplete.value = false
     showReturn.value = false
     showCancel.value = false
+    showWait.value = false
+    showEscalate.value = false
+    showReassign.value = false
   }
+}
+
+const submitReassign = async () => {
+  if (!reassignUserId.value || !reassignMotif.value.trim())
+    return
+  await run('reassign', {
+    assignee_id: reassignUserId.value,
+    motif: reassignMotif.value,
+  })
+  reassignUserId.value = null
+  reassignMotif.value = ''
+}
+
+const submitEscalate = async () => {
+  await run('escalate', {
+    level: escalateLevel.value,
+    reason: escalateReason.value || null,
+  })
+  escalateReason.value = ''
+  escalateLevel.value = 1
+}
+
+const uploadAttachment = async () => {
+  const file = attachmentFile.value?.[0]
+  if (!file)
+    return
+  uploadingAttachment.value = true
+  try {
+    const body = new FormData()
+    body.append('file', file)
+    body.append('kind', 'attachment')
+    await $api(`/tasks/${taskId.value}/attachments`, { method: 'POST', body })
+    attachmentFile.value = null
+    await load()
+  }
+  finally {
+    uploadingAttachment.value = false
+  }
+}
+
+const downloadAttachment = (attachmentId: number) => {
+  window.open(`/api/tasks/${taskId.value}/attachments/${attachmentId}/download`, '_blank')
 }
 
 const addComment = async () => {
@@ -316,7 +411,18 @@ const unlinkDocument = async (linkId: number) => {
 }
 
 onMounted(async () => {
-  await Promise.all([load(), loadRelatedOptions(), loadClassification(), loadAvailableDocs()])
+  await Promise.all([
+    load(),
+    loadRelatedOptions(),
+    loadClassification(),
+    loadAvailableDocs(),
+    loadUsers(),
+  ])
+})
+
+watch(activeTab, (tab) => {
+  if (tab === 'audit' && !auditItems.value.length)
+    loadAudit()
 })
 </script>
 
@@ -513,6 +619,16 @@ onMounted(async () => {
               </VBtn>
               <VBtn
                 v-if="task.status === 'en_cours'"
+                color="warning"
+                variant="tonal"
+                prepend-icon="tabler-player-pause"
+                :loading="acting"
+                @click="showWait = true"
+              >
+                Mettre en attente
+              </VBtn>
+              <VBtn
+                v-if="task.status === 'en_cours'"
                 color="success"
                 prepend-icon="tabler-circle-check"
                 :loading="acting"
@@ -538,6 +654,26 @@ onMounted(async () => {
                 @click="showReturn = true"
               >
                 Retourner
+              </VBtn>
+              <VBtn
+                v-if="canManageAssignment && ($can('update', 'Task') || $can('manage', 'Task'))"
+                color="info"
+                variant="tonal"
+                prepend-icon="tabler-user-share"
+                :loading="acting"
+                @click="showReassign = true"
+              >
+                Réaffecter
+              </VBtn>
+              <VBtn
+                v-if="canManageAssignment && ($can('update', 'Task') || $can('manage', 'Task'))"
+                color="warning"
+                variant="tonal"
+                prepend-icon="tabler-arrow-up-right"
+                :loading="acting"
+                @click="showEscalate = true"
+              >
+                Escalader
               </VBtn>
               <VSpacer />
               <VBtn
@@ -624,6 +760,45 @@ onMounted(async () => {
                 >
                   {{ docsCount }}
                 </VChip>
+              </VTab>
+              <VTab value="attachments">
+                <VIcon
+                  start
+                  icon="tabler-paperclip"
+                />
+                Pièces jointes
+                <VChip
+                  v-if="attachmentsCount"
+                  class="ms-2"
+                  size="x-small"
+                  color="primary"
+                  variant="tonal"
+                >
+                  {{ attachmentsCount }}
+                </VChip>
+              </VTab>
+              <VTab value="history">
+                <VIcon
+                  start
+                  icon="tabler-history"
+                />
+                Historique
+                <VChip
+                  v-if="historyCount"
+                  class="ms-2"
+                  size="x-small"
+                  color="primary"
+                  variant="tonal"
+                >
+                  {{ historyCount }}
+                </VChip>
+              </VTab>
+              <VTab value="audit">
+                <VIcon
+                  start
+                  icon="tabler-shield-search"
+                />
+                Audit
               </VTab>
             </VTabs>
 
@@ -1017,6 +1192,111 @@ onMounted(async () => {
                   </VListItem>
                 </VList>
               </VWindowItem>
+
+              <VWindowItem value="attachments">
+                <VCardText class="d-flex flex-wrap align-end gap-3">
+                  <VFileInput
+                    v-model="attachmentFile"
+                    label="Ajouter une pièce jointe"
+                    prepend-icon=""
+                    prepend-inner-icon="tabler-upload"
+                    density="comfortable"
+                    hide-details
+                    class="flex-grow-1"
+                    style="min-inline-size: 240px"
+                  />
+                  <VBtn
+                    color="primary"
+                    prepend-icon="tabler-upload"
+                    :loading="uploadingAttachment"
+                    :disabled="!attachmentFile?.length"
+                    @click="uploadAttachment"
+                  >
+                    Déposer
+                  </VBtn>
+                </VCardText>
+                <VDivider />
+                <div
+                  v-if="!(task.attachments || []).length"
+                  class="text-center py-10 text-medium-emphasis"
+                >
+                  Aucune pièce jointe
+                </div>
+                <VList
+                  v-else
+                  lines="two"
+                >
+                  <VListItem
+                    v-for="att in task.attachments || []"
+                    :key="att.id"
+                    :title="att.original_name || `Fichier #${att.id}`"
+                    :subtitle="`${att.uploader?.name || '—'} · ${att.kind || 'attachment'}`"
+                  >
+                    <template #append>
+                      <VBtn
+                        icon
+                        variant="text"
+                        size="small"
+                        @click="downloadAttachment(att.id)"
+                      >
+                        <VIcon icon="tabler-download" />
+                      </VBtn>
+                    </template>
+                  </VListItem>
+                </VList>
+              </VWindowItem>
+
+              <VWindowItem value="history">
+                <div
+                  v-if="!(task.histories || []).length"
+                  class="text-center py-10 text-medium-emphasis"
+                >
+                  Aucun historique
+                </div>
+                <VList
+                  v-else
+                  lines="two"
+                >
+                  <VListItem
+                    v-for="h in task.histories || []"
+                    :key="h.id"
+                    :title="h.event || h.comment || 'Événement'"
+                    :subtitle="`${h.user?.name || 'Système'} · ${h.created_at ? new Date(h.created_at).toLocaleString('fr-FR') : ''}`"
+                  >
+                    <template #append>
+                      <span class="text-caption text-medium-emphasis">
+                        {{ h.from_status ? `${h.from_status} → ${h.to_status || ''}` : '' }}
+                      </span>
+                    </template>
+                  </VListItem>
+                </VList>
+              </VWindowItem>
+
+              <VWindowItem value="audit">
+                <div
+                  v-if="loadingAudit"
+                  class="text-center py-10"
+                >
+                  <VProgressCircular indeterminate />
+                </div>
+                <div
+                  v-else-if="!auditItems.length"
+                  class="text-center py-10 text-medium-emphasis"
+                >
+                  Aucune entrée d’audit accessible
+                </div>
+                <VList
+                  v-else
+                  lines="two"
+                >
+                  <VListItem
+                    v-for="(entry, idx) in auditItems"
+                    :key="entry.id || idx"
+                    :title="entry.action || entry.event || entry.description || 'Audit'"
+                    :subtitle="`${entry.user?.name || entry.actor?.name || '—'} · ${entry.created_at ? new Date(entry.created_at).toLocaleString('fr-FR') : ''}`"
+                  />
+                </VList>
+              </VWindowItem>
             </VWindow>
           </VCard>
         </VCol>
@@ -1122,6 +1402,25 @@ onMounted(async () => {
                 </VListItemTitle>
                 <VListItemSubtitle class="text-body-2 text-high-emphasis">
                   {{ taskSourceLabels[task.source_kind] || task.source_kind || 'Manuelle' }}
+                </VListItemSubtitle>
+              </VListItem>
+              <VListItem
+                v-if="productionLink"
+                class="cursor-pointer"
+                @click="router.push(productionLink)"
+              >
+                <template #prepend>
+                  <VIcon
+                    icon="tabler-file-time"
+                    size="20"
+                    class="me-2 text-medium-emphasis"
+                  />
+                </template>
+                <VListItemTitle class="text-caption text-medium-emphasis">
+                  Occurrence de production
+                </VListItemTitle>
+                <VListItemSubtitle class="text-body-2 text-primary">
+                  Ouvrir l’occurrence #{{ task.source_id }}
                 </VListItemSubtitle>
               </VListItem>
               <VListItem
@@ -1305,6 +1604,101 @@ onMounted(async () => {
             @click="run('cancel', { reason: cancelReason })"
           >
             Annuler la tâche
+          </VBtn>
+        </VCardActions>
+      </VCard>
+    </VDialog>
+
+    <VDialog
+      v-model="showWait"
+      max-width="480"
+    >
+      <VCard title="Mettre en attente">
+        <VCardText>
+          <AppTextarea
+            v-model="waitComment"
+            label="Commentaire (optionnel)"
+            rows="3"
+          />
+        </VCardText>
+        <VCardActions>
+          <VSpacer />
+          <VBtn @click="showWait = false">
+            Annuler
+          </VBtn>
+          <VBtn
+            color="warning"
+            :loading="acting"
+            @click="run('wait', { comment: waitComment || null })"
+          >
+            Confirmer
+          </VBtn>
+        </VCardActions>
+      </VCard>
+    </VDialog>
+
+    <VDialog
+      v-model="showEscalate"
+      max-width="480"
+    >
+      <VCard title="Escalader la tâche">
+        <VCardText class="d-flex flex-column gap-3">
+          <AppSelect
+            v-model="escalateLevel"
+            label="Niveau"
+            :items="[1, 2, 3, 4, 5].map(v => ({ title: `Niveau ${v}`, value: v }))"
+          />
+          <AppTextarea
+            v-model="escalateReason"
+            label="Motif (optionnel)"
+            rows="3"
+          />
+        </VCardText>
+        <VCardActions>
+          <VSpacer />
+          <VBtn @click="showEscalate = false">
+            Annuler
+          </VBtn>
+          <VBtn
+            color="warning"
+            :loading="acting"
+            @click="submitEscalate"
+          >
+            Escalader
+          </VBtn>
+        </VCardActions>
+      </VCard>
+    </VDialog>
+
+    <VDialog
+      v-model="showReassign"
+      max-width="520"
+    >
+      <VCard title="Réaffecter la tâche">
+        <VCardText class="d-flex flex-column gap-3">
+          <UserAutocomplete
+            v-model="reassignUserId"
+            :items="users"
+            label="Nouveau responsable *"
+          />
+          <AppTextarea
+            v-model="reassignMotif"
+            label="Motif *"
+            rows="3"
+          />
+        </VCardText>
+        <VCardActions>
+          <VSpacer />
+          <VBtn @click="showReassign = false">
+            Annuler
+          </VBtn>
+          <VBtn
+            color="primary"
+            :loading="acting"
+            :disabled="!reassignUserId || !reassignMotif.trim()"
+            @click="submitReassign"
+          >
+            Réaffecter
           </VBtn>
         </VCardActions>
       </VCard>

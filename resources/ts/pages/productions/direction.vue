@@ -41,8 +41,8 @@ onMounted(load)
 <template>
   <div>
     <ParapheurPageHeader
-      title="Pilotage Direction Générale"
-      subtitle="Vue consolidée des productions institutionnelles"
+      title="Suivi Direction"
+      subtitle="Vue consolidée — manquants, retards et envois du jour"
       icon="tabler-chart-dots"
     >
       <template #actions>

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import OnlyOfficeEditor from '@/components/parapheur/OnlyOfficeEditor.vue'
 import ParapheurPageHeader from '@/components/parapheur/ParapheurPageHeader.vue'
 import {
   formatTaskDue,
@@ -25,25 +26,52 @@ const decision = ref('approved')
 const motif = ref('')
 const errorMessage = ref('')
 const justification = ref('')
+const editorDocId = ref<number | null>(null)
+const showEditor = ref(false)
 
 const id = computed(() => Number(route.params.id))
 
 const depositStatuses = ['a_produire', 'en_preparation', 'deposee', 'a_completer', 'rejetee']
 
 const canDeposit = computed(() => depositStatuses.includes(item.value?.status))
-const awaitingDecision = computed(() => ['soumise_validation', 'en_validation'].includes(item.value?.status))
-const readyToSend = computed(() => ['validee', 'prete_a_transmettre'].includes(item.value?.status))
+const validationRequired = computed(() => Boolean(item.value?.obligation?.validation_required))
+const awaitingDecision = computed(() => validationRequired.value && ['soumise_validation', 'en_validation'].includes(item.value?.status))
+const canSendDirect = computed(() => {
+  if (validationRequired.value)
+    return ['validee', 'prete_a_transmettre'].includes(item.value?.status)
+  return ['a_produire', 'deposee', 'en_preparation', 'a_completer', 'rejetee', 'prete_a_transmettre', 'validee'].includes(item.value?.status)
+    && (item.value?.files?.length || 0) > 0
+})
 const isLate = computed(() => Boolean(item.value?.delay_flags?.length))
 
+const recipientActors = computed(() =>
+  (item.value?.obligation?.actors || []).filter((a: any) => a.role === 'recipient'),
+)
+
+const sendLabel = computed(() => {
+  const roles = recipientActors.value.map((a: any) => a.role_name).filter(Boolean)
+  const hasDg = roles.includes('Directeur Général')
+  const hasDga = roles.includes('DGA')
+  if (hasDg && hasDga)
+    return 'Envoyer au DG / DGA'
+  if (hasDg)
+    return 'Envoyer au DG'
+  if (hasDga)
+    return 'Envoyer au DGA'
+  return 'Envoyer aux destinataires'
+})
+
 const nextStep = computed(() => {
-  if (canDeposit.value)
-    return item.value?.files?.length ? 'Le fichier est prêt : soumettez-le.' : 'Déposez le fichier attendu.'
+  if (canDeposit.value && !item.value?.files?.length)
+    return 'Déposez le fichier attendu.'
+  if (canSendDirect.value)
+    return 'Le document est prêt : envoyez-le aux destinataires.'
+  if (validationRequired.value && canDeposit.value && item.value?.files?.length)
+    return 'Soumettez pour validation interne, puis envoi.'
   if (awaitingDecision.value)
-    return 'Une décision est attendue.'
-  if (readyToSend.value)
-    return 'Le livrable peut être transmis.'
+    return 'Une validation interne est attendue.'
   if (item.value?.status === 'transmise')
-    return 'Production transmise. Une rectification reste possible.'
+    return 'Document envoyé. Une rectification reste possible.'
 
   return 'Aucune action à cette étape.'
 })
@@ -115,13 +143,45 @@ const transmit = (rectificative = false) => run(() => $api(`/productions/occurre
   body: { rectificative },
 }))
 
-const createOffice = () => run(() => $api(`/productions/occurrences/${id.value}/office`, {
-  method: 'POST',
-  body: { format: 'docx' },
-}))
+const createOffice = async () => {
+  acting.value = true
+  errorMessage.value = ''
+  try {
+    const file = await $api(`/productions/occurrences/${id.value}/office`, {
+      method: 'POST',
+      body: { format: 'docx' },
+    })
+    await load()
+    const docId = file?.document_id || file?.document?.id
+    if (docId) {
+      editorDocId.value = docId
+      showEditor.value = true
+    }
+  }
+  catch (error: any) {
+    errorMessage.value = error?.data?.message
+      || Object.values(error?.data?.errors || {})?.[0]?.[0]
+      || 'Création Office impossible.'
+  }
+  finally {
+    acting.value = false
+  }
+}
+
+const openOffice = (file: any) => {
+  const docId = file?.document_id || file?.document?.id
+  if (!docId)
+    return
+  editorDocId.value = docId
+  showEditor.value = true
+}
 
 const classify = (fileId: number) => run(() => $api(`/productions/occurrences/${id.value}/files/${fileId}/submit-ged`, {
   method: 'POST',
+}))
+
+const removeFile = (fileId: number) => run(() => $api(`/productions/occurrences/${id.value}/files/${fileId}`, {
+  method: 'DELETE',
 }))
 
 const submitParapheur = () => run(() => $api(`/productions/occurrences/${id.value}/submit-parapheur`, {
@@ -141,8 +201,8 @@ onMounted(load)
 <template>
   <div>
     <ParapheurPageHeader
-      :title="item?.obligation?.label || 'Occurrence'"
-      :subtitle="item?.reference || 'Fiche de production'"
+      :title="item?.obligation?.label || 'Situation'"
+      :subtitle="item?.reference || 'Livrable à envoyer'"
       icon="tabler-file-upload"
     >
       <template #actions>
@@ -358,6 +418,16 @@ onMounted(load)
                 <template #append>
                   <div class="d-flex align-center gap-2">
                     <VBtn
+                      v-if="file.document_id || file.document?.id"
+                      size="small"
+                      variant="tonal"
+                      color="primary"
+                      prepend-icon="tabler-edit"
+                      @click="openOffice(file)"
+                    >
+                      Ouvrir
+                    </VBtn>
+                    <VBtn
                       v-if="['validee', 'prete_a_transmettre', 'transmise', 'cloturee'].includes(item.status)"
                       size="small"
                       variant="tonal"
@@ -365,6 +435,14 @@ onMounted(load)
                     >
                       Classer GED
                     </VBtn>
+                    <VBtn
+                      v-if="canDeposit && !file.transmitted_at"
+                      size="small"
+                      variant="text"
+                      color="error"
+                      icon="tabler-trash"
+                      @click="removeFile(file.id)"
+                    />
                     <VChip
                       size="small"
                       variant="tonal"
@@ -439,16 +517,27 @@ onMounted(load)
                 v-for="tx in item.transmissions"
                 :key="tx.id"
                 :title="tx.reference"
-                :subtitle="`${tx.transmitter?.name || '—'} · ${tx.recipients?.length || 0} destinataire(s)`"
+                :subtitle="`${tx.transmitter?.name || '—'} · ${tx.recipients?.length || 0} destinataire(s)${tx.recipients?.some((r: any) => r.opinion) ? ' · avis reçu' : ''}`"
               >
                 <template #append>
-                  <VChip
-                    size="small"
-                    variant="tonal"
-                    :color="tx.is_rectificative ? 'warning' : 'success'"
-                  >
-                    {{ tx.is_rectificative ? 'Rectificative' : 'Initiale' }}
-                  </VChip>
+                  <div class="d-flex align-center gap-2">
+                    <VChip
+                      v-for="r in (tx.recipients || []).filter((x: any) => x.opinion)"
+                      :key="r.id"
+                      size="x-small"
+                      variant="tonal"
+                      color="info"
+                    >
+                      {{ r.user?.name || 'Destinataire' }} : {{ r.opinion }}
+                    </VChip>
+                    <VChip
+                      size="small"
+                      variant="tonal"
+                      :color="tx.is_rectificative ? 'warning' : 'success'"
+                    >
+                      {{ tx.is_rectificative ? 'Rectificative' : 'Envoyée' }}
+                    </VChip>
+                  </div>
                 </template>
               </VListItem>
             </VList>
@@ -470,6 +559,14 @@ onMounted(load)
             </VCardItem>
             <VDivider />
             <VCardText class="d-flex flex-column gap-3">
+              <div
+                v-if="recipientActors.length"
+                class="text-caption text-medium-emphasis"
+              >
+                Destinataires :
+                {{ recipientActors.map((a: any) => a.user?.name || a.role_name || a.structure?.name).join(', ') }}
+              </div>
+
               <template v-if="canDeposit">
                 <VBtn
                   variant="text"
@@ -488,14 +585,27 @@ onMounted(load)
                 >
                   Envoyer au parapheur
                 </VBtn>
+              </template>
+
+              <VBtn
+                v-if="canSendDirect && $can('transmit', 'Production')"
+                color="primary"
+                prepend-icon="tabler-send"
+                :loading="acting"
+                @click="transmit(false)"
+              >
+                {{ sendLabel }}
+              </VBtn>
+
+              <template v-else-if="validationRequired && canDeposit && item.files?.length">
                 <VBtn
                   color="primary"
-                  prepend-icon="tabler-send"
+                  variant="tonal"
+                  prepend-icon="tabler-checks"
                   :loading="acting"
-                  :disabled="!item.files?.length"
                   @click="submit"
                 >
-                  Soumettre
+                  Soumettre pour validation
                 </VBtn>
               </template>
 
@@ -525,16 +635,6 @@ onMounted(load)
               </template>
 
               <VBtn
-                v-else-if="readyToSend && $can('transmit', 'Production')"
-                color="primary"
-                prepend-icon="tabler-mail-forward"
-                :loading="acting"
-                @click="transmit(false)"
-              >
-                Transmettre
-              </VBtn>
-
-              <VBtn
                 v-else-if="item.status === 'transmise' && $can('transmit', 'Production')"
                 color="primary"
                 variant="tonal"
@@ -546,7 +646,7 @@ onMounted(load)
               </VBtn>
 
               <p
-                v-else
+                v-else-if="!canDeposit && !canSendDirect"
                 class="text-body-2 text-medium-emphasis mb-0"
               >
                 Cette étape est entre les mains d’un autre acteur.
@@ -583,5 +683,27 @@ onMounted(load)
         </VCol>
       </VRow>
     </template>
+
+    <VDialog
+      v-model="showEditor"
+      fullscreen
+      transition="dialog-bottom-transition"
+    >
+      <VCard>
+        <VToolbar color="primary">
+          <VBtn
+            icon="tabler-x"
+            @click="showEditor = false"
+          />
+          <VToolbarTitle>Édition ONLYOFFICE</VToolbarTitle>
+        </VToolbar>
+        <VCardText v-if="editorDocId">
+          <OnlyOfficeEditor
+            :document-id="editorDocId"
+            @saved="load"
+          />
+        </VCardText>
+      </VCard>
+    </VDialog>
   </div>
 </template>

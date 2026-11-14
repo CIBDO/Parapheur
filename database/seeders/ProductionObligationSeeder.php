@@ -9,7 +9,6 @@ use App\Models\Instruction;
 use App\Models\ProductionFolderTemplate;
 use App\Models\ProductionObligation;
 use App\Models\ProductionObligationActor;
-use App\Models\ProductionReminderRule;
 use App\Models\Structure;
 use App\Models\User;
 use Carbon\Carbon;
@@ -170,7 +169,7 @@ class ProductionObligationSeeder extends Seeder
                 'allowed_formats' => ['pdf', 'xlsx', 'docx', 'csv'],
                 'min_files' => 1,
                 'max_files' => 10,
-                'validation_required' => true,
+                'validation_required' => false,
                 'validation_mode' => 'sequential',
                 'auto_transmit' => false,
                 'archive_enabled' => true,
@@ -181,38 +180,13 @@ class ProductionObligationSeeder extends Seeder
         $obligation->actors()->delete();
         $obligation->reminderRules()->delete();
 
-        if ($producerId) {
-            ProductionObligationActor::query()->create([
-                'production_obligation_id' => $obligation->id,
-                'role' => 'validator',
-                'user_id' => $producerId,
-                'step_order' => 1,
-            ]);
-        }
-
+        // Destinataires flexibles : DG + DGA par défaut pour la trésorerie
         foreach (array_filter([$dgRole, $dgaRole]) as $index => $roleName) {
             ProductionObligationActor::query()->create([
                 'production_obligation_id' => $obligation->id,
                 'role' => 'recipient',
                 'role_name' => $roleName,
                 'step_order' => $index + 1,
-            ]);
-        }
-
-        foreach ([
-            ['offset_type' => 'before', 'offset_minutes' => 90, 'target' => 'producer'],
-            ['offset_type' => 'before', 'offset_minutes' => 30, 'target' => 'producer'],
-            ['offset_type' => 'at_deadline', 'offset_minutes' => 0, 'target' => 'producer', 'escalate' => false],
-            ['offset_type' => 'after', 'offset_minutes' => 30, 'target' => 'hierarchy', 'escalate' => true],
-        ] as $rule) {
-            ProductionReminderRule::query()->create([
-                'production_obligation_id' => $obligation->id,
-                'offset_type' => $rule['offset_type'],
-                'offset_minutes' => $rule['offset_minutes'],
-                'target' => $rule['target'],
-                'escalate' => (bool) ($rule['escalate'] ?? false),
-                'stop_when' => 'transmitted',
-                'is_active' => true,
             ]);
         }
     }

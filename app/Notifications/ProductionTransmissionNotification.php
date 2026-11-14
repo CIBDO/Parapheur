@@ -31,7 +31,7 @@ class ProductionTransmissionNotification extends Notification implements ShouldQ
 
     public function toMail(object $notifiable): MailMessage
     {
-        $url = url('/productions/occurrences/'.$this->occurrence->id);
+        $url = url('/productions/recues?transmission='.$this->transmission->id);
 
         return (new MailMessage)
             ->subject(NotificationPresentation::mailSubject('Productions', $this->title()))
@@ -55,7 +55,7 @@ class ProductionTransmissionNotification extends Notification implements ShouldQ
             'profile' => $this->profile,
             'occurrence_id' => $this->occurrence->id,
             'transmission_id' => $this->transmission->id,
-            'url' => '/productions/occurrences/'.$this->occurrence->id,
+            'url' => '/productions/recues?transmission='.$this->transmission->id,
         ];
     }
 

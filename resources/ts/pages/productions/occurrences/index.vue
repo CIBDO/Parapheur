@@ -14,7 +14,8 @@ const router = useRouter()
 const loading = ref(false)
 const errorMessage = ref('')
 const items = ref<any[]>([])
-const total = ref(0)
+const page = ref(1)
+const meta = ref({ current_page: 1, last_page: 1, total: 0 })
 const filters = ref({
   q: '',
   status: '',
@@ -39,6 +40,8 @@ const load = async () => {
     const query: Record<string, any> = {
       q: filters.value.q || undefined,
       status: filters.value.status || undefined,
+      page: page.value,
+      per_page: 20,
     }
     if (view.value === 'overdue')
       query.overdue = 1
@@ -51,16 +54,25 @@ const load = async () => {
 
     const res = await $api('/productions/occurrences', { query })
     items.value = res.data ?? res
-    total.value = res.total ?? items.value.length
+    meta.value = {
+      current_page: res.current_page || 1,
+      last_page: res.last_page || 1,
+      total: res.total ?? items.value.length,
+    }
   }
   catch (error: any) {
     items.value = []
-    total.value = 0
+    meta.value = { current_page: 1, last_page: 1, total: 0 }
     errorMessage.value = error?.data?.message || 'Impossible de charger les occurrences.'
   }
   finally {
     loading.value = false
   }
+}
+
+const changePage = (value: number) => {
+  page.value = value
+  load()
 }
 
 const isLate = (item: any) => {
@@ -70,7 +82,10 @@ const isLate = (item: any) => {
   return new Date(item.deadline_at) < new Date()
 }
 
-watch(() => route.query.view, load)
+watch(() => route.query.view, () => {
+  page.value = 1
+  load()
+})
 onMounted(load)
 </script>
 
@@ -147,7 +162,7 @@ onMounted(load)
             <VBtn
               color="primary"
               block
-              @click="load"
+              @click="page = 1; load()"
             >
               Filtrer
             </VBtn>
@@ -212,10 +227,17 @@ onMounted(load)
         </tbody>
       </VTable>
       <VCardText
-        v-if="total"
-        class="text-caption"
+        v-if="meta.total"
+        class="d-flex flex-wrap align-center justify-space-between gap-3"
       >
-        {{ total }} résultat(s)
+        <span class="text-caption">{{ meta.total }} résultat(s)</span>
+        <VPagination
+          v-if="meta.last_page > 1"
+          :model-value="meta.current_page"
+          :length="meta.last_page"
+          total-visible="5"
+          @update:model-value="changePage"
+        />
       </VCardText>
     </VCard>
   </div>
