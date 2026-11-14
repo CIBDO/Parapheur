@@ -108,7 +108,7 @@ export default [
       {
         title: 'Dossier du jour',
         icon: { icon: 'tabler-folder' },
-        to: 'productions-dossiers',
+        to: 'productions-dossier-du-jour',
         action: 'read',
         subject: 'Production',
       },

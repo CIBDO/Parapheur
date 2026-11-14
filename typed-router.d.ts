@@ -118,6 +118,7 @@ declare module 'vue-router/auto-routes' {
     'portail-admin': RouteRecordInfo<'portail-admin', '/portail/admin', Record<never, never>, Record<never, never>>,
     'productions': RouteRecordInfo<'productions', '/productions', Record<never, never>, Record<never, never>>,
     'productions-direction': RouteRecordInfo<'productions-direction', '/productions/direction', Record<never, never>, Record<never, never>>,
+    'productions-dossier-du-jour': RouteRecordInfo<'productions-dossier-du-jour', '/productions/dossier-du-jour', Record<never, never>, Record<never, never>>,
     'productions-dossiers': RouteRecordInfo<'productions-dossiers', '/productions/dossiers', Record<never, never>, Record<never, never>>,
     'productions-dossiers-id': RouteRecordInfo<'productions-dossiers-id', '/productions/dossiers/:id', { id: ParamValue<true> }, { id: ParamValue<false> }>,
     'productions-obligations': RouteRecordInfo<'productions-obligations', '/productions/obligations', Record<never, never>, Record<never, never>>,

@@ -95,6 +95,13 @@ onMounted(load)
         </VBtn>
         <VBtn
           variant="tonal"
+          prepend-icon="tabler-folder"
+          @click="router.push('/productions/dossier-du-jour')"
+        >
+          Dossier du jour
+        </VBtn>
+        <VBtn
+          variant="tonal"
           prepend-icon="tabler-inbox"
           @click="router.push('/productions/recues')"
         >

@@ -407,6 +407,103 @@ class ProductionModuleTest extends TestCase
             ->exists());
     }
 
+    public function test_dossier_du_jour_pack_buckets(): void
+    {
+        $admin = User::factory()->create();
+        $admin->assignRole('Administrateur');
+        $admin->givePermissionTo(['production.view', 'production.manage', 'production.transmit']);
+        $dg = User::factory()->create();
+        $dg->assignRole('Directeur Général');
+        $dg->givePermissionTo(['production.view']);
+
+        \App\Models\ProductionFolderTemplate::query()->create([
+            'code' => 'daily_treasury',
+            'label' => 'Dossier quotidien de trésorerie',
+            'obligation_codes' => ['PACK-MISS', 'PACK-SEND', 'PACK-VIEW', 'PACK-OP'],
+            'is_active' => true,
+        ]);
+
+        $makeObligation = function (string $code) use ($admin) {
+            return ProductionObligation::query()->create([
+                'code' => $code,
+                'label' => "Situation {$code}",
+                'category' => 'tresorerie',
+                'producer_id' => $admin->id,
+                'frequency' => ProductionFrequency::Once->value,
+                'schedule_config' => ['date' => '2026-11-14'],
+                'deadline_time' => '10:00:00',
+                'validation_required' => false,
+                'min_files' => 1,
+                'is_active' => true,
+                'created_by' => $admin->id,
+            ]);
+        };
+
+        $missing = $makeObligation('PACK-MISS');
+        $toSend = $makeObligation('PACK-SEND');
+        $viewed = $makeObligation('PACK-VIEW');
+        $withOpinion = $makeObligation('PACK-OP');
+
+        foreach ([$viewed, $withOpinion] as $ob) {
+            ProductionObligationActor::query()->create([
+                'production_obligation_id' => $ob->id,
+                'role' => 'recipient',
+                'user_id' => $dg->id,
+                'step_order' => 1,
+            ]);
+        }
+
+        $service = app(ProductionOccurrenceService::class);
+        $day = Carbon::parse('2026-11-14');
+
+        $occToSend = $service->createIfMissing($toSend, $day, $admin);
+        $this->attachFile($occToSend, $admin);
+
+        $occViewed = $service->createIfMissing($viewed, $day, $admin);
+        $this->attachFile($occViewed, $admin);
+        Sanctum::actingAs($admin);
+        $this->postJson('/api/productions/occurrences/'.$occViewed->id.'/transmit')->assertOk();
+        ProductionTransmissionRecipient::query()
+            ->where('user_id', $dg->id)
+            ->whereHas('transmission', fn ($q) => $q->where('production_occurrence_id', $occViewed->id))
+            ->update(['viewed_at' => now()]);
+
+        $occOpinion = $service->createIfMissing($withOpinion, $day, $admin);
+        $this->attachFile($occOpinion, $admin);
+        $this->postJson('/api/productions/occurrences/'.$occOpinion->id.'/transmit')->assertOk();
+        ProductionTransmissionRecipient::query()
+            ->where('user_id', $dg->id)
+            ->whereHas('transmission', fn ($q) => $q->where('production_occurrence_id', $occOpinion->id))
+            ->update([
+                'viewed_at' => now(),
+                'opinion' => 'ok',
+                'opinion_comment' => 'Conforme',
+                'opinion_at' => now(),
+            ]);
+
+        // occurrence manquante volontairement non créée pour PACK-MISS
+        $this->assertNotNull($missing->id);
+
+        Sanctum::actingAs($dg);
+        $pack = $this->getJson('/api/productions/dossier-du-jour?date=2026-11-14')
+            ->assertOk()
+            ->json();
+
+        $this->assertSame(4, $pack['stats']['expected']);
+        $this->assertSame(1, $pack['stats']['missing']);
+        $this->assertSame(1, $pack['stats']['to_send']);
+        $this->assertSame(2, $pack['stats']['sent']);
+        $this->assertSame(2, $pack['stats']['viewed']);
+        $this->assertSame(1, $pack['stats']['with_opinion']);
+
+        $byCode = collect($pack['items'])->keyBy('obligation_code');
+        $this->assertSame('missing', $byCode['PACK-MISS']['bucket']);
+        $this->assertSame('to_send', $byCode['PACK-SEND']['bucket']);
+        $this->assertSame('viewed', $byCode['PACK-VIEW']['bucket']);
+        $this->assertSame('with_opinion', $byCode['PACK-OP']['bucket']);
+        $this->assertSame('ok', $byCode['PACK-OP']['opinions'][0]['opinion']);
+    }
+
     public function test_multi_file_submit_and_rectificative_transmission(): void
     {
         $admin = User::factory()->create();

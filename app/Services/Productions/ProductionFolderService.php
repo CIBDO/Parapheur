@@ -3,11 +3,14 @@
 namespace App\Services\Productions;
 
 use App\Enums\NumberingSequenceCode;
+use App\Enums\ProductionOccurrenceStatus;
 use App\Models\ProductionFolder;
 use App\Models\ProductionFolderTemplate;
+use App\Models\ProductionObligation;
 use App\Models\ProductionOccurrence;
 use App\Models\User;
 use App\Services\NumberingService;
+use Carbon\Carbon;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 
@@ -16,6 +19,183 @@ class ProductionFolderService
     public function __construct(
         private readonly NumberingService $numbering,
     ) {}
+
+    /**
+     * Pack trésorerie du jour : attendus / manquants / envoyés / consultés / avis.
+     *
+     * @return array<string, mixed>
+     */
+    public function todayPack(User $actor, ?string $date = null): array
+    {
+        $day = $date ? Carbon::parse($date)->startOfDay() : now()->startOfDay();
+
+        try {
+            app(ProductionOccurrenceService::class)->generateForDate($day, $actor);
+        } catch (\Throwable) {
+            // ne bloque pas la consultation du pack
+        }
+
+        $template = ProductionFolderTemplate::query()
+            ->where('code', 'daily_treasury')
+            ->where('is_active', true)
+            ->first();
+
+        $codes = $template?->obligation_codes ?? [];
+        if ($codes === []) {
+            $codes = ProductionObligation::query()
+                ->where('category', 'tresorerie')
+                ->where('is_active', true)
+                ->orderBy('code')
+                ->pluck('code')
+                ->all();
+        }
+
+        $obligations = ProductionObligation::query()
+            ->whereIn('code', $codes)
+            ->where('is_active', true)
+            ->with(['producer:id,name', 'structure:id,code,name'])
+            ->orderBy('code')
+            ->get()
+            ->keyBy('code');
+
+        $folder = ProductionFolder::query()
+            ->where('kind', 'daily_treasury')
+            ->whereDate('period_date', $day->toDateString())
+            ->first();
+
+        $items = [];
+
+        foreach ($codes as $code) {
+            $obligation = $obligations->get($code);
+            if (! $obligation) {
+                continue;
+            }
+
+            $occurrence = ProductionOccurrence::query()
+                ->with([
+                    'responsible:id,name',
+                    'structure:id,code,name',
+                    'files:id,production_occurrence_id',
+                    'transmissions' => fn ($q) => $q->orderByDesc('id')->limit(1),
+                    'transmissions.recipients.user:id,name',
+                ])
+                ->where('production_obligation_id', $obligation->id)
+                ->where(function ($q) use ($day) {
+                    $q->whereDate('reference_date', $day->toDateString())
+                        ->orWhere(function ($inner) use ($day) {
+                            $inner->whereDate('period_start', '<=', $day->toDateString())
+                                ->whereDate('period_end', '>=', $day->toDateString());
+                        });
+                })
+                ->orderByDesc('id')
+                ->first();
+
+            $items[] = $this->packLine($obligation, $occurrence, $actor);
+        }
+
+        $stats = [
+            'expected' => count($items),
+            'missing' => collect($items)->where('bucket', 'missing')->count(),
+            'to_send' => collect($items)->where('bucket', 'to_send')->count(),
+            'sent' => collect($items)->whereIn('bucket', ['sent', 'viewed', 'with_opinion'])->count(),
+            'viewed' => collect($items)->whereIn('bucket', ['viewed', 'with_opinion'])->count(),
+            'with_opinion' => collect($items)->where('bucket', 'with_opinion')->count(),
+        ];
+
+        return [
+            'date' => $day->toDateString(),
+            'title' => $template?->label ?? 'Dossier quotidien de trésorerie',
+            'folder_id' => $folder?->id,
+            'folder_reference' => $folder?->reference,
+            'stats' => $stats,
+            'items' => $items,
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function packLine(ProductionObligation $obligation, ?ProductionOccurrence $occurrence, User $actor): array
+    {
+        if (! $occurrence) {
+            return [
+                'obligation_code' => $obligation->code,
+                'obligation_label' => $obligation->label,
+                'structure' => $obligation->structure,
+                'producer' => $obligation->producer,
+                'occurrence_id' => null,
+                'reference' => null,
+                'status' => null,
+                'bucket' => 'missing',
+                'bucket_label' => 'Manquant',
+                'deadline_at' => null,
+                'transmitted_at' => null,
+                'transmission_id' => null,
+                'views' => [],
+                'opinions' => [],
+                'my_transmission_id' => null,
+            ];
+        }
+
+        $status = $occurrence->status?->value ?? $occurrence->status;
+        $filesCount = $occurrence->files->count();
+        $transmission = $occurrence->transmissions->first();
+        $recipients = $transmission?->recipients ?? collect();
+
+        $views = $recipients->filter(fn ($r) => $r->viewed_at)->map(fn ($r) => [
+            'user' => $r->user?->only(['id', 'name']),
+            'viewed_at' => optional($r->viewed_at)?->toIso8601String(),
+        ])->values()->all();
+
+        $opinions = $recipients->filter(fn ($r) => $r->opinion)->map(fn ($r) => [
+            'user' => $r->user?->only(['id', 'name']),
+            'opinion' => $r->opinion,
+            'comment' => $r->opinion_comment,
+            'opinion_at' => optional($r->opinion_at)?->toIso8601String(),
+        ])->values()->all();
+
+        $myRecipient = $recipients->firstWhere('user_id', $actor->id);
+
+        if (in_array($status, [
+            ProductionOccurrenceStatus::Transmise->value,
+            ProductionOccurrenceStatus::Cloturee->value,
+        ], true)) {
+            if (count($opinions) > 0) {
+                $bucket = 'with_opinion';
+                $bucketLabel = 'Avis reçu';
+            } elseif (count($views) > 0) {
+                $bucket = 'viewed';
+                $bucketLabel = 'Consulté';
+            } else {
+                $bucket = 'sent';
+                $bucketLabel = 'Envoyé';
+            }
+        } elseif ($filesCount > 0) {
+            $bucket = 'to_send';
+            $bucketLabel = 'À envoyer';
+        } else {
+            $bucket = 'missing';
+            $bucketLabel = 'Manquant';
+        }
+
+        return [
+            'obligation_code' => $obligation->code,
+            'obligation_label' => $obligation->label,
+            'structure' => $occurrence->structure ?? $obligation->structure,
+            'producer' => $occurrence->responsible ?? $obligation->producer,
+            'occurrence_id' => $occurrence->id,
+            'reference' => $occurrence->reference,
+            'status' => $status,
+            'bucket' => $bucket,
+            'bucket_label' => $bucketLabel,
+            'deadline_at' => optional($occurrence->deadline_at)?->toIso8601String(),
+            'transmitted_at' => optional($occurrence->transmitted_at)?->toIso8601String(),
+            'transmission_id' => $transmission?->id,
+            'views' => $views,
+            'opinions' => $opinions,
+            'my_transmission_id' => $myRecipient ? $transmission?->id : null,
+        ];
+    }
 
     /**
      * @param  array<string, mixed>  $filters

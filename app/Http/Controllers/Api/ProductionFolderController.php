@@ -27,6 +27,25 @@ class ProductionFolderController extends Controller
         return response()->json($this->folders->list($request->user(), $request->all()));
     }
 
+    public function today(Request $request): JsonResponse
+    {
+        abort_unless(
+            $request->user()->can('production.view')
+            || $request->user()->can('production.view_all')
+            || $request->user()->can('production.manage')
+            || $request->user()->can('admin.access'),
+            403
+        );
+
+        $data = $request->validate([
+            'date' => ['nullable', 'date'],
+        ]);
+
+        return response()->json(
+            $this->folders->todayPack($request->user(), $data['date'] ?? null)
+        );
+    }
+
     public function store(Request $request): JsonResponse
     {
         abort_unless(

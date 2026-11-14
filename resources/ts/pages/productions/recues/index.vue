@@ -139,7 +139,7 @@ onMounted(load)
         <VBtn
           variant="tonal"
           prepend-icon="tabler-folder"
-          @click="router.push('/productions/dossiers')"
+          @click="router.push('/productions/dossier-du-jour')"
         >
           Dossier du jour
         </VBtn>

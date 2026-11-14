@@ -408,6 +408,7 @@ Route::middleware(['auth:sanctum', 'auth.idle', 'password.changed'])->group(func
     Route::post('/productions/occurrences/{occurrence}/justify-delay', [ProductionOccurrenceController::class, 'justifyDelay']);
     Route::patch('/productions/occurrences/{occurrence}/status', [ProductionOccurrenceController::class, 'updateStatus']);
 
+    Route::get('/productions/dossier-du-jour', [ProductionFolderController::class, 'today']);
     Route::get('/productions/folders', [ProductionFolderController::class, 'index']);
     Route::post('/productions/folders', [ProductionFolderController::class, 'store']);
     Route::get('/productions/folders/{folder}', [ProductionFolderController::class, 'show']);

@@ -97,9 +97,9 @@ onMounted(load)
 <template>
   <div>
     <ParapheurPageHeader
-      title="Dossier du jour"
-      subtitle="Pack des situations transmises ou attendues pour la Direction"
-      icon="tabler-folder"
+      title="Dossiers"
+      subtitle="Dossiers de production regroupés par période"
+      icon="tabler-folders"
     >
       <template #actions>
         <VBtn

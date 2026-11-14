@@ -70,7 +70,7 @@ export default [
       },
       {
         title: 'Dossier du jour',
-        to: 'productions-dossiers',
+        to: 'productions-dossier-du-jour',
         action: 'read',
         subject: 'Production',
       },
