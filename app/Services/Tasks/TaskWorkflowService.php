@@ -72,7 +72,7 @@ class TaskWorkflowService
                 'actor_id' => $actor->id,
                 'by_delegation' => (bool) $delegationNote,
             ]);
-            $this->notifications->notifyStatus($task, 'taken_charge');
+            $this->notifications->notifyStatus($task, 'taken_charge', $actor);
 
             return $task->fresh(['assignee', 'creator']);
         });
@@ -134,8 +134,7 @@ class TaskWorkflowService
             $this->tasks->recordHistory($task, $actor, 'submitted_validation', TaskStatus::Terminee->value, TaskStatus::AValider->value, 'Soumise à validation');
 
             $this->audit->log('task.completed', $task, ['actor_id' => $actor->id]);
-            $this->notifications->notifyStatus($task, 'completed');
-            $this->notifications->notifyValidationRequested($task);
+            $this->notifications->notifyValidationRequested($task, $actor);
             event(new TaskCompleted($task, $actor));
 
             return $task->fresh(['assignee', 'creator', 'completions']);
@@ -158,7 +157,7 @@ class TaskWorkflowService
 
             $this->tasks->recordHistory($task, $actor, 'cancelled', $from->value, TaskStatus::Annulee->value, $reason);
             $this->audit->log('task.cancelled', $task, ['actor_id' => $actor->id, 'reason' => $reason]);
-            $this->notifications->notifyStatus($task, 'cancelled');
+            $this->notifications->notifyStatus($task, 'cancelled', $actor);
 
             return $task->fresh(['assignee', 'creator']);
         });
@@ -177,7 +176,7 @@ class TaskWorkflowService
 
             $this->tasks->recordHistory($task, $actor, $event, $from->value, $to->value, $comment);
             $this->audit->log('task.'.$event, $task, ['actor_id' => $actor->id]);
-            $this->notifications->notifyStatus($task, $event);
+            $this->notifications->notifyStatus($task, $event, $actor);
 
             return $task->fresh(['assignee', 'creator']);
         });

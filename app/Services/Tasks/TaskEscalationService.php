@@ -5,7 +5,6 @@ namespace App\Services\Tasks;
 use App\Models\Task;
 use App\Models\TaskEscalation;
 use App\Models\User;
-use App\Notifications\TaskStatusNotification;
 use App\Services\AuditLogger;
 use Illuminate\Support\Facades\DB;
 
@@ -13,6 +12,7 @@ class TaskEscalationService
 {
     public function __construct(
         private readonly TaskService $tasks,
+        private readonly TaskNotificationService $notifications,
         private readonly AuditLogger $audit,
     ) {}
 
@@ -102,17 +102,10 @@ class TaskEscalationService
                 'notified_user_id' => $manager?->id,
             ]);
 
-            $recipients = collect([$manager, $task->creator, $task->validator, $task->assignee])
-                ->filter()
-                ->unique('id')
-                ->values();
-
-            foreach ($recipients as $user) {
-                $user->notify(new TaskStatusNotification($task, 'escalated', [
-                    'level' => $level,
-                    'reason' => $reason,
-                ]));
-            }
+            $this->notifications->notifyEscalated($task, $manager, $actor, [
+                'level' => $level,
+                'reason' => $reason,
+            ]);
 
             return true;
         });

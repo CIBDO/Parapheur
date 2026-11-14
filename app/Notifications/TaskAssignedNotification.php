@@ -52,7 +52,7 @@ class TaskAssignedNotification extends Notification
 
     private function title(): string
     {
-        return $this->reassigned ? 'Tâche réaffectée' : 'Nouvelle tâche imputée';
+        return $this->reassigned ? 'Tâche réaffectée' : 'Nouvelle tâche';
     }
 
     private function body(): string
@@ -61,9 +61,9 @@ class TaskAssignedNotification extends Notification
         $ref = $this->task->reference.' — '.$this->task->title;
 
         if ($this->reassigned) {
-            return 'La tâche « '.$ref.' » vous a été réaffectée'.$by.'. Merci d’en assurer l’exécution dans le délai indiqué.';
+            return 'La tâche « '.$ref.' » vous a été réaffectée'.$by.'.';
         }
 
-        return 'La tâche « '.$ref.' » vous a été imputée'.$by.', en votre qualité d’agent chargé de son exécution. Merci d’en prendre connaissance et d’en assurer le suivi.';
+        return 'La tâche « '.$ref.' » vous a été imputée'.$by.'.';
     }
 }

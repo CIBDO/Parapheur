@@ -46,7 +46,7 @@ class TaskValidationService
 
             $this->tasks->recordHistory($task, $actor, 'validated', $from->value, TaskStatus::Validee->value, $comment);
             $this->audit->log('task.validated', $task, ['actor_id' => $actor->id]);
-            $this->notifications->notifyStatus($task, 'validated');
+            $this->notifications->notifyStatus($task, 'validated', $actor);
             event(new TaskValidated($task, $actor));
 
             return $task->fresh(['assignee', 'creator', 'validations']);
@@ -87,7 +87,7 @@ class TaskValidationService
 
             $this->tasks->recordHistory($task, $actor, 'returned', $from->value, TaskStatus::Retournee->value, $data['motif']);
             $this->audit->log('task.returned', $task, ['actor_id' => $actor->id, 'motif' => $data['motif']]);
-            $this->notifications->notifyStatus($task, 'returned');
+            $this->notifications->notifyStatus($task, 'returned', $actor);
             event(new TaskReturned($task, $actor, $data['motif']));
 
             return $task->fresh(['assignee', 'creator', 'validations']);

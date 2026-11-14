@@ -10,6 +10,15 @@ use Illuminate\Support\Facades\Notification;
 
 class TaskNotificationService
 {
+    /** Événements qui envoient aussi un e-mail (le reste = app seulement). */
+    public const MAIL_EVENTS = [
+        'returned',
+        'validation_requested',
+        'reminder',
+        'escalated',
+        'mention',
+    ];
+
     public function notifyAssigned(Task $task, ?User $actor = null, bool $reassigned = false): void
     {
         $assignee = $task->assignee;
@@ -20,9 +29,11 @@ class TaskNotificationService
         $assignee->notify(new TaskAssignedNotification($task, $actor?->name, $reassigned));
     }
 
-    public function notifyStatus(Task $task, string $event): void
+    public function notifyStatus(Task $task, string $event, ?User $actor = null): void
     {
-        $recipients = $this->stakeholders($task);
+        $recipients = $this->recipientsFor($task, $event);
+        $recipients = $this->withoutActor($recipients, $actor);
+
         if ($recipients === []) {
             return;
         }
@@ -30,10 +41,10 @@ class TaskNotificationService
         Notification::send($recipients, new TaskStatusNotification($task, $event));
     }
 
-    public function notifyValidationRequested(Task $task): void
+    public function notifyValidationRequested(Task $task, ?User $actor = null): void
     {
         $validator = $task->validator ?? $task->creator;
-        if (! $validator) {
+        if (! $validator || ($actor && (int) $validator->id === (int) $actor->id)) {
             return;
         }
 
@@ -42,10 +53,7 @@ class TaskNotificationService
 
     public function notifyComment(Task $task, User $author, string $body): void
     {
-        $recipients = collect($this->stakeholders($task))
-            ->reject(fn (User $u) => (int) $u->id === (int) $author->id)
-            ->values()
-            ->all();
+        $recipients = $this->withoutActor($this->stakeholders($task), $author);
 
         if ($recipients === []) {
             return;
@@ -85,6 +93,53 @@ class TaskNotificationService
         }
 
         $assignee->notify(new TaskStatusNotification($task, 'reminder', ['kind' => $kind]));
+    }
+
+    /**
+     * @param  array<string, mixed>  $extra
+     */
+    public function notifyEscalated(Task $task, ?User $manager, ?User $actor = null, array $extra = []): void
+    {
+        if (! $manager || ($actor && (int) $manager->id === (int) $actor->id)) {
+            return;
+        }
+
+        $manager->notify(new TaskStatusNotification($task, 'escalated', $extra));
+    }
+
+    public static function sendsMail(string $event): bool
+    {
+        return in_array($event, self::MAIL_EVENTS, true);
+    }
+
+    /**
+     * @return list<User>
+     */
+    private function recipientsFor(Task $task, string $event): array
+    {
+        $task->loadMissing(['assignee', 'creator', 'validator', 'contributors']);
+
+        return match ($event) {
+            'returned' => array_values(array_filter([$task->assignee])),
+            'validation_requested' => array_values(array_filter([$task->validator ?? $task->creator])),
+            default => $this->stakeholders($task),
+        };
+    }
+
+    /**
+     * @param  list<User>  $recipients
+     * @return list<User>
+     */
+    private function withoutActor(array $recipients, ?User $actor): array
+    {
+        if (! $actor) {
+            return $recipients;
+        }
+
+        return collect($recipients)
+            ->reject(fn (User $u) => (int) $u->id === (int) $actor->id)
+            ->values()
+            ->all();
     }
 
     /**
