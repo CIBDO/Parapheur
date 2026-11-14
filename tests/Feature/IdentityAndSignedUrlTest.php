@@ -75,6 +75,65 @@ class IdentityAndSignedUrlTest extends TestCase
         $this->get($url)->assertForbidden();
     }
 
+    public function test_onlyoffice_signed_url_allows_multiple_uses_then_expires(): void
+    {
+        $this->seed(DatabaseSeeder::class);
+        Storage::fake('local');
+        config(['parapheur.signed_urls.onlyoffice_max_uses' => 3]);
+
+        $agent = User::query()->where('email', 'agent.dsi@dgtcp.local')->firstOrFail();
+        $type = DocumentType::query()->firstOrFail();
+        $structure = Structure::query()->where('code', 'DSI')->firstOrFail();
+
+        $document = Document::query()->create([
+            'reference' => 'SIGNED-OO-001',
+            'object' => 'Doc OO signé',
+            'document_type_id' => $type->id,
+            'structure_id' => $structure->id,
+            'author_id' => $agent->id,
+            'current_assignee_id' => $agent->id,
+            'status' => 'brouillon',
+            'priority' => 'normale',
+            'confidentiality' => 'normal',
+            'expected_action' => 'consultation',
+            'document_date' => now()->toDateString(),
+            'current_version' => 1,
+        ]);
+
+        Storage::disk('local')->put('documents/oo.docx', 'docx-bytes');
+        $version = DocumentVersion::query()->create([
+            'document_id' => $document->id,
+            'version_number' => 1,
+            'disk' => 'local',
+            'path' => 'documents/oo.docx',
+            'original_name' => 'oo.docx',
+            'mime_type' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'size' => 10,
+            'checksum' => hash('sha256', 'docx-bytes'),
+            'is_main' => true,
+            'uploaded_by' => $agent->id,
+        ]);
+
+        /** @var SignedDownloadService $signed */
+        $signed = app(SignedDownloadService::class);
+        $params = $signed->paramsForVersion(
+            $document,
+            $version->id,
+            $agent,
+            SignedDownloadService::PURPOSE_ONLYOFFICE,
+        );
+        $url = URL::temporarySignedRoute(
+            'documents.version.download',
+            now()->addMinutes(120),
+            $params,
+        );
+
+        $this->get($url)->assertOk();
+        $this->get($url)->assertOk();
+        $this->get($url)->assertOk();
+        $this->get($url)->assertForbidden();
+    }
+
     public function test_onlyoffice_jwt_accepts_previous_secret_on_decode(): void
     {
         config([

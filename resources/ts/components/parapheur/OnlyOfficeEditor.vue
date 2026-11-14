@@ -22,7 +22,10 @@ const compareVersions = ref<Array<{ title: string; value: number }>>([])
 const selectedCompareVersion = ref<number | null>(null)
 
 const EDITOR_HEIGHT_PX = 720
-const editorId = `oo-editor-${props.documentId}-${Math.random().toString(36).slice(2, 9)}`
+const READY_TIMEOUT_MS = 20000
+const SCRIPT_TIMEOUT_MS = 12000
+
+let editorId = `oo-editor-${props.documentId}-${Math.random().toString(36).slice(2, 9)}`
 const vueAnchor = ref<HTMLElement | null>(null)
 
 const statusLabel = computed(() => {
@@ -39,6 +42,8 @@ const statusLabel = computed(() => {
 let editorInstance: any = null
 let hostEl: HTMLDivElement | null = null
 let readyTimer: ReturnType<typeof setTimeout> | null = null
+let initGeneration = 0
+let unmounted = false
 
 declare global {
   interface Window {
@@ -87,28 +92,61 @@ const ooErrorMessage = (data: unknown): string => {
   return 'Erreur éditeur ONLYOFFICE (détail indisponible — voir console navigateur / logs Docs)'
 }
 
-const loadScript = (src: string): Promise<void> => new Promise((resolve, reject) => {
-  const existing = document.querySelector<HTMLScriptElement>('script[data-onlyoffice-api="1"]')
-  if (existing && window.DocsAPI) {
-    resolve()
+const waitForDocsApi = (timeoutMs: number): Promise<void> => new Promise((resolve, reject) => {
+  const started = Date.now()
+  const tick = () => {
+    if (window.DocsAPI?.DocEditor) {
+      resolve()
 
-    return
+      return
+    }
+    if (Date.now() - started >= timeoutMs) {
+      reject(new Error('DocsAPI indisponible après chargement de api.js'))
+
+      return
+    }
+    window.setTimeout(tick, 50)
   }
-  if (existing) {
-    existing.addEventListener('load', () => resolve())
-    existing.addEventListener('error', () => reject(new Error('Chargement api.js ONLYOFFICE impossible')))
-
-    return
-  }
-
-  const script = document.createElement('script')
-  script.src = src
-  script.async = true
-  script.dataset.onlyofficeApi = '1'
-  script.onload = () => resolve()
-  script.onerror = () => reject(new Error('Chargement api.js ONLYOFFICE impossible'))
-  document.head.appendChild(script)
+  tick()
 })
+
+const loadScript = async (src: string): Promise<void> => {
+  if (window.DocsAPI?.DocEditor)
+    return
+
+  const existing = document.querySelector<HTMLScriptElement>('script[data-onlyoffice-api="1"]')
+
+  if (existing) {
+    // Script déjà présent mais load passé / DocsAPI pas encore prêt → poller.
+    await waitForDocsApi(SCRIPT_TIMEOUT_MS)
+
+    return
+  }
+
+  await new Promise<void>((resolve, reject) => {
+    const script = document.createElement('script')
+    script.src = src
+    script.async = true
+    script.dataset.onlyofficeApi = '1'
+
+    const timer = window.setTimeout(() => {
+      reject(new Error(`Délai dépassé en chargeant api.js (${SCRIPT_TIMEOUT_MS / 1000}s) — vérifiez ONLYOFFICE_URL`))
+    }, SCRIPT_TIMEOUT_MS)
+
+    script.onload = () => {
+      window.clearTimeout(timer)
+      resolve()
+    }
+    script.onerror = () => {
+      window.clearTimeout(timer)
+      script.remove()
+      reject(new Error('Chargement api.js ONLYOFFICE impossible — Document Server injoignable'))
+    }
+    document.head.appendChild(script)
+  })
+
+  await waitForDocsApi(SCRIPT_TIMEOUT_MS)
+}
 
 const clearReadyTimer = () => {
   if (readyTimer) {
@@ -117,14 +155,7 @@ const clearReadyTimer = () => {
   }
 }
 
-/** Crée un nœud hors contrôle Vue à la place de l’ancre. */
-const ensureHostEl = (): HTMLDivElement => {
-  if (hostEl && document.body.contains(hostEl))
-    return hostEl
-
-  if (!vueAnchor.value)
-    throw new Error('Ancre éditeur manquante')
-
+const buildHostEl = (): HTMLDivElement => {
   const el = document.createElement('div')
   el.id = editorId
   el.className = 'onlyoffice-editor-host border rounded'
@@ -134,7 +165,24 @@ const ensureHostEl = (): HTMLDivElement => {
   el.style.overflow = 'hidden'
   el.style.background = '#f5f5f5'
 
-  // Remplace l’ancre Vue : ce nœud ne sera plus patché par le VDOM.
+  return el
+}
+
+/** Crée / recrée un nœud hors contrôle Vue (id frais à chaque init). */
+const ensureHostEl = (): HTMLDivElement => {
+  editorId = `oo-editor-${props.documentId}-${Math.random().toString(36).slice(2, 9)}`
+  const el = buildHostEl()
+
+  if (hostEl?.parentElement) {
+    hostEl.replaceWith(el)
+    hostEl = el
+
+    return el
+  }
+
+  if (!vueAnchor.value)
+    throw new Error('Ancre éditeur manquante')
+
   vueAnchor.value.replaceWith(el)
   hostEl = el
   vueAnchor.value = null
@@ -152,12 +200,12 @@ const destroyEditor = () => {
   }
   editorInstance = null
 
-  if (hostEl) {
+  if (hostEl)
     hostEl.innerHTML = ''
-  }
 }
 
 const initEditor = async () => {
+  const generation = ++initGeneration
   loading.value = true
   documentReady.value = false
   error.value = ''
@@ -167,14 +215,25 @@ const initEditor = async () => {
     const query = props.versionId ? `?version_id=${props.versionId}` : ''
     const payload = await $api(`/parapheur/documents/${props.documentId}/onlyoffice/config${query}`) as any
 
+    if (unmounted || generation !== initGeneration)
+      return
+
     if (!payload?.config || !payload?.api_script)
       throw new Error('Configuration ONLYOFFICE incomplète')
 
     await loadScript(payload.api_script)
+
+    if (unmounted || generation !== initGeneration)
+      return
+
     if (!window.DocsAPI?.DocEditor)
       throw new Error('DocsAPI indisponible')
 
     await nextTick()
+
+    if (unmounted || generation !== initGeneration)
+      return
+
     const host = ensureHostEl()
 
     const config: Record<string, unknown> = {
@@ -187,9 +246,13 @@ const initEditor = async () => {
       height: `${EDITOR_HEIGHT_PX}px`,
       events: {
         onAppReady() {
+          if (generation !== initGeneration)
+            return
           loading.value = false
         },
         onDocumentReady() {
+          if (generation !== initGeneration)
+            return
           clearReadyTimer()
           loading.value = false
           documentReady.value = true
@@ -200,6 +263,8 @@ const initEditor = async () => {
             emit('saved')
         },
         onError(event: { data?: unknown }) {
+          if (generation !== initGeneration)
+            return
           clearReadyTimer()
           loading.value = false
           error.value = ooErrorMessage(event?.data)
@@ -259,26 +324,33 @@ const initEditor = async () => {
       },
     }
 
-    // DocsAPI cible l’id du nœud hors-Vue.
     void host
     editorInstance = new window.DocsAPI.DocEditor(editorId, config)
 
     readyTimer = setTimeout(() => {
-      if (!documentReady.value && !error.value) {
-        const iframeCount = host.querySelectorAll('iframe').length
-        error.value = iframeCount
-          ? 'ONLYOFFICE a chargé une iframe mais le document ne s’ouvre pas (JWT, téléchargement fichier ou ONLYOFFICE_APP_URL injoignable depuis Docs).'
-          : 'ONLYOFFICE n’a pas créé d’iframe. Vérifiez ONLYOFFICE_URL (api.js) et un rechargement forcé (Ctrl+F5).'
-        emit('error', error.value)
-        loading.value = false
-      }
-    }, 60000)
+      if (generation !== initGeneration || documentReady.value || error.value)
+        return
+
+      const iframeCount = host.querySelectorAll('iframe').length
+      error.value = iframeCount
+        ? 'ONLYOFFICE a chargé une iframe mais le document ne s’ouvre pas (JWT, téléchargement fichier ou ONLYOFFICE_APP_URL injoignable depuis Docs).'
+        : 'ONLYOFFICE n’a pas créé d’iframe. Vérifiez que le Document Server répond (ONLYOFFICE_URL / healthcheck) puis réessayez.'
+      emit('error', error.value)
+      loading.value = false
+    }, READY_TIMEOUT_MS)
   }
   catch (e: any) {
+    if (unmounted || generation !== initGeneration)
+      return
     error.value = e?.data?.message || e?.message || 'Impossible d’ouvrir ONLYOFFICE'
     emit('error', error.value)
     loading.value = false
   }
+}
+
+/** Réessaie localement — ne dépend plus du parent (@reload). */
+const retryEditor = () => {
+  void initEditor()
 }
 
 const applyCompare = async () => {
@@ -297,10 +369,13 @@ const applyCompare = async () => {
 }
 
 onMounted(() => {
+  unmounted = false
   initEditor()
 })
 
 onBeforeUnmount(() => {
+  unmounted = true
+  initGeneration += 1
   destroyEditor()
   // Remet une ancre vide pour le GC DOM si le parent conserve le slot
   if (hostEl?.parentElement) {
@@ -334,7 +409,7 @@ onBeforeUnmount(() => {
         variant="tonal"
         prepend-icon="tabler-refresh"
         :loading="loading"
-        @click="emit('reload')"
+        @click="retryEditor"
       >
         Recharger
       </VBtn>
@@ -356,7 +431,8 @@ onBeforeUnmount(() => {
         <VBtn
           size="small"
           variant="text"
-          @click="emit('reload')"
+          :loading="loading"
+          @click="retryEditor"
         >
           Réessayer
         </VBtn>

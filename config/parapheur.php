@@ -15,9 +15,10 @@ return [
     'signed_urls' => [
         'download_ttl_minutes' => (int) env('SIGNED_URL_DOWNLOAD_TTL', 15),
         'stream_ttl_minutes' => (int) env('SIGNED_URL_STREAM_TTL', 15),
-        'onlyoffice_ttl_minutes' => (int) env('SIGNED_URL_ONLYOFFICE_TTL', 30),
+        // Docs peut retenter / multi-GET (preview, conversion, collab) : TTL et plafond larges.
+        'onlyoffice_ttl_minutes' => (int) env('SIGNED_URL_ONLYOFFICE_TTL', 120),
         'stream_max_uses' => (int) env('SIGNED_URL_STREAM_MAX_USES', 12),
-        'onlyoffice_max_uses' => (int) env('SIGNED_URL_ONLYOFFICE_MAX_USES', 8),
+        'onlyoffice_max_uses' => (int) env('SIGNED_URL_ONLYOFFICE_MAX_USES', 40),
     ],
 
 ];

@@ -114,4 +114,16 @@ Cause typique : le callback Docs atteint Laravel, mais le **téléchargement** d
    ```
    puis recharger la fiche (nouvelle clé document après sauvegarde OK).
 
-Note : un bug Vue effaçait l’iframe DocsAPI à chaque re-render ; le conteneur éditeur utilise désormais `v-once`.
+Note : un bug Vue effaçait l’iframe DocsAPI à chaque re-render ; le conteneur éditeur est créé hors VDOM (`replaceWith`).
+
+## Fiabilité (symptômes « parfois ça marche »)
+
+| Symptôme | Cause fréquente | Action |
+|----------|-----------------|--------|
+| Zone grise / timeout | Docs n’atteint pas Laravel | `ONLYOFFICE_APP_URL` + `php artisan serve --host=0.0.0.0` |
+| Erreur JWT `-8` | Secret Laravel ≠ conteneur | Même `ONLYOFFICE_JWT_SECRET`, `docker compose up -d --force-recreate` |
+| 403 lien déjà utilisé | Plafond jti trop bas / courses | `SIGNED_URL_ONLYOFFICE_MAX_USES=40`, TTL 120 |
+| Réessayer sans effet | Ancien bug UX | Bouton appelle désormais `initEditor()` localement |
+| api.js qui ne charge pas | Conteneur pas prêt | Attendre healthcheck `http://localhost:8080/healthcheck` |
+
+Les URLs signées ONLYOFFICE sont multi-usages (Docs peut retenter plusieurs GET). Ne pas descendre sous ~20 usages en production.

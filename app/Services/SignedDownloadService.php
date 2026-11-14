@@ -70,27 +70,35 @@ class SignedDownloadService
         abort_unless($jti !== '', 403, 'Lien de téléchargement invalide (jti manquant).');
 
         $key = $this->cacheKey($jti);
-        $payload = Cache::get($key);
-        abort_unless(is_array($payload), 403, 'Lien expiré ou déjà utilisé.');
+        $lock = Cache::lock('lock:'.$key, 5);
 
-        $purpose = (string) ($payload['purpose'] ?? '');
-        abort_unless(
-            in_array($purpose, $allowedPurposes, true)
-            && (int) ($payload['document_id'] ?? 0) === (int) $document->id
-            && (int) ($payload['user_id'] ?? 0) === (int) $user->id,
-            403,
-            'Lien de téléchargement invalide.'
-        );
+        abort_unless($lock->block(3), 503, 'Lien de téléchargement temporairement indisponible.');
 
-        $uses = (int) ($payload['uses'] ?? 1) - 1;
-        if ($uses <= 0) {
-            Cache::forget($key);
+        try {
+            $payload = Cache::get($key);
+            abort_unless(is_array($payload), 403, 'Lien expiré ou déjà utilisé.');
 
-            return;
+            $purpose = (string) ($payload['purpose'] ?? '');
+            abort_unless(
+                in_array($purpose, $allowedPurposes, true)
+                && (int) ($payload['document_id'] ?? 0) === (int) $document->id
+                && (int) ($payload['user_id'] ?? 0) === (int) $user->id,
+                403,
+                'Lien de téléchargement invalide.'
+            );
+
+            $uses = (int) ($payload['uses'] ?? 1) - 1;
+            if ($uses <= 0) {
+                Cache::forget($key);
+
+                return;
+            }
+
+            $ttl = max(1, (int) ($payload['ttl_minutes'] ?? $this->ttlMinutes($purpose)));
+            Cache::put($key, array_merge($payload, ['uses' => $uses]), now()->addMinutes($ttl));
+        } finally {
+            $lock->release();
         }
-
-        $ttl = max(1, (int) ($payload['ttl_minutes'] ?? $this->ttlMinutes($purpose)));
-        Cache::put($key, array_merge($payload, ['uses' => $uses]), now()->addMinutes($ttl));
     }
 
     /**
@@ -103,7 +111,7 @@ class SignedDownloadService
         $ttl = $this->ttlMinutes($purpose);
         $uses = match ($purpose) {
             self::PURPOSE_STREAM => (int) config('parapheur.signed_urls.stream_max_uses', 12),
-            self::PURPOSE_ONLYOFFICE => (int) config('parapheur.signed_urls.onlyoffice_max_uses', 8),
+            self::PURPOSE_ONLYOFFICE => (int) config('parapheur.signed_urls.onlyoffice_max_uses', 40),
             default => 1,
         };
 
