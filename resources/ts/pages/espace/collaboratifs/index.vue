@@ -49,15 +49,22 @@ async function load() {
   }
 }
 
+const router = useRouter()
+
 async function create() {
   errorMsg.value = ''
   try {
-    await $api('/workspace', {
+    const created = await $api('/workspace', {
       method: 'POST',
       body: form.value,
     })
     dialog.value = false
     form.value = { name: '', description: '', type: 'project' }
+    const newId = created?.id ?? created?.workspace?.id
+    if (newId) {
+      await router.push({ name: 'espace-dossiers', query: { workspace: String(newId) } })
+      return
+    }
     await load()
   }
   catch (e: any) {
@@ -71,8 +78,8 @@ onMounted(load)
 <template>
   <div>
     <ParapheurPageHeader
-      title="Espaces collaboratifs"
-      subtitle="Travaillez en équipe sur des dossiers et documents partagés"
+      title="Équipes"
+      subtitle="Espaces partagés — ouvrez les fichiers, gérez les membres"
       icon="tabler-users"
     >
       <template #actions>
@@ -143,17 +150,16 @@ onMounted(load)
           </VCardText>
           <VCardActions>
             <VBtn
+              color="primary"
+              :to="{ name: 'espace-dossiers', query: { workspace: ws.id } }"
+            >
+              Ouvrir les fichiers
+            </VBtn>
+            <VBtn
               variant="tonal"
               :to="{ name: 'espace-collaboratifs-id', params: { id: ws.id } }"
             >
-              Gérer
-            </VBtn>
-            <VBtn
-              color="primary"
-              variant="tonal"
-              :to="{ name: 'espace-dossiers', query: { workspace: ws.id } }"
-            >
-              Ouvrir
+              Membres
             </VBtn>
           </VCardActions>
         </VCard>

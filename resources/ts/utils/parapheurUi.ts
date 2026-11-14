@@ -44,8 +44,20 @@ export const actionLabels: Record<string, string> = {
   visa: 'Pour visa',
   validation: 'Pour validation',
   revision: 'Pour révision',
-  signature: 'Pour signature',
+  // Pas de signature électronique : on oriente vers la validation administrative
+  signature: 'Pour validation',
 }
+
+/** Actions proposées à la création / transmission (sans faux « Signer »). */
+export const expectedActionChoices = [
+  { title: 'Pour information', value: 'information' },
+  { title: 'Pour consultation', value: 'consultation' },
+  { title: 'Pour avis', value: 'avis' },
+  { title: 'Pour observations', value: 'observations' },
+  { title: 'Pour instruction', value: 'instruction' },
+  { title: 'Pour visa', value: 'visa' },
+  { title: 'Pour validation', value: 'validation' },
+]
 
 export const folderMeta: Array<{
   key: string
@@ -68,13 +80,28 @@ export const folderMeta: Array<{
 export const statusOptions = Object.entries(statusLabels).map(([value, title]) => ({ value, title }))
 export const priorityOptions = Object.entries(priorityLabels).map(([value, title]) => ({ value, title }))
 export const confidentialityOptions = Object.entries(confidentialityLabels).map(([value, title]) => ({ value, title }))
-export const expectedActionOptions = Object.entries(actionLabels).map(([value, title]) => ({ value, title }))
+export const expectedActionOptions = expectedActionChoices
 
 export const labelOf = (map: Record<string, string>, value?: string | null, fallback = '—') => {
   if (!value)
     return fallback
 
   return map[value] || value
+}
+
+export const isOverdue = (due?: string | null, status?: string | null) => {
+  if (!due)
+    return false
+  if (['valide', 'vise', 'traite', 'classe', 'archive', 'annule'].includes(status || ''))
+    return false
+  const d = new Date(due)
+  if (Number.isNaN(d.getTime()))
+    return false
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  d.setHours(0, 0, 0, 0)
+
+  return d < today
 }
 
 export const statusColor = (status?: string) => {

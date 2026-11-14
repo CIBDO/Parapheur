@@ -1,6 +1,4 @@
 <script setup lang="ts">
-import { useTheme } from 'vuetify'
-import { hexToRgb } from '@layouts/utils'
 import ParapheurPageHeader from '@/components/parapheur/ParapheurPageHeader.vue'
 import UserAutocomplete from '@/components/common/UserAutocomplete.vue'
 
@@ -47,7 +45,6 @@ interface DgStats {
   audiences_today?: number
 }
 
-const vuetifyTheme = useTheme()
 const userData = useCookie<any>('userData')
 
 const stats = ref<DgStats | null>(null)
@@ -71,37 +68,28 @@ const kpiCards = computed(() => [
     value: stats.value?.to_process ?? 0,
     icon: 'tabler-inbox',
     color: 'primary',
+    to: { name: 'parapheur', query: { folder: 'a_traiter' } },
   },
   {
     title: 'Urgents',
     value: stats.value?.urgent ?? 0,
     icon: 'tabler-alert-triangle',
     color: 'error',
+    to: { name: 'parapheur', query: { folder: 'a_traiter' } },
   },
   {
     title: 'En retard',
     value: stats.value?.overdue ?? 0,
     icon: 'tabler-clock-exclamation',
     color: 'warning',
+    to: { name: 'parapheur', query: { folder: 'a_traiter' } },
   },
-  {
-    title: 'Validés',
-    value: stats.value?.validated ?? 0,
-    icon: 'tabler-circle-check',
-    color: 'success',
-  },
-  {
-    title: 'Retournés',
-    value: stats.value?.returned ?? 0,
-    icon: 'tabler-arrow-back-up',
-    color: 'secondary',
-  },
-  {
-    title: 'Reçus',
-    value: stats.value?.received ?? 0,
-    icon: 'tabler-files',
-    color: 'info',
-  },
+])
+
+const secondaryKpis = computed(() => [
+  { title: 'Validés', value: stats.value?.validated ?? 0 },
+  { title: 'Retournés', value: stats.value?.returned ?? 0 },
+  { title: 'Reçus', value: stats.value?.received ?? 0 },
 ])
 
 const formatTime = (value?: string | null) => {
@@ -109,19 +97,6 @@ const formatTime = (value?: string | null) => {
     return '—'
 
   return new Date(value).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
-}
-
-const statusLabels: Record<string, string> = {
-  brouillon: 'Brouillon',
-  transmis: 'Transmis',
-  a_consulter: 'À consulter',
-  a_viser: 'À viser',
-  a_valider: 'À valider',
-  a_corriger: 'À corriger',
-  valide: 'Validé',
-  traite: 'Traité',
-  archive: 'Archivé',
-  en_circuit: 'En circuit',
 }
 
 const priorityLabel = (priority: string) => {
@@ -153,86 +128,6 @@ const actionLabel = (action: string) => {
   }
 
   return map[action] ?? action
-}
-
-const structureSeries = computed(() => [{
-  name: 'Documents',
-  data: Object.values(stats.value?.by_structure ?? {}),
-}])
-
-const structureChartOptions = computed(() => {
-  const currentTheme = vuetifyTheme.current.value.colors
-  const variableTheme = vuetifyTheme.current.value.variables
-  const labelColor = `rgba(${hexToRgb(currentTheme['on-surface'])}, ${variableTheme['disabled-opacity']})`
-  const categories = Object.keys(stats.value?.by_structure ?? {})
-
-  return {
-    chart: {
-      parentHeightOffset: 0,
-      type: 'bar',
-      toolbar: { show: false },
-    },
-    plotOptions: {
-      bar: {
-        borderRadius: 4,
-        columnWidth: '40%',
-        distributed: true,
-      },
-    },
-    colors: [
-      currentTheme.primary,
-      currentTheme.success,
-      currentTheme.warning,
-      currentTheme.info,
-      currentTheme.error,
-    ],
-    grid: {
-      strokeDashArray: 4,
-      borderColor: `rgba(${hexToRgb(String(variableTheme['border-color']))}, ${variableTheme['border-opacity']})`,
-      xaxis: { lines: { show: false } },
-      padding: { top: -10, left: -8, right: -8, bottom: -8 },
-    },
-    dataLabels: { enabled: false },
-    legend: { show: false },
-    tooltip: { enabled: true },
-    xaxis: {
-      categories,
-      axisBorder: { show: false },
-      axisTicks: { show: false },
-      labels: { style: { colors: labelColor, fontSize: '12px' } },
-    },
-    yaxis: {
-      labels: { style: { colors: labelColor, fontSize: '12px' } },
-    },
-  }
-})
-
-const statusBreakdown = computed(() => {
-  const entries = Object.entries(stats.value?.by_status ?? {})
-  const total = entries.reduce((sum, [, count]) => sum + Number(count), 0) || 1
-
-  return entries
-    .map(([status, count]) => ({
-      status,
-      label: statusLabels[status] ?? status,
-      count: Number(count),
-      percent: Math.round((Number(count) / total) * 100),
-    }))
-    .sort((a, b) => b.count - a.count)
-    .slice(0, 6)
-})
-
-const statusColor = (status: string) => {
-  if (['valide', 'traite', 'archive'].includes(status))
-    return 'success'
-  if (['a_corriger'].includes(status))
-    return 'error'
-  if (['a_valider', 'a_viser'].includes(status))
-    return 'warning'
-  if (['transmis', 'a_consulter', 'en_circuit'].includes(status))
-    return 'primary'
-
-  return 'secondary'
 }
 
 const loadError = ref('')
@@ -331,7 +226,7 @@ onMounted(async () => {
   <div>
     <ParapheurPageHeader
       :title="`${greeting}${userData?.fullName ? `, ${userData.fullName}` : ''}`"
-      subtitle="Bureau du Directeur Général"
+      subtitle="À traiter · Urgents · En retard"
       icon="tabler-layout-dashboard"
     >
       <template #actions>
@@ -365,32 +260,37 @@ onMounted(async () => {
       {{ loadError }}
     </VAlert>
 
-    <VRow dense class="mb-4">
+    <VRow
+      dense
+      class="mb-2"
+    >
       <VCol
         v-for="card in kpiCards"
         :key="card.title"
-        cols="6"
+        cols="12"
         sm="4"
-        md="2"
       >
-        <VCard class="dash-kpi">
-          <VCardText class="d-flex align-center gap-3 pa-3">
+        <VCard
+          class="dash-kpi cursor-pointer"
+          @click="$router.push(card.to)"
+        >
+          <VCardText class="d-flex align-center gap-3 pa-4">
             <VAvatar
               :color="card.color"
               variant="tonal"
               rounded
-              size="36"
+              size="44"
             >
               <VIcon
                 :icon="card.icon"
-                size="20"
+                size="24"
               />
             </VAvatar>
             <div class="min-w-0">
-              <div class="text-h5 font-weight-semibold lh-1 mb-1">
+              <div class="text-h4 font-weight-semibold lh-1 mb-1">
                 {{ card.value }}
               </div>
-              <div class="text-caption text-medium-emphasis text-truncate">
+              <div class="text-body-2 font-weight-medium">
                 {{ card.title }}
               </div>
             </div>
@@ -399,205 +299,38 @@ onMounted(async () => {
       </VCol>
     </VRow>
 
+    <div class="d-flex flex-wrap gap-3 mb-4 text-caption text-medium-emphasis">
+      <span
+        v-for="s in secondaryKpis"
+        :key="s.title"
+      >
+        {{ s.title }} <strong class="text-high-emphasis">{{ s.value }}</strong>
+      </span>
+      <span>Instructions <strong class="text-high-emphasis">{{ stats?.instructions_open ?? 0 }}</strong></span>
+      <span>Réunions auj. <strong class="text-high-emphasis">{{ stats?.meetings_today ?? 0 }}</strong></span>
+      <span>RDV auj. <strong class="text-high-emphasis">{{ stats?.appointments_today ?? 0 }}</strong></span>
+    </div>
+
     <VRow dense class="match-height">
-      <VCol
-        cols="12"
-        sm="4"
-      >
-        <VCard class="h-100">
-          <VCardItem class="pb-0">
-            <VCardTitle class="text-subtitle-1">
-              Instructions
-            </VCardTitle>
-          </VCardItem>
-          <VCardText class="pt-3">
-            <div class="d-flex align-center justify-space-between mb-3">
-              <span class="text-body-2">Ouvertes</span>
-              <span class="text-body-1 font-weight-medium">{{ stats?.instructions_open ?? 0 }}</span>
-            </div>
-            <div class="d-flex align-center justify-space-between mb-4">
-              <span class="text-body-2">En retard</span>
-              <span class="text-body-1 font-weight-medium text-error">{{ stats?.instructions_late ?? 0 }}</span>
-            </div>
-            <VBtn
-              size="small"
-              variant="tonal"
-              color="primary"
-              block
-              :to="{ name: 'parapheur-instructions' }"
-            >
-              Voir
-            </VBtn>
-          </VCardText>
-        </VCard>
-      </VCol>
-
-      <VCol
-        cols="12"
-        sm="4"
-      >
-        <VCard class="h-100">
-          <VCardItem class="pb-0">
-            <VCardTitle class="text-subtitle-1">
-              Réunions
-            </VCardTitle>
-          </VCardItem>
-          <VCardText class="pt-3">
-            <div class="d-flex align-center justify-space-between mb-2">
-              <span class="text-body-2">Aujourd’hui</span>
-              <span class="text-body-1 font-weight-medium">{{ stats?.meetings_today ?? 0 }}</span>
-            </div>
-            <div class="d-flex align-center justify-space-between mb-2">
-              <span class="text-body-2">Cette semaine</span>
-              <span class="text-body-1 font-weight-medium">{{ stats?.meetings_this_week ?? 0 }}</span>
-            </div>
-            <div class="d-flex align-center justify-space-between mb-2">
-              <span class="text-body-2">Décisions ouvertes</span>
-              <span class="text-body-1 font-weight-medium">{{ stats?.meeting_decisions_open ?? 0 }}</span>
-            </div>
-            <div class="d-flex align-center justify-space-between mb-4">
-              <span class="text-body-2">Décisions en retard</span>
-              <span class="text-body-1 font-weight-medium text-error">{{ stats?.meeting_decisions_late ?? 0 }}</span>
-            </div>
-            <VBtn
-              size="small"
-              variant="tonal"
-              color="primary"
-              block
-              :to="{ name: 'parapheur-reunions' }"
-            >
-              Voir
-            </VBtn>
-          </VCardText>
-        </VCard>
-      </VCol>
-
-      <VCol
-        cols="12"
-        sm="4"
-      >
-        <VCard class="h-100">
-          <VCardItem class="pb-0">
-            <VCardTitle class="text-subtitle-1">
-              Agenda
-            </VCardTitle>
-          </VCardItem>
-          <VCardText class="pt-3">
-            <div class="d-flex align-center justify-space-between mb-2">
-              <span class="text-body-2">RDV aujourd’hui</span>
-              <span class="text-body-1 font-weight-medium">{{ stats?.appointments_today ?? 0 }}</span>
-            </div>
-            <div class="d-flex align-center justify-space-between mb-2">
-              <span class="text-body-2">Audiences</span>
-              <span class="text-body-1 font-weight-medium">{{ stats?.audiences_today ?? 0 }}</span>
-            </div>
-            <div class="d-flex align-center justify-space-between mb-2">
-              <span class="text-body-2">Prochain</span>
-              <span class="text-body-1 font-weight-medium">{{ formatTime(stats?.appointments_next_at) }}</span>
-            </div>
-            <div class="d-flex align-center justify-space-between mb-4">
-              <span class="text-body-2">À valider</span>
-              <span class="text-body-1 font-weight-medium text-warning">{{ stats?.appointments_to_validate ?? 0 }}</span>
-            </div>
-            <div class="d-flex gap-2">
-              <VBtn
-                size="small"
-                variant="tonal"
-                color="primary"
-                block
-                :to="{ name: 'parapheur-agenda' }"
-              >
-                Agenda
-              </VBtn>
-              <VBtn
-                v-if="(stats?.appointments_to_validate || 0) > 0"
-                size="small"
-                color="warning"
-                block
-                :to="{ name: 'parapheur-agenda-avalider' }"
-              >
-                Valider
-              </VBtn>
-            </div>
-          </VCardText>
-        </VCard>
-      </VCol>
-
-      <VCol
-        cols="12"
-        md="8"
-      >
-        <VCard>
-          <VCardItem class="pb-0">
-            <VCardTitle class="text-subtitle-1">
-              Répartition par structure
-            </VCardTitle>
-          </VCardItem>
-          <VCardText>
-            <div
-              v-if="!Object.keys(stats?.by_structure ?? {}).length"
-              class="text-medium-emphasis py-6 text-center"
-            >
-              Aucune donnée de structure
-            </div>
-            <VueApexCharts
-              v-else
-              type="bar"
-              height="220"
-              :options="structureChartOptions"
-              :series="structureSeries"
-            />
-          </VCardText>
-        </VCard>
-      </VCol>
-
-      <VCol
-        cols="12"
-        md="4"
-      >
-        <VCard class="h-100">
-          <VCardItem class="pb-0">
-            <VCardTitle class="text-subtitle-1">
-              États des dossiers
-            </VCardTitle>
-          </VCardItem>
-          <VCardText>
-            <div
-              v-if="!statusBreakdown.length"
-              class="text-medium-emphasis text-center py-4"
-            >
-              Aucun statut
-            </div>
-            <div
-              v-for="item in statusBreakdown"
-              :key="item.status"
-              class="mb-3"
-            >
-              <div class="d-flex align-center justify-space-between mb-1">
-                <span class="text-body-2">{{ item.label }}</span>
-                <span class="text-caption font-weight-medium">{{ item.count }} · {{ item.percent }}%</span>
-              </div>
-              <VProgressLinear
-                :model-value="item.percent"
-                :color="statusColor(item.status)"
-                height="4"
-                rounded
-              />
-            </div>
-          </VCardText>
-        </VCard>
-      </VCol>
-
       <VCol
         cols="12"
         lg="8"
       >
-        <VCard>
+        <VCard class="h-100">
           <VCardItem>
             <VCardTitle class="text-subtitle-1">
               À traiter
             </VCardTitle>
-            <VCardSubtitle>Actions rapides</VCardSubtitle>
+            <VCardSubtitle>Lire · Viser · Valider · Retourner</VCardSubtitle>
+            <template #append>
+              <VBtn
+                size="small"
+                variant="tonal"
+                :to="{ name: 'parapheur', query: { folder: 'a_traiter' } }"
+              >
+                Tout voir
+              </VBtn>
+            </template>
           </VCardItem>
           <VDivider />
           <VCardText>

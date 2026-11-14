@@ -104,10 +104,10 @@ onMounted(load)
         </VBtn>
         <VBtn
           color="primary"
-          prepend-icon="tabler-arrows-exchange"
+          prepend-icon="tabler-send"
           @click="actionsOpen = true"
         >
-          Actions
+          Envoyer au parapheur
         </VBtn>
       </template>
     </ParapheurPageHeader>
@@ -206,6 +206,7 @@ onMounted(load)
       :workspace-id="workspaceId"
       :document-id="docId"
       :document-title="doc.title || doc.object"
+      initial-tab="parapheur"
     />
   </div>
 </template>

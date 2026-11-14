@@ -171,7 +171,7 @@ onMounted(load)
 <template>
   <div>
     <ParapheurPageHeader
-      :title="ws?.name || 'Espace collaboratif'"
+      :title="ws?.name || 'Espace équipe'"
       :subtitle="ws
         ? `${labelOf(workspaceTypeLabels, ws.type)} · ${members.length} membre${members.length > 1 ? 's' : ''}`
         : ''"
@@ -179,10 +179,19 @@ onMounted(load)
     >
       <template #actions>
         <VBtn
-          variant="tonal"
-          :to="{ name: 'espace-collaboratifs' }"
+          color="primary"
+          prepend-icon="tabler-folder"
+          :to="{ name: 'espace-dossiers', query: { workspace: id } }"
         >
-          Retour
+          Ouvrir les fichiers
+        </VBtn>
+        <VBtn
+          v-if="canManage"
+          variant="tonal"
+          prepend-icon="tabler-user-plus"
+          @click="addOpen = true"
+        >
+          Ajouter un membre
         </VBtn>
         <VBtn
           v-if="canEditMeta"
@@ -193,19 +202,10 @@ onMounted(load)
           Modifier
         </VBtn>
         <VBtn
-          variant="tonal"
-          color="primary"
-          :to="{ name: 'espace-dossiers', query: { workspace: id } }"
+          variant="text"
+          :to="{ name: 'espace-collaboratifs' }"
         >
-          Ouvrir les dossiers
-        </VBtn>
-        <VBtn
-          v-if="canManage"
-          color="primary"
-          prepend-icon="tabler-user-plus"
-          @click="addOpen = true"
-        >
-          Ajouter un membre
+          Retour
         </VBtn>
       </template>
     </ParapheurPageHeader>

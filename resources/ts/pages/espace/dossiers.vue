@@ -30,14 +30,14 @@ const isCollaborative = computed(() => !!overrideWorkspaceId.value)
 
 const pageTitle = computed(() => {
   if (isCollaborative.value && collabWorkspace.value?.name)
-    return `Dossiers — ${collabWorkspace.value.name}`
-  return 'Mes dossiers'
+    return collabWorkspace.value.name
+  return 'Mes fichiers'
 })
 
 const pageSubtitle = computed(() => {
   if (isCollaborative.value)
-    return 'Espace collaboratif — importez et organisez les fichiers de l’équipe'
-  return 'Naviguez, importez et organisez vos documents — y compris vos modèles personnels'
+    return 'Fichiers de l’équipe — importer, partager, envoyer au parapheur'
+  return 'Importer, organiser, partager, envoyer au parapheur'
 })
 
 async function loadCollabMeta() {
@@ -65,6 +65,7 @@ const shareDocId = ref<number | null>(null)
 const shareFolderId = ref<number | null>(null)
 const actionsOpen = ref(false)
 const actionsDoc = ref<any>(null)
+const actionsTab = ref('parapheur')
 const isDragOver = ref(false)
 const dropTargetFolderId = ref<number | null | undefined>(undefined)
 const dragging = ref<{ kind: 'document' | 'folder'; id: number } | null>(null)
@@ -135,8 +136,9 @@ function openShareFolder(folder: any) {
   shareOpen.value = true
 }
 
-function openActions(doc: any) {
+function openActions(doc: any, tab = 'parapheur') {
   actionsDoc.value = doc
+  actionsTab.value = tab
   actionsOpen.value = true
 }
 
@@ -640,6 +642,23 @@ function folderSubtitle(folder: any) {
                     {{ formatBytes(doc.latest_version?.size) }}
                   </div>
                 </VCardText>
+                <div class="d-flex justify-center gap-1 pb-2">
+                  <VBtn
+                    icon="tabler-send"
+                    size="x-small"
+                    variant="text"
+                    color="primary"
+                    title="Envoyer au parapheur"
+                    @click.stop="openActions(doc, 'parapheur')"
+                  />
+                  <VBtn
+                    icon="tabler-share"
+                    size="x-small"
+                    variant="text"
+                    title="Partager"
+                    @click.stop="openShareDoc(doc)"
+                  />
+                </div>
               </VCard>
             </VCol>
           </VRow>
@@ -725,12 +744,17 @@ function folderSubtitle(folder: any) {
                   </template>
                   <VList density="compact">
                     <VListItem
+                      title="Envoyer au parapheur"
+                      prepend-icon="tabler-send"
+                      @click="openActions(doc, 'parapheur')"
+                    />
+                    <VListItem
                       title="Partager"
                       prepend-icon="tabler-share"
                       @click="openShareDoc(doc)"
                     />
                     <VListItem
-                      title="GED / Parapheur / Liaisons"
+                      title="Autres actions"
                       prepend-icon="tabler-arrows-exchange"
                       @click="openActions(doc)"
                     />
@@ -801,6 +825,7 @@ function folderSubtitle(folder: any) {
       :workspace-id="workspaceId"
       :document-id="actionsDoc.id"
       :document-title="actionsDoc.title || actionsDoc.object"
+      :initial-tab="actionsTab"
       @done="load"
     />
   </div>

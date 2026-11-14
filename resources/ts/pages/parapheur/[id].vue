@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import OnlyOfficeEditor from '@/components/parapheur/OnlyOfficeEditor.vue'
 import UserAutocomplete from '@/components/common/UserAutocomplete.vue'
+import { expectedActionChoices, formatDateTimeFr, isOverdue } from '@/utils/parapheurUi'
 
 const route = useRoute('parapheur-id')
 const ability = useAbility()
@@ -26,6 +27,8 @@ const versionFile = ref<FileInputValue>(null)
 const versionNote = ref('')
 const attachmentFile = ref<FileInputValue>(null)
 const attachmentKind = ref('piece_jointe')
+const detailTab = ref<'infos' | 'circuit' | 'transmettre' | 'historique'>('infos')
+const expectedActions = expectedActionChoices
 
 const transmitForm = ref({
   intent: 'transmit' as 'transmit' | 'reassign',
@@ -42,16 +45,6 @@ const instructionForm = ref({
   body: '',
   due_date: '',
 })
-
-const expectedActions = [
-  { title: 'Pour information', value: 'information' },
-  { title: 'Pour consultation', value: 'consultation' },
-  { title: 'Pour avis', value: 'avis' },
-  { title: 'Pour observations', value: 'observations' },
-  { title: 'Pour instruction', value: 'instruction' },
-  { title: 'Pour visa', value: 'visa' },
-  { title: 'Pour validation', value: 'validation' },
-]
 
 const statusLabels: Record<string, string> = {
   brouillon: 'Brouillon',
@@ -253,6 +246,13 @@ const showActionComment = computed(() =>
 )
 const showActionPanel = computed(() =>
   showComments.value || showTreatGroup.value || showCirculation.value || showFiling.value,
+)
+const dossierOverdue = computed(() =>
+  isOverdue(dossier.value?.due_date, dossier.value?.status),
+)
+const visaMentions = computed(() => dossier.value?.visas || [])
+const approvalMentions = computed(() =>
+  (dossier.value?.approvals || []).filter((a: any) => !a.decision || a.decision === 'valide'),
 )
 
 const asFile = (value: FileInputValue | undefined): File | null => {
@@ -654,19 +654,161 @@ const circuitSteps = computed(() => {
       </div>
     </VAlert>
 
+    <VAlert
+      v-if="dossierOverdue"
+      type="error"
+      variant="tonal"
+      class="mb-4"
+      density="comfortable"
+    >
+      Échéance dépassée — {{ formatDate(dossier.due_date) }}
+    </VAlert>
+
+    <!-- Bandeau actions : toujours visible pour décider vite -->
+    <VCard
+      v-if="showActionPanel"
+      class="mb-4 action-bar"
+      border
+    >
+      <VCardText class="py-3">
+        <div class="text-subtitle-2 mb-2">
+          À faire
+          <span
+            v-if="dossier.current_assignee"
+            class="text-medium-emphasis font-weight-regular"
+          >
+            · chez {{ dossier.current_assignee.name }}
+          </span>
+        </div>
+        <AppTextarea
+          v-if="showActionComment"
+          v-model="actionComment"
+          label="Commentaire / motif"
+          rows="2"
+          class="mb-3"
+          hide-details
+        />
+        <div class="d-flex flex-wrap gap-2">
+          <template v-if="showTreatGroup">
+            <VBtn
+              v-if="showAcknowledge"
+              color="secondary"
+              :loading="busy"
+              @click="runAction('acknowledge')"
+            >
+              Prise de connaissance
+            </VBtn>
+            <VBtn
+              v-if="showVise"
+              color="info"
+              :loading="busy"
+              @click="runAction('vise')"
+            >
+              Viser
+            </VBtn>
+            <VBtn
+              v-if="showValidate"
+              color="success"
+              :loading="busy"
+              @click="runAction('validate')"
+            >
+              Valider
+            </VBtn>
+            <VBtn
+              v-if="showReject"
+              color="error"
+              variant="tonal"
+              :loading="busy"
+              @click="runAction('reject')"
+            >
+              Rejeter
+            </VBtn>
+          </template>
+          <template v-if="showCirculation">
+            <VBtn
+              color="warning"
+              variant="tonal"
+              :loading="busy"
+              @click="runAction('return')"
+            >
+              Retourner
+            </VBtn>
+            <VBtn
+              color="warning"
+              variant="text"
+              :loading="busy"
+              @click="runAction('complement')"
+            >
+              Demander complément
+            </VBtn>
+            <VBtn
+              variant="text"
+              :loading="busy"
+              @click="runAction('hold')"
+            >
+              En attente
+            </VBtn>
+          </template>
+          <template v-if="showComments">
+            <VBtn
+              variant="tonal"
+              :loading="busy"
+              @click="runAction('comments', { body: actionComment, kind: 'general' })"
+            >
+              Commenter
+            </VBtn>
+            <VBtn
+              variant="tonal"
+              :loading="busy"
+              @click="runAction('comments', { body: actionComment, kind: 'avis' })"
+            >
+              Avis
+            </VBtn>
+          </template>
+          <template v-if="showFiling">
+            <VBtn
+              variant="tonal"
+              :loading="busy"
+              @click="runAction('classify')"
+            >
+              Classer
+            </VBtn>
+            <VBtn
+              variant="tonal"
+              :loading="busy"
+              @click="runAction('archive')"
+            >
+              Archiver
+            </VBtn>
+          </template>
+          <VBtn
+            v-if="canTransmit"
+            variant="outlined"
+            prepend-icon="tabler-send"
+            @click="detailTab = 'transmettre'"
+          >
+            Transmettre
+          </VBtn>
+        </div>
+        <p class="text-caption text-medium-emphasis mt-3 mb-0">
+          Visa et validation sont des actes administratifs (pas de signature électronique).
+        </p>
+      </VCardText>
+    </VCard>
+
     <VRow>
       <VCol
         cols="12"
         lg="8"
       >
-        <VCard class="mb-6">
+        <VCard class="mb-4">
           <VCardItem>
             <VCardTitle class="d-flex align-center gap-2">
               <VIcon
                 icon="tabler-file-text"
                 size="22"
               />
-              Document principal
+              Document
             </VCardTitle>
             <template #append>
               <VChip
@@ -707,8 +849,7 @@ const circuitSteps = computed(() => {
 
               <iframe
                 v-if="streamUrl"
-                class="mb-4 w-100"
-                style="border: 0; min-block-size: 520px;"
+                class="mb-4 w-100 doc-preview"
                 :src="streamUrl"
                 title="Aperçu du document principal"
               />
@@ -831,616 +972,453 @@ const circuitSteps = computed(() => {
           </VCardText>
         </VCard>
 
-        <VCard class="mb-6">
-          <VCardItem>
-            <VCardTitle class="d-flex align-center gap-2">
-              <VIcon
-                icon="tabler-paperclip"
-                size="22"
-              />
+        <VExpansionPanels
+          class="mb-4"
+          variant="accordion"
+        >
+          <VExpansionPanel>
+            <VExpansionPanelTitle>
               Pièces jointes
-            </VCardTitle>
-            <template #append>
               <VChip
-                size="small"
+                size="x-small"
+                class="ms-2"
                 label
-                variant="tonal"
               >
                 {{ dossier.attachments?.length || 0 }}
               </VChip>
-            </template>
-          </VCardItem>
-          <VDivider />
-          <VCardText>
-            <VList
-              v-if="dossier.attachments?.length"
-              class="py-0 mb-4"
-              density="compact"
-            >
-              <VListItem
-                v-for="att in dossier.attachments"
-                :key="att.id"
-                :title="att.original_name"
-                :subtitle="`${labelOf(kindLabels, att.kind)} · ${formatBytes(att.size)}`"
+            </VExpansionPanelTitle>
+            <VExpansionPanelText>
+              <VList
+                v-if="dossier.attachments?.length"
+                class="py-0 mb-3"
+                density="compact"
               >
-                <template #append>
-                  <VBtn
-                    size="small"
-                    variant="tonal"
-                    :href="att.download_url"
-                    target="_blank"
-                  >
-                    Télécharger
-                  </VBtn>
-                </template>
-              </VListItem>
-            </VList>
-            <div
-              v-else
-              class="mb-4 text-medium-emphasis"
-            >
-              Aucune pièce jointe
-            </div>
-
-            <div
-              v-if="canMutate"
-              class="d-flex flex-column gap-3"
-            >
-              <VRow dense>
-                <VCol
-                  cols="12"
-                  md="4"
+                <VListItem
+                  v-for="att in dossier.attachments"
+                  :key="att.id"
+                  :title="att.original_name"
+                  :subtitle="`${labelOf(kindLabels, att.kind)} · ${formatBytes(att.size)}`"
                 >
-                  <AppSelect
-                    v-model="attachmentKind"
-                    :items="[
-                      { title: 'Pièce jointe', value: 'piece_jointe' },
-                      { title: 'Annexe', value: 'annexe' },
-                      { title: 'Complément', value: 'complement' },
-                    ]"
-                    label="Type"
-                    density="compact"
-                  />
-                </VCol>
-                <VCol
-                  cols="12"
-                  md="8"
-                >
-                  <VFileInput
-                    v-model="attachmentFile"
-                    label="Ajouter un fichier"
-                    prepend-icon=""
-                    prepend-inner-icon="tabler-paperclip"
-                    show-size
-                    density="compact"
-                    clearable
-                  />
-                </VCol>
-              </VRow>
-              <VBtn
-                variant="tonal"
-                :loading="busy"
-                :disabled="!asFile(attachmentFile)"
-                @click="uploadAttachment"
-              >
-                Ajouter
-              </VBtn>
-            </div>
-          </VCardText>
-        </VCard>
-
-        <VCard class="mb-6">
-          <VCardTitle>Observations & actions</VCardTitle>
-          <VDivider />
-          <VCardText>
-            <div
-              v-if="dossier.comments?.length"
-              class="mb-4"
-            >
-              <div
-                v-for="comment in dossier.comments"
-                :key="comment.id"
-                class="mb-4"
-              >
-                <div class="d-flex flex-wrap justify-space-between gap-2">
-                  <div class="font-weight-medium">
-                    {{ comment.user?.name }}
-                    <VChip
-                      size="x-small"
-                      class="ms-1"
-                      label
+                  <template #append>
+                    <VBtn
+                      size="small"
+                      variant="tonal"
+                      :href="att.download_url"
+                      target="_blank"
                     >
-                      {{ labelOf(kindLabels, comment.kind) }}
-                    </VChip>
+                      Télécharger
+                    </VBtn>
+                  </template>
+                </VListItem>
+              </VList>
+              <div
+                v-else
+                class="mb-3 text-medium-emphasis"
+              >
+                Aucune pièce jointe
+              </div>
+              <div
+                v-if="canMutate"
+                class="d-flex flex-column gap-3"
+              >
+                <AppSelect
+                  v-model="attachmentKind"
+                  :items="[
+                    { title: 'Pièce jointe', value: 'piece_jointe' },
+                    { title: 'Annexe', value: 'annexe' },
+                    { title: 'Complément', value: 'complement' },
+                  ]"
+                  label="Type"
+                  density="compact"
+                />
+                <VFileInput
+                  v-model="attachmentFile"
+                  label="Ajouter un fichier"
+                  prepend-icon=""
+                  prepend-inner-icon="tabler-paperclip"
+                  show-size
+                  density="compact"
+                  clearable
+                />
+                <VBtn
+                  variant="tonal"
+                  :loading="busy"
+                  :disabled="!asFile(attachmentFile)"
+                  @click="uploadAttachment"
+                >
+                  Ajouter
+                </VBtn>
+              </div>
+            </VExpansionPanelText>
+          </VExpansionPanel>
+
+          <VExpansionPanel>
+            <VExpansionPanelTitle>
+              Observations
+              <VChip
+                size="x-small"
+                class="ms-2"
+                label
+              >
+                {{ dossier.comments?.length || 0 }}
+              </VChip>
+            </VExpansionPanelTitle>
+            <VExpansionPanelText>
+              <div
+                v-if="dossier.comments?.length"
+              >
+                <div
+                  v-for="comment in dossier.comments"
+                  :key="comment.id"
+                  class="mb-3"
+                >
+                  <div class="d-flex flex-wrap justify-space-between gap-2">
+                    <div class="font-weight-medium">
+                      {{ comment.user?.name }}
+                      <VChip
+                        size="x-small"
+                        class="ms-1"
+                        label
+                      >
+                        {{ labelOf(kindLabels, comment.kind) }}
+                      </VChip>
+                    </div>
+                    <div class="text-caption text-medium-emphasis">
+                      {{ formatDateTime(comment.created_at) }}
+                    </div>
                   </div>
-                  <div class="text-caption text-medium-emphasis">
-                    {{ formatDateTime(comment.created_at) }}
+                  <div class="text-body-2 mt-1">
+                    {{ comment.body }}
                   </div>
-                </div>
-                <div class="text-body-2 mt-1">
-                  {{ comment.body }}
                 </div>
               </div>
-            </div>
-            <div
-              v-else
-              class="text-medium-emphasis mb-4"
-            >
-              Aucune observation pour le moment.
-            </div>
-
-            <VAlert
-              v-if="isInitiatorSpectator"
-              type="info"
-              variant="tonal"
-              class="mb-4"
-            >
-              Suivi initiateur : le dossier est chez
-              <strong>{{ dossier.current_assignee?.name || 'un destinataire' }}</strong>
-              ({{ labelOf(statusLabels, dossier.status) }}).
-              Aucune action de traitement n’est disponible ici.
-            </VAlert>
-
-            <VAlert
-              v-else-if="isReturnedToAuthor"
-              type="warning"
-              variant="tonal"
-              class="mb-4"
-            >
-              Dossier retourné à votre charge. Corrigez le document puis retransmettez-le.
-            </VAlert>
-
-            <AppTextarea
-              v-if="showActionComment"
-              v-model="actionComment"
-              label="Commentaire / motif d'action"
-              rows="3"
-              class="mb-4"
-            />
-
-            <template v-if="showActionPanel">
-              <template v-if="showComments">
-                <div class="text-subtitle-2 mb-2">
-                  Commenter
-                </div>
-                <div class="d-flex flex-wrap gap-2 mb-4">
-                  <VBtn
-                    variant="tonal"
-                    :loading="busy"
-                    @click="runAction('comments', { body: actionComment, kind: 'general' })"
-                  >
-                    Commenter
-                  </VBtn>
-                  <VBtn
-                    variant="tonal"
-                    :loading="busy"
-                    @click="runAction('comments', { body: actionComment, kind: 'avis' })"
-                  >
-                    Avis
-                  </VBtn>
-                  <VBtn
-                    variant="tonal"
-                    :loading="busy"
-                    @click="runAction('comments', { body: actionComment, kind: 'recommandation' })"
-                  >
-                    Recommander
-                  </VBtn>
-                </div>
-              </template>
-
-              <template v-if="showTreatGroup">
-                <div class="text-subtitle-2 mb-2">
-                  Traiter
-                </div>
-                <div class="d-flex flex-wrap gap-2 mb-4">
-                  <VBtn
-                    v-if="showAcknowledge"
-                    color="secondary"
-                    :loading="busy"
-                    @click="runAction('acknowledge')"
-                  >
-                    Prise de connaissance
-                  </VBtn>
-                  <VBtn
-                    v-if="showVise"
-                    color="info"
-                    :loading="busy"
-                    @click="runAction('vise')"
-                  >
-                    Viser
-                  </VBtn>
-                  <VBtn
-                    v-if="showValidate"
-                    color="success"
-                    :loading="busy"
-                    @click="runAction('validate')"
-                  >
-                    Valider
-                  </VBtn>
-                  <VBtn
-                    v-if="showReject"
-                    color="error"
-                    :loading="busy"
-                    @click="runAction('reject')"
-                  >
-                    Rejeter
-                  </VBtn>
-                </div>
-              </template>
-
-              <template v-if="showCirculation">
-                <div class="text-subtitle-2 mb-2">
-                  Circulation
-                </div>
-                <div class="d-flex flex-wrap gap-2 mb-4">
-                  <VBtn
-                    color="warning"
-                    :loading="busy"
-                    @click="runAction('return')"
-                  >
-                    Retourner
-                  </VBtn>
-                  <VBtn
-                    color="warning"
-                    variant="tonal"
-                    :loading="busy"
-                    @click="runAction('complement')"
-                  >
-                    Demander complément
-                  </VBtn>
-                  <VBtn
-                    variant="tonal"
-                    :loading="busy"
-                    @click="runAction('hold')"
-                  >
-                    En attente
-                  </VBtn>
-                </div>
-              </template>
-
-              <template v-if="showFiling">
-                <div class="text-subtitle-2 mb-2">
-                  Classement
-                </div>
-                <div class="d-flex flex-wrap gap-2">
-                  <VBtn
-                    variant="tonal"
-                    :loading="busy"
-                    @click="runAction('classify')"
-                  >
-                    Classer
-                  </VBtn>
-                  <VBtn
-                    variant="tonal"
-                    :loading="busy"
-                    @click="runAction('archive')"
-                  >
-                    Archiver
-                  </VBtn>
-                </div>
-              </template>
-            </template>
-            <VAlert
-              v-else-if="!isInitiatorSpectator"
-              type="info"
-              variant="tonal"
-              class="mt-2"
-            >
-              Consultation uniquement — vous n'avez pas les droits d'action sur ce dossier.
-            </VAlert>
-            <p class="text-caption text-medium-emphasis mt-3 mb-0">
-              Les actes de visa et de validation sont administratifs (pas de signature électronique).
-            </p>
-          </VCardText>
-        </VCard>
+              <div
+                v-else
+                class="text-medium-emphasis"
+              >
+                Aucune observation
+              </div>
+            </VExpansionPanelText>
+          </VExpansionPanel>
+        </VExpansionPanels>
       </VCol>
 
       <VCol
         cols="12"
         lg="4"
       >
-        <VCard class="mb-6">
-          <VCardTitle>Fiche du dossier</VCardTitle>
-          <VDivider />
-          <VCardText>
-            <div class="d-flex flex-column gap-4">
-              <div>
-                <div class="text-caption text-medium-emphasis">
-                  Auteur
-                </div>
-                <div>{{ dossier.author?.name || '—' }}</div>
-              </div>
-              <div>
-                <div class="text-caption text-medium-emphasis">
-                  Destinataire actuel
-                </div>
-                <div>{{ dossier.current_assignee?.name || '—' }}</div>
-              </div>
-              <div>
-                <div class="text-caption text-medium-emphasis">
-                  Confidentialité
-                </div>
-                <div>{{ labelOf(confidentialityLabels, dossier.confidentiality) }}</div>
-              </div>
-              <div>
-                <div class="text-caption text-medium-emphasis">
-                  Date du document
-                </div>
-                <div>{{ formatDate(dossier.document_date) }}</div>
-              </div>
-              <div>
-                <div class="text-caption text-medium-emphasis">
-                  Échéance
-                </div>
-                <div>{{ formatDate(dossier.due_date) }}</div>
-              </div>
-              <div>
-                <div class="text-caption text-medium-emphasis">
-                  Mots-clés
-                </div>
-                <div>
-                  <template v-if="dossier.keywords?.length">
-                    <VChip
-                      v-for="kw in dossier.keywords"
-                      :key="kw"
-                      size="small"
-                      class="me-1 mb-1"
-                      label
-                    >
-                      {{ kw }}
-                    </VChip>
-                  </template>
-                  <span v-else>—</span>
-                </div>
-              </div>
-              <div>
-                <div class="text-caption text-medium-emphasis">
-                  Classement GED
-                </div>
-                <div>{{ dossier.classification_node?.path || dossier.classification_node?.name || '—' }}</div>
-              </div>
-              <div>
-                <div class="text-caption text-medium-emphasis">
-                  Tags GED
-                </div>
-                <div>
-                  <template v-if="dossier.tags?.length">
-                    <VChip
-                      v-for="tag in dossier.tags"
-                      :key="tag.id"
-                      size="small"
-                      class="me-1 mb-1"
-                      label
-                    >
-                      #{{ tag.name }}
-                    </VChip>
-                  </template>
-                  <span v-else>—</span>
-                </div>
-              </div>
-              <div v-if="dossier.official_version">
-                <div class="text-caption text-medium-emphasis">
-                  Version officielle
-                </div>
-                <div>v{{ dossier.official_version.version_number }}</div>
-              </div>
-            </div>
-          </VCardText>
-        </VCard>
-
-        <VCard class="mb-6">
-          <VCardTitle>Circuit</VCardTitle>
-          <VDivider />
-          <VCardText>
-            <div
-              v-if="dossier.workflow_instance"
-              class="mb-4"
+        <VCard>
+          <VTabs
+            v-model="detailTab"
+            density="compact"
+            show-arrows
+          >
+            <VTab value="infos">
+              Infos
+            </VTab>
+            <VTab value="circuit">
+              Circuit
+            </VTab>
+            <VTab
+              v-if="canTransmit"
+              value="transmettre"
             >
-              <div class="text-caption mb-3">
-                Mode : {{ dossier.workflow_instance.kind === 'predefini' ? 'Circuit prédéfini' : 'Libre' }}
-                <span v-if="dossier.workflow_instance.workflow">
-                  — {{ dossier.workflow_instance.workflow.name }}
-                </span>
-              </div>
-              <VTimeline
-                v-if="circuitSteps.length"
-                density="compact"
-                side="end"
-              >
-                <VTimelineItem
-                  v-for="step in circuitSteps"
-                  :key="step.id"
-                  size="x-small"
-                  :dot-color="step.current ? 'primary' : (step.done ? 'success' : 'secondary')"
+              Envoyer
+            </VTab>
+            <VTab value="historique">
+              Historique
+            </VTab>
+          </VTabs>
+          <VDivider />
+          <VWindow v-model="detailTab">
+            <VWindowItem value="infos">
+              <VCardText>
+                <div class="d-flex flex-column gap-3">
+                  <div>
+                    <div class="text-caption text-medium-emphasis">
+                      Destinataire
+                    </div>
+                    <div class="font-weight-medium">
+                      {{ dossier.current_assignee?.name || '—' }}
+                    </div>
+                  </div>
+                  <div>
+                    <div class="text-caption text-medium-emphasis">
+                      Auteur
+                    </div>
+                    <div>{{ dossier.author?.name || '—' }}</div>
+                  </div>
+                  <div>
+                    <div class="text-caption text-medium-emphasis">
+                      Échéance
+                    </div>
+                    <div :class="{ 'text-error font-weight-medium': dossierOverdue }">
+                      {{ formatDate(dossier.due_date) }}
+                      <span v-if="dossierOverdue"> · En retard</span>
+                    </div>
+                  </div>
+                  <div>
+                    <div class="text-caption text-medium-emphasis">
+                      Confidentialité
+                    </div>
+                    <div>{{ labelOf(confidentialityLabels, dossier.confidentiality) }}</div>
+                  </div>
+                  <div>
+                    <div class="text-caption text-medium-emphasis">
+                      Date du document
+                    </div>
+                    <div>{{ formatDate(dossier.document_date) }}</div>
+                  </div>
+
+                  <template v-if="visaMentions.length || approvalMentions.length">
+                    <VDivider />
+                    <div class="text-subtitle-2">
+                      Preuves
+                    </div>
+                    <div
+                      v-for="v in visaMentions"
+                      :key="`visa-${v.id}`"
+                      class="text-body-2"
+                    >
+                      Visé par {{ v.user?.name || '—' }}
+                      <span v-if="v.delegator"> (délégation de {{ v.delegator.name }})</span>
+                      le {{ formatDateTimeFr(v.vised_at) }}
+                    </div>
+                    <div
+                      v-for="a in approvalMentions"
+                      :key="`app-${a.id}`"
+                      class="text-body-2"
+                    >
+                      Validé par {{ a.user?.name || '—' }}
+                      <span v-if="a.delegator"> (délégation de {{ a.delegator.name }})</span>
+                      le {{ formatDateTimeFr(a.decided_at || a.created_at) }}
+                    </div>
+                  </template>
+
+                  <VExpansionPanels
+                    v-if="canInstruct && canProcess"
+                    variant="accordion"
+                    class="mt-2"
+                  >
+                    <VExpansionPanel>
+                      <VExpansionPanelTitle>Instruction</VExpansionPanelTitle>
+                      <VExpansionPanelText>
+                        <AppTextField
+                          v-model="instructionForm.title"
+                          label="Titre"
+                          class="mb-3"
+                        />
+                        <AppTextarea
+                          v-model="instructionForm.body"
+                          label="Instruction"
+                          class="mb-3"
+                        />
+                        <UserAutocomplete
+                          v-model="instructionForm.assignee_id"
+                          :items="users"
+                          label="Responsable"
+                          class="mb-3"
+                        />
+                        <AppTextField
+                          v-model="instructionForm.due_date"
+                          type="date"
+                          label="Échéance"
+                          class="mb-3"
+                        />
+                        <VBtn
+                          block
+                          color="primary"
+                          :loading="busy"
+                          @click="createInstruction"
+                        >
+                          Enregistrer
+                        </VBtn>
+                      </VExpansionPanelText>
+                    </VExpansionPanel>
+                  </VExpansionPanels>
+                </div>
+              </VCardText>
+            </VWindowItem>
+
+            <VWindowItem value="circuit">
+              <VCardText>
+                <div
+                  v-if="dossier.workflow_instance"
+                  class="mb-4"
                 >
-                  <div class="font-weight-medium">
-                    {{ step.name }}
+                  <div class="text-caption mb-3">
+                    {{ dossier.workflow_instance.kind === 'predefini' ? 'Circuit prédéfini' : 'Libre' }}
+                    <span v-if="dossier.workflow_instance.workflow">
+                      — {{ dossier.workflow_instance.workflow.name }}
+                    </span>
                   </div>
-                  <div class="text-caption">
-                    {{ step.role_name }} · {{ labelOf(actionLabels, step.expected_action) }}
-                    <span v-if="step.current"> ← en cours</span>
-                  </div>
-                </VTimelineItem>
-              </VTimeline>
-            </div>
-            <div
-              v-else
-              class="text-medium-emphasis mb-4"
-            >
-              Aucun circuit démarré
-            </div>
-
-            <div class="text-subtitle-2 mb-2">
-              Transmissions
-            </div>
-            <div
-              v-if="dossier.transmissions?.length"
-            >
-              <div
-                v-for="t in dossier.transmissions"
-                :key="t.id"
-                class="mb-3 text-body-2"
-              >
-                <strong>{{ t.from_user?.name }}</strong> → {{ t.to_user?.name }}
-                <div class="text-caption">
-                  {{ labelOf(actionLabels, t.expected_action) }}
-                  · {{ labelOf(folderLabels, t.folder) }}
-                  · {{ labelOf(transmissionStatusLabels, t.status) }}
+                  <VTimeline
+                    v-if="circuitSteps.length"
+                    density="compact"
+                    side="end"
+                  >
+                    <VTimelineItem
+                      v-for="step in circuitSteps"
+                      :key="step.id"
+                      size="x-small"
+                      :dot-color="step.current ? 'primary' : (step.done ? 'success' : 'secondary')"
+                    >
+                      <div class="font-weight-medium">
+                        {{ step.name }}
+                      </div>
+                      <div class="text-caption">
+                        {{ step.role_name }} · {{ labelOf(actionLabels, step.expected_action) }}
+                        <span v-if="step.current"> ← en cours</span>
+                      </div>
+                    </VTimelineItem>
+                  </VTimeline>
                 </div>
                 <div
-                  v-if="t.message"
-                  class="text-caption"
+                  v-else
+                  class="text-medium-emphasis mb-4"
                 >
-                  {{ t.message }}
+                  Aucun circuit démarré
                 </div>
-              </div>
-            </div>
-            <div
-              v-else
-              class="text-medium-emphasis"
-            >
-              Aucune transmission
-            </div>
-          </VCardText>
-        </VCard>
 
-        <VCard
-          v-if="canTransmit"
-          class="mb-6"
-        >
-          <VCardTitle>Transmettre / réaffecter</VCardTitle>
-          <VDivider />
-          <VCardText>
-            <AppSelect
-              v-model="transmitForm.intent"
-              :items="[
-                { title: 'Transmettre', value: 'transmit' },
-                { title: 'Réaffecter', value: 'reassign' },
-              ]"
-              label="Action"
-              class="mb-3"
-            />
-            <AppSelect
-              v-if="transmitForm.intent === 'transmit'"
-              v-model="transmitForm.mode"
-              :items="[
-                { title: 'Libre', value: 'libre' },
-                { title: 'Circuit prédéfini', value: 'predefini' },
-              ]"
-              label="Mode"
-              class="mb-3"
-            />
-            <UserAutocomplete
-              v-if="transmitForm.intent === 'reassign' || transmitForm.mode === 'libre'"
-              v-model="transmitForm.to_user_id"
-              :items="users"
-              label="Destinataire"
-              class="mb-3"
-            />
-            <AppSelect
-              v-else
-              v-model="transmitForm.workflow_id"
-              :items="workflows"
-              item-title="name"
-              item-value="id"
-              label="Circuit prédéfini"
-              class="mb-3"
-            />
-            <AppSelect
-              v-model="transmitForm.expected_action"
-              :items="expectedActions"
-              label="Action attendue"
-              class="mb-3"
-            />
-            <AppTextField
-              v-model="transmitForm.message"
-              label="Message"
-              class="mb-3"
-            />
-            <VBtn
-              block
-              color="primary"
-              :loading="busy"
-              @click="transmitOrReassign"
-            >
-              {{ transmitForm.intent === 'reassign' ? 'Réaffecter' : 'Transmettre' }}
-            </VBtn>
-          </VCardText>
-        </VCard>
+                <div class="text-subtitle-2 mb-2">
+                  Transmissions
+                </div>
+                <div v-if="dossier.transmissions?.length">
+                  <div
+                    v-for="t in dossier.transmissions"
+                    :key="t.id"
+                    class="mb-3 text-body-2"
+                  >
+                    <strong>{{ t.from_user?.name }}</strong> → {{ t.to_user?.name }}
+                    <div class="text-caption">
+                      {{ labelOf(actionLabels, t.expected_action) }}
+                      · {{ labelOf(folderLabels, t.folder) }}
+                      · {{ labelOf(transmissionStatusLabels, t.status) }}
+                    </div>
+                  </div>
+                </div>
+                <div
+                  v-else
+                  class="text-medium-emphasis"
+                >
+                  Aucune transmission
+                </div>
+              </VCardText>
+            </VWindowItem>
 
-        <VCard class="mb-6">
-          <VCardTitle>Historique</VCardTitle>
-          <VDivider />
-          <VCardText>
-            <VTimeline
-              v-if="dossier.actions?.length"
-              density="compact"
-              side="end"
+            <VWindowItem
+              v-if="canTransmit"
+              value="transmettre"
             >
-              <VTimelineItem
-                v-for="action in dossier.actions"
-                :key="action.id"
-                size="x-small"
-              >
-                <div class="font-weight-medium">
-                  {{ labelOf(historyLabels, action.action_type) }}
-                </div>
-                <div class="text-caption">
-                  {{ action.actor?.name }}
-                  <span v-if="action.delegator"> (délégation de {{ action.delegator.name }})</span>
-                  <span v-if="action.created_at"> · {{ formatDateTime(action.created_at) }}</span>
-                </div>
-                <div v-if="action.comment">
-                  {{ action.comment }}
-                </div>
-              </VTimelineItem>
-            </VTimeline>
-            <div
-              v-else
-              class="text-medium-emphasis"
-            >
-              Aucun historique
-            </div>
-          </VCardText>
-        </VCard>
+              <VCardText>
+                <AppSelect
+                  v-model="transmitForm.intent"
+                  :items="[
+                    { title: 'Transmettre', value: 'transmit' },
+                    { title: 'Réaffecter', value: 'reassign' },
+                  ]"
+                  label="Action"
+                  class="mb-3"
+                />
+                <AppSelect
+                  v-if="transmitForm.intent === 'transmit'"
+                  v-model="transmitForm.mode"
+                  :items="[
+                    { title: 'Libre', value: 'libre' },
+                    { title: 'Circuit prédéfini', value: 'predefini' },
+                  ]"
+                  label="Mode"
+                  class="mb-3"
+                />
+                <UserAutocomplete
+                  v-if="transmitForm.intent === 'reassign' || transmitForm.mode === 'libre'"
+                  v-model="transmitForm.to_user_id"
+                  :items="users"
+                  label="Destinataire"
+                  class="mb-3"
+                />
+                <AppSelect
+                  v-else
+                  v-model="transmitForm.workflow_id"
+                  :items="workflows"
+                  item-title="name"
+                  item-value="id"
+                  label="Circuit prédéfini"
+                  class="mb-3"
+                />
+                <AppSelect
+                  v-model="transmitForm.expected_action"
+                  :items="expectedActions"
+                  item-title="title"
+                  item-value="value"
+                  label="Action attendue"
+                  class="mb-3"
+                />
+                <AppTextField
+                  v-model="transmitForm.message"
+                  label="Message"
+                  class="mb-3"
+                />
+                <VBtn
+                  block
+                  color="primary"
+                  :loading="busy"
+                  @click="transmitOrReassign"
+                >
+                  {{ transmitForm.intent === 'reassign' ? 'Réaffecter' : 'Transmettre' }}
+                </VBtn>
+              </VCardText>
+            </VWindowItem>
 
-        <VCard v-if="canInstruct && canProcess">
-          <VCardTitle>Créer une instruction</VCardTitle>
-          <VDivider />
-          <VCardText>
-            <AppTextField
-              v-model="instructionForm.title"
-              label="Titre"
-              class="mb-3"
-            />
-            <AppTextarea
-              v-model="instructionForm.body"
-              label="Instruction"
-              class="mb-3"
-            />
-            <UserAutocomplete
-              v-model="instructionForm.assignee_id"
-              :items="users"
-              label="Responsable"
-              class="mb-3"
-            />
-            <AppTextField
-              v-model="instructionForm.due_date"
-              type="date"
-              label="Échéance"
-              class="mb-3"
-            />
-            <VBtn
-              block
-              color="primary"
-              :loading="busy"
-              @click="createInstruction"
-            >
-              Enregistrer l'instruction
-            </VBtn>
-          </VCardText>
+            <VWindowItem value="historique">
+              <VCardText>
+                <VTimeline
+                  v-if="dossier.actions?.length"
+                  density="compact"
+                  side="end"
+                >
+                  <VTimelineItem
+                    v-for="action in dossier.actions"
+                    :key="action.id"
+                    size="x-small"
+                  >
+                    <div class="font-weight-medium">
+                      {{ labelOf(historyLabels, action.action_type) }}
+                    </div>
+                    <div class="text-caption">
+                      {{ action.actor?.name }}
+                      <span v-if="action.delegator"> (délégation de {{ action.delegator.name }})</span>
+                      <span v-if="action.created_at"> · {{ formatDateTime(action.created_at) }}</span>
+                    </div>
+                    <div v-if="action.comment">
+                      {{ action.comment }}
+                    </div>
+                  </VTimelineItem>
+                </VTimeline>
+                <div
+                  v-else
+                  class="text-medium-emphasis"
+                >
+                  Aucun historique
+                </div>
+              </VCardText>
+            </VWindowItem>
+          </VWindow>
         </VCard>
       </VCol>
     </VRow>
   </div>
 </template>
+
+<style scoped>
+.action-bar {
+  position: sticky;
+  top: 4.5rem;
+  z-index: 2;
+}
+
+.doc-preview {
+  border: 0;
+  min-block-size: min(70vh, 720px);
+}
+</style>

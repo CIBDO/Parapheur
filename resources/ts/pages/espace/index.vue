@@ -46,9 +46,9 @@ const provenanceColor: Record<string, string> = {
 }
 
 const cards = computed(() => [
-  { title: 'Mes dossiers', icon: 'tabler-folder', color: 'primary', to: 'espace-dossiers', value: folders.value.length, hint: 'Racine de mon espace' },
-  { title: 'Partagés', icon: 'tabler-share', color: 'success', to: 'espace-partages', value: null, hint: 'Avec moi' },
-  { title: 'Collaboratifs', icon: 'tabler-users', color: 'secondary', to: 'espace-collaboratifs', value: null, hint: 'Espaces d\'équipe' },
+  { title: 'Mes fichiers', icon: 'tabler-folder', color: 'primary', to: 'espace-dossiers', value: folders.value.length, hint: 'Explorer' },
+  { title: 'Partagés avec moi', icon: 'tabler-share', color: 'success', to: 'espace-partages', value: null, hint: 'Reçus' },
+  { title: 'Équipes', icon: 'tabler-users', color: 'secondary', to: 'espace-collaboratifs', value: null, hint: 'Espaces partagés' },
   { title: 'Bibliothèque', icon: 'tabler-books', color: 'info', to: 'espace-bibliotheque', value: null, hint: 'Références' },
 ])
 
@@ -182,8 +182,8 @@ const workspaceTypeLabel = computed(() => {
 <template>
   <div class="espace-dashboard">
     <ParapheurPageHeader
-      title="Mon espace documentaire"
-      subtitle="Pilotage, recherche et accès rapide à vos documents"
+      title="Mon espace"
+      subtitle="Préparer · partager · envoyer au parapheur"
       icon="tabler-cloud"
     >
       <template #actions>

@@ -6,11 +6,11 @@ import {
   confidentialityOptions,
   folderMeta,
   formatDateFr,
+  isOverdue,
   labelOf,
   priorityColor,
   priorityLabels,
   priorityOptions,
-  statusColor,
   statusLabels,
   statusOptions,
 } from '@/utils/parapheurUi'
@@ -33,6 +33,7 @@ interface DocItem {
   structure?: { code: string; name: string }
   type?: { name: string }
   author?: { name: string }
+  current_assignee?: { id: number; name: string }
 }
 
 interface StructureOption {
@@ -160,12 +161,11 @@ const activeFilterCount = computed(() => {
 })
 
 const headers = [
-  { title: 'Référence', key: 'reference', width: '140px' },
+  { title: 'Référence', key: 'reference', width: '130px' },
   { title: 'Objet', key: 'object' },
-  { title: 'Structure', key: 'structure', width: '110px' },
+  { title: 'Chez', key: 'current_assignee', width: '140px' },
   { title: 'Action', key: 'expected_action', width: '120px' },
-  { title: 'Priorité', key: 'priority', width: '120px' },
-  { title: 'Statut', key: 'status', width: '130px' },
+  { title: 'Priorité', key: 'priority', width: '110px' },
   { title: 'Échéance', key: 'due_date', width: '120px' },
 ]
 
@@ -290,7 +290,7 @@ onMounted(async () => {
   <div class="parapheur-dashboard">
     <ParapheurPageHeader
       title="Mon parapheur"
-      subtitle="Pilotage, recherche et traitement de vos dossiers"
+      subtitle="À traiter, à viser, à valider"
       icon="tabler-briefcase"
     >
       <template #actions>
@@ -702,14 +702,10 @@ onMounted(async () => {
           </div>
         </template>
 
-        <template #item.structure="{ item }">
-          <VChip
-            size="small"
-            label
-            variant="tonal"
-          >
-            {{ item.structure?.code || '—' }}
-          </VChip>
+        <template #item.current_assignee="{ item }">
+          <span class="text-body-2">
+            {{ item.current_assignee?.name || '—' }}
+          </span>
         </template>
 
         <template #item.expected_action="{ item }">
@@ -726,18 +722,14 @@ onMounted(async () => {
           </VChip>
         </template>
 
-        <template #item.status="{ item }">
-          <VChip
-            size="small"
-            :color="statusColor(item.status)"
-            variant="tonal"
-          >
-            {{ labelOf(statusLabels, item.status) }}
-          </VChip>
-        </template>
-
         <template #item.due_date="{ item }">
-          {{ formatDateFr(item.due_date) }}
+          <span :class="{ 'text-error font-weight-medium': isOverdue(item.due_date, item.status) }">
+            {{ formatDateFr(item.due_date) }}
+            <span
+              v-if="isOverdue(item.due_date, item.status)"
+              class="text-caption"
+            > · Retard</span>
+          </span>
         </template>
 
         <template #no-data>

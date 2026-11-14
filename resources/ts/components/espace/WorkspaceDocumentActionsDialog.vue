@@ -6,6 +6,7 @@ const props = defineProps<{
   workspaceId: number
   documentId: number
   documentTitle?: string
+  initialTab?: string
 }>()
 
 const emit = defineEmits<{
@@ -18,7 +19,7 @@ const open = computed({
   set: (v: boolean) => emit('update:modelValue', v),
 })
 
-const tab = ref('ged')
+const tab = ref(props.initialTab || 'parapheur')
 const users = ref<any[]>([])
 const workflows = ref<any[]>([])
 const meetings = ref<any[]>([])
@@ -39,6 +40,26 @@ const parapheur = ref({
 const meetingId = ref<number | null>(null)
 const appointmentId = ref<number | null>(null)
 const instructionId = ref<number | null>(null)
+
+watch(
+  () => props.initialTab,
+  (v) => {
+    if (v)
+      tab.value = v
+  },
+)
+
+watch(
+  () => props.modelValue,
+  (isOpen) => {
+    if (isOpen) {
+      tab.value = props.initialTab || 'parapheur'
+      parapheur.value.object = props.documentTitle || parapheur.value.object
+      successMsg.value = ''
+      errorMsg.value = ''
+    }
+  },
+)
 
 onMounted(async () => {
   try {
@@ -64,11 +85,11 @@ async function submitGed() {
   errorMsg.value = ''
   try {
     await $api(`/workspace/${props.workspaceId}/documents/${props.documentId}/submit-ged`, { method: 'POST', body: {} })
-    successMsg.value = 'Document soumis à la GED.'
+    successMsg.value = 'Document envoyé à la GED.'
     emit('done')
   }
   catch (e: any) {
-    errorMsg.value = e?.data?.message || 'Échec soumission GED'
+    errorMsg.value = e?.data?.message || 'Échec envoi GED'
   }
   finally {
     saving.value = false
@@ -87,11 +108,11 @@ async function submitParapheur() {
         workflow_id: parapheur.value.workflow_id || undefined,
       },
     })
-    successMsg.value = 'Document soumis au parapheur (version figée).'
+    successMsg.value = 'Dossier transmis — suivi dans Mon parapheur.'
     emit('done')
   }
   catch (e: any) {
-    errorMsg.value = e?.data?.message || 'Échec soumission parapheur'
+    errorMsg.value = e?.data?.message || 'Échec envoi au parapheur'
   }
   finally {
     saving.value = false
@@ -168,7 +189,7 @@ async function attachInstruction() {
     max-width="640"
   >
     <VCard>
-      <VCardTitle>Actions documentaires</VCardTitle>
+      <VCardTitle>Envoyer le document</VCardTitle>
       <VCardText>
         <VAlert
           v-if="errorMsg"
@@ -186,11 +207,11 @@ async function attachInstruction() {
         </VAlert>
 
         <VTabs v-model="tab">
-          <VTab value="ged">
-            GED
-          </VTab>
           <VTab value="parapheur">
             Parapheur
+          </VTab>
+          <VTab value="ged">
+            GED
           </VTab>
           <VTab value="reunion">
             Réunion
@@ -203,24 +224,14 @@ async function attachInstruction() {
           </VTab>
         </VTabs>
 
-        <VTabsWindow
+        <VWindow
           v-model="tab"
           class="mt-4"
         >
-          <VTabsWindowItem value="ged">
-            <p class="text-body-2 mb-4">
-              Transformer ce document de travail en document institutionnel GED (même fichier, changement de contexte).
+          <VWindowItem value="parapheur">
+            <p class="text-body-2 mb-3">
+              Envoyer pour visa ou validation. La version est figée.
             </p>
-            <VBtn
-              color="primary"
-              :loading="saving"
-              @click="submitGed"
-            >
-              Envoyer vers la GED
-            </VBtn>
-          </VTabsWindowItem>
-
-          <VTabsWindowItem value="parapheur">
             <VTextField
               v-model="parapheur.object"
               label="Objet"
@@ -245,10 +256,10 @@ async function attachInstruction() {
             <VSelect
               v-model="parapheur.expected_action"
               :items="[
-                { title: 'Visa', value: 'visa' },
-                { title: 'Validation', value: 'validation' },
-                { title: 'Consultation', value: 'consultation' },
-                { title: 'Information', value: 'information' },
+                { title: 'Pour visa', value: 'visa' },
+                { title: 'Pour validation', value: 'validation' },
+                { title: 'Pour consultation', value: 'consultation' },
+                { title: 'Pour information', value: 'information' },
               ]"
               label="Action attendue"
               class="mb-3"
@@ -261,14 +272,28 @@ async function attachInstruction() {
             />
             <VBtn
               color="primary"
+              prepend-icon="tabler-send"
               :loading="saving"
               @click="submitParapheur"
             >
-              Soumettre au parapheur
+              Envoyer au parapheur
             </VBtn>
-          </VTabsWindowItem>
+          </VWindowItem>
 
-          <VTabsWindowItem value="reunion">
+          <VWindowItem value="ged">
+            <p class="text-body-2 mb-4">
+              Classer ce document comme document institutionnel.
+            </p>
+            <VBtn
+              color="primary"
+              :loading="saving"
+              @click="submitGed"
+            >
+              Envoyer à la GED
+            </VBtn>
+          </VWindowItem>
+
+          <VWindowItem value="reunion">
             <VSelect
               v-model="meetingId"
               :items="meetings.map((m: any) => ({ title: m.title || m.object || m.reference, value: m.id }))"
@@ -282,9 +307,9 @@ async function attachInstruction() {
             >
               Lier à la réunion
             </VBtn>
-          </VTabsWindowItem>
+          </VWindowItem>
 
-          <VTabsWindowItem value="rdv">
+          <VWindowItem value="rdv">
             <VSelect
               v-model="appointmentId"
               :items="appointments.map((a: any) => ({ title: a.subject || a.reference, value: a.id }))"
@@ -298,9 +323,9 @@ async function attachInstruction() {
             >
               Ajouter au dossier RDV
             </VBtn>
-          </VTabsWindowItem>
+          </VWindowItem>
 
-          <VTabsWindowItem value="instruction">
+          <VWindowItem value="instruction">
             <VSelect
               v-model="instructionId"
               :items="instructions.map((i: any) => ({ title: i.title || `#${i.id}`, value: i.id }))"
@@ -314,8 +339,8 @@ async function attachInstruction() {
             >
               Associer à l’instruction
             </VBtn>
-          </VTabsWindowItem>
-        </VTabsWindow>
+          </VWindowItem>
+        </VWindow>
       </VCardText>
       <VCardActions>
         <VSpacer />

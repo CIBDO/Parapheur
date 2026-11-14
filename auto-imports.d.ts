@@ -83,6 +83,7 @@ declare global {
   const eagerComputed: typeof import('@vueuse/core')['eagerComputed']
   const effectScope: typeof import('vue')['effectScope']
   const emailValidator: typeof import('./resources/ts/@core/utils/validators')['emailValidator']
+  const expectedActionChoices: typeof import('./resources/ts/utils/parapheurUi')['expectedActionChoices']
   const expectedActionOptions: typeof import('./resources/ts/utils/parapheurUi')['expectedActionOptions']
   const exportKindLabels: typeof import('./resources/ts/utils/meetingsUi')['exportKindLabels']
   const extendRef: typeof import('@vueuse/core')['extendRef']
@@ -135,6 +136,7 @@ declare global {
   const isNullOrUndefined: typeof import('./resources/ts/@core/utils/helpers')['isNullOrUndefined']
   const isObject: typeof import('./resources/ts/@core/utils/helpers')['isObject']
   const isOnlyOfficeEditableDocument: typeof import('./resources/ts/utils/meetingsUi')['isOnlyOfficeEditableDocument']
+  const isOverdue: typeof import('./resources/ts/utils/parapheurUi')['isOverdue']
   const isProxy: typeof import('vue')['isProxy']
   const isReactive: typeof import('vue')['isReactive']
   const isReadonly: typeof import('vue')['isReadonly']
@@ -413,6 +415,7 @@ declare global {
   const usePreferredReducedMotion: typeof import('@vueuse/core')['usePreferredReducedMotion']
   const usePreferredReducedTransparency: typeof import('@vueuse/core')['usePreferredReducedTransparency']
   const usePrevious: typeof import('@vueuse/core')['usePrevious']
+  const useProductions: typeof import('./resources/ts/composables/useProductions')['useProductions']
   const useProjection: typeof import('@vueuse/math')['useProjection']
   const useRafFn: typeof import('@vueuse/core')['useRafFn']
   const useRefHistory: typeof import('@vueuse/core')['useRefHistory']
@@ -578,6 +581,7 @@ declare module 'vue' {
     readonly eagerComputed: UnwrapRef<typeof import('@vueuse/core')['eagerComputed']>
     readonly effectScope: UnwrapRef<typeof import('vue')['effectScope']>
     readonly emailValidator: UnwrapRef<typeof import('./resources/ts/@core/utils/validators')['emailValidator']>
+    readonly expectedActionChoices: UnwrapRef<typeof import('./resources/ts/utils/parapheurUi')['expectedActionChoices']>
     readonly expectedActionOptions: UnwrapRef<typeof import('./resources/ts/utils/parapheurUi')['expectedActionOptions']>
     readonly exportKindLabels: UnwrapRef<typeof import('./resources/ts/utils/meetingsUi')['exportKindLabels']>
     readonly extendRef: UnwrapRef<typeof import('@vueuse/core')['extendRef']>
@@ -623,6 +627,7 @@ declare module 'vue' {
     readonly isNullOrUndefined: UnwrapRef<typeof import('./resources/ts/@core/utils/helpers')['isNullOrUndefined']>
     readonly isObject: UnwrapRef<typeof import('./resources/ts/@core/utils/helpers')['isObject']>
     readonly isOnlyOfficeEditableDocument: UnwrapRef<typeof import('./resources/ts/utils/meetingsUi')['isOnlyOfficeEditableDocument']>
+    readonly isOverdue: UnwrapRef<typeof import('./resources/ts/utils/parapheurUi')['isOverdue']>
     readonly isProxy: UnwrapRef<typeof import('vue')['isProxy']>
     readonly isReactive: UnwrapRef<typeof import('vue')['isReactive']>
     readonly isReadonly: UnwrapRef<typeof import('vue')['isReadonly']>
@@ -897,6 +902,7 @@ declare module 'vue' {
     readonly usePreferredLanguages: UnwrapRef<typeof import('@vueuse/core')['usePreferredLanguages']>
     readonly usePreferredReducedMotion: UnwrapRef<typeof import('@vueuse/core')['usePreferredReducedMotion']>
     readonly usePrevious: UnwrapRef<typeof import('@vueuse/core')['usePrevious']>
+    readonly useProductions: UnwrapRef<typeof import('./resources/ts/composables/useProductions')['useProductions']>
     readonly useProjection: UnwrapRef<typeof import('@vueuse/math')['useProjection']>
     readonly useRafFn: UnwrapRef<typeof import('@vueuse/core')['useRafFn']>
     readonly useRefHistory: UnwrapRef<typeof import('@vueuse/core')['useRefHistory']>
