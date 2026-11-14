@@ -42,10 +42,18 @@ onMounted(load)
 <template>
   <div>
     <ParapheurPageHeader
-      title="Documents à valider"
-      subtitle="File de validation et publication institutionnelle"
+      title="À valider"
+      subtitle="Documents en attente de validation ou de publication"
       icon="tabler-file-check"
-    />
+    >
+      <VBtn
+        variant="tonal"
+        prepend-icon="tabler-folder-open"
+        :to="{ name: 'ged-explorer' }"
+      >
+        Explorer
+      </VBtn>
+    </ParapheurPageHeader>
 
     <VCard class="parapheur-section-card">
       <VCardText>

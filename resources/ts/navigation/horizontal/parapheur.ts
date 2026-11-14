@@ -197,13 +197,6 @@ export default [
     icon: { icon: 'tabler-building-bank' },
     children: [
       {
-        title: 'Accueil',
-        icon: { icon: 'tabler-layout-dashboard' },
-        to: 'ged',
-        action: 'read',
-        subject: 'Ged',
-      },
-      {
         title: 'Explorer',
         icon: { icon: 'tabler-folder-open' },
         to: 'ged-explorer',
@@ -211,7 +204,7 @@ export default [
         subject: 'Ged',
       },
       {
-        title: 'Rechercher',
+        title: 'Recherche',
         icon: { icon: 'tabler-search' },
         to: 'ged-recherche',
         action: 'read',
@@ -225,11 +218,11 @@ export default [
         subject: 'Ged',
       },
       {
-        title: 'Dossiers',
-        icon: { icon: 'tabler-folders' },
-        to: 'ged-dossiers',
-        action: 'manage',
-        subject: 'GedAdmin',
+        title: 'Mes dépôts',
+        icon: { icon: 'tabler-folder-user' },
+        to: 'ged-mes-documents',
+        action: 'read',
+        subject: 'Ged',
       },
       {
         title: 'Archives',

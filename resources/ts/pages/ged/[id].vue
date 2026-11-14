@@ -229,6 +229,44 @@ const canOnlyOffice = computed(() =>
   /word|excel|powerpoint|officedocument|opendocument|msword|ms-excel|ms-powerpoint/i.test(mime.value)
   || /\.(docx?|xlsx?|pptx?)$/i.test(doc.value?.latest_version?.original_name || ''),
 )
+
+const pubStatus = computed(() => doc.value?.publication_status || '')
+const canSubmitPublication = computed(() =>
+  ['brouillon', 'depose', 'a_corriger', 'rejete'].includes(pubStatus.value),
+)
+const canValidatePublication = computed(() =>
+  !!doc.value?.permissions?.can_validate_publication && pubStatus.value === 'en_verification',
+)
+const canReturnPublication = computed(() =>
+  !!doc.value?.permissions?.can_validate_publication && pubStatus.value === 'en_verification',
+)
+const canRejectPublication = computed(() =>
+  !!doc.value?.permissions?.can_validate_publication
+  && ['en_verification', 'valide'].includes(pubStatus.value),
+)
+const canPublish = computed(() =>
+  !!doc.value?.permissions?.can_publish
+  && ['valide', 'en_verification', 'depose'].includes(pubStatus.value),
+)
+const showPublicationPanel = computed(() =>
+  canSubmitPublication.value
+  || canValidatePublication.value
+  || canReturnPublication.value
+  || canRejectPublication.value
+  || canPublish.value,
+)
+const publicationHint = computed(() => {
+  if (canPublish.value && pubStatus.value === 'valide')
+    return 'Document validé — publiez-le pour le rendre officiel.'
+  if (canValidatePublication.value)
+    return 'En vérification — validez, renvoyez à corriger ou rejetez.'
+  if (canSubmitPublication.value)
+    return 'Soumettez le document pour lancer le circuit de publication.'
+  if (pubStatus.value === 'publie')
+    return 'Document publié — consultation institutionnelle.'
+
+  return 'Actions de publication disponibles.'
+})
 </script>
 
 <template>
@@ -247,64 +285,17 @@ const canOnlyOffice = computed(() =>
         {{ labelOf(publicationStatusLabels, doc.publication_status) }}
       </VChip>
       <VBtn
-        v-if="doc?.publication_status && ['brouillon', 'depose', 'a_corriger', 'rejete'].includes(doc.publication_status)"
-        class="me-2"
-        color="primary"
         variant="tonal"
         size="small"
-        @click="publicationAction('submit-publication')"
+        :to="{ name: 'ged-explorer' }"
       >
-        Soumettre
-      </VBtn>
-      <VBtn
-        v-if="doc?.permissions?.can_validate_publication && doc?.publication_status === 'en_verification'"
-        class="me-2"
-        color="success"
-        variant="tonal"
-        size="small"
-        @click="publicationAction('approve-publication')"
-      >
-        Valider
-      </VBtn>
-      <VBtn
-        v-if="doc?.permissions?.can_validate_publication && doc?.publication_status === 'en_verification'"
-        class="me-2"
-        color="warning"
-        variant="tonal"
-        size="small"
-        @click="publicationAction('return-publication')"
-      >
-        À corriger
-      </VBtn>
-      <VBtn
-        v-if="doc?.permissions?.can_validate_publication && ['en_verification', 'valide'].includes(doc.publication_status)"
-        class="me-2"
-        color="error"
-        variant="tonal"
-        size="small"
-        @click="publicationAction('reject-publication')"
-      >
-        Rejeter
-      </VBtn>
-      <VBtn
-        v-if="doc?.permissions?.can_publish && ['valide', 'en_verification', 'depose'].includes(doc.publication_status)"
-        class="me-2"
-        color="success"
-        size="small"
-        @click="publicationAction('publish')"
-      >
-        Publier
-      </VBtn>
-      <VBtn
-        variant="tonal"
-        :to="{ name: 'parapheur-id', params: { id: String(id) } }"
-      >
-        Parapheur
+        Explorer
       </VBtn>
       <VBtn
         class="ms-2"
         :variant="favorited ? 'flat' : 'tonal'"
         :color="favorited ? 'warning' : undefined"
+        size="small"
         prepend-icon="tabler-star"
         @click="toggleFavorite"
       >
@@ -313,6 +304,7 @@ const canOnlyOffice = computed(() =>
       <VBtn
         class="ms-2"
         variant="tonal"
+        size="small"
         prepend-icon="tabler-download"
         @click="exportZip"
       >
@@ -323,6 +315,7 @@ const canOnlyOffice = computed(() =>
         class="ms-2"
         color="warning"
         variant="tonal"
+        size="small"
         @click="archive"
       >
         Archiver
@@ -343,6 +336,63 @@ const canOnlyOffice = computed(() =>
     />
 
     <template v-else-if="doc">
+      <VCard
+        v-if="showPublicationPanel"
+        class="mb-4 action-bar"
+        border
+      >
+        <VCardText class="py-3">
+          <div class="text-subtitle-2 mb-1">
+            À faire
+            <span class="text-medium-emphasis font-weight-regular">
+              · publication
+            </span>
+          </div>
+          <div class="text-body-2 text-medium-emphasis mb-3">
+            {{ publicationHint }}
+          </div>
+          <div class="d-flex flex-wrap gap-2">
+            <VBtn
+              v-if="canSubmitPublication"
+              color="primary"
+              @click="publicationAction('submit-publication')"
+            >
+              Soumettre à publication
+            </VBtn>
+            <VBtn
+              v-if="canValidatePublication"
+              color="success"
+              @click="publicationAction('approve-publication')"
+            >
+              Valider
+            </VBtn>
+            <VBtn
+              v-if="canReturnPublication"
+              color="warning"
+              variant="tonal"
+              @click="publicationAction('return-publication')"
+            >
+              À corriger
+            </VBtn>
+            <VBtn
+              v-if="canRejectPublication"
+              color="error"
+              variant="tonal"
+              @click="publicationAction('reject-publication')"
+            >
+              Rejeter
+            </VBtn>
+            <VBtn
+              v-if="canPublish"
+              color="success"
+              @click="publicationAction('publish')"
+            >
+              Publier
+            </VBtn>
+          </div>
+        </VCardText>
+      </VCard>
+
       <div class="d-flex flex-wrap gap-2 mb-4">
         <VChip
           :color="statusColor(doc.status)"
@@ -809,3 +859,11 @@ const canOnlyOffice = computed(() =>
     </template>
   </div>
 </template>
+
+<style scoped>
+.action-bar {
+  position: sticky;
+  top: 4.5rem;
+  z-index: 2;
+}
+</style>

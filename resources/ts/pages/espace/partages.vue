@@ -13,8 +13,15 @@ definePage({
 
 const router = useRouter()
 const loading = ref(true)
-const filter = ref('all')
+const filter = ref<'all' | 'documents' | 'folders' | 'workspaces'>('all')
 const items = ref<any[]>([])
+
+const filterOptions = [
+  { value: 'all' as const, title: 'Tout' },
+  { value: 'documents' as const, title: 'Documents' },
+  { value: 'folders' as const, title: 'Dossiers' },
+  { value: 'workspaces' as const, title: 'Espaces' },
+]
 
 async function load() {
   loading.value = true
@@ -76,27 +83,17 @@ watch(filter, load)
     />
 
     <VCard class="parapheur-section-card mb-4">
-      <VCardText>
-        <VBtnToggle
-          v-model="filter"
-          mandatory
-          density="compact"
-          divided
-          color="primary"
+      <VCardText class="d-flex flex-wrap align-center gap-2 py-3">
+        <VChip
+          v-for="opt in filterOptions"
+          :key="opt.value"
+          :color="filter === opt.value ? 'primary' : undefined"
+          :variant="filter === opt.value ? 'flat' : 'tonal'"
+          class="cursor-pointer"
+          @click="filter = opt.value"
         >
-          <VBtn value="all">
-            Tout
-          </VBtn>
-          <VBtn value="documents">
-            Documents
-          </VBtn>
-          <VBtn value="folders">
-            Dossiers
-          </VBtn>
-          <VBtn value="workspaces">
-            Espaces
-          </VBtn>
-        </VBtnToggle>
+          {{ opt.title }}
+        </VChip>
       </VCardText>
     </VCard>
 

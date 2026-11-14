@@ -89,9 +89,9 @@ const tableTitle = computed(() =>
 )
 
 const quickActions = [
-  { title: 'Tous les documents', icon: 'tabler-files', color: 'primary', route: 'ged-documents' },
-  { title: 'Mes documents', icon: 'tabler-folder-user', color: 'success', route: 'ged-mes-documents' },
-  { title: 'Plan de classement', icon: 'tabler-sitemap', color: 'info', route: 'ged-classification' },
+  { title: 'Explorer', icon: 'tabler-folder-open', color: 'primary', route: 'ged-explorer' },
+  { title: 'Recherche', icon: 'tabler-search', color: 'info', route: 'ged-recherche' },
+  { title: 'Mes dépôts', icon: 'tabler-folder-user', color: 'success', route: 'ged-mes-documents' },
   { title: 'Archives', icon: 'tabler-archive', color: 'secondary', route: 'ged-archives' },
 ]
 
@@ -202,10 +202,18 @@ function openDoc(id: number) {
   <div class="ged-dashboard">
     <ParapheurPageHeader
       title="Documentation institutionnelle"
-      subtitle="Pilotage, recherche et suivi du patrimoine documentaire"
+      subtitle="Vue d’ensemble — l’entrée principale reste Explorer"
       icon="tabler-folders"
     >
       <template #actions>
+        <VBtn
+          variant="tonal"
+          color="primary"
+          prepend-icon="tabler-folder-open"
+          :to="{ name: 'ged-explorer' }"
+        >
+          Explorer
+        </VBtn>
         <VBtn
           variant="tonal"
           color="primary"
@@ -217,10 +225,10 @@ function openDoc(id: number) {
         </VBtn>
         <VBtn
           color="primary"
-          prepend-icon="tabler-file-plus"
+          prepend-icon="tabler-upload"
           :to="{ name: 'ged-nouveau' }"
         >
-          Nouveau document
+          Déposer
         </VBtn>
       </template>
     </ParapheurPageHeader>

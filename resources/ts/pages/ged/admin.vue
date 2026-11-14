@@ -181,9 +181,31 @@ const saveClassificationRule = async () => {
   <div>
     <ParapheurPageHeader
       title="Administration documentaire"
-      subtitle="Catégories, domaines, conservation et classement"
+      subtitle="Référentiels, conservation, classement et dossiers"
       icon="tabler-settings"
-    />
+    >
+      <VBtn
+        variant="tonal"
+        prepend-icon="tabler-folders"
+        :to="{ name: 'ged-dossiers' }"
+      >
+        Dossiers
+      </VBtn>
+      <VBtn
+        variant="tonal"
+        prepend-icon="tabler-sitemap"
+        :to="{ name: 'ged-classification' }"
+      >
+        Plan de classement
+      </VBtn>
+      <VBtn
+        variant="tonal"
+        prepend-icon="tabler-shield-search"
+        :to="{ name: 'ged-audit' }"
+      >
+        Journal d’audit
+      </VBtn>
+    </ParapheurPageHeader>
 
     <VTabs
       v-model="tab"
@@ -200,12 +222,6 @@ const saveClassificationRule = async () => {
       </VTab>
       <VTab value="auto-class">
         Classement auto
-      </VTab>
-      <VTab
-        value="classification"
-        :to="{ name: 'ged-classification' }"
-      >
-        Plan de classement
       </VTab>
       <VTab
         value="types"

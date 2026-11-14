@@ -76,6 +76,14 @@ const onSelectFolder = (item: any) => {
 
 const openDoc = (id: number) => router.push({ name: 'ged-id', params: { id } })
 
+const shortcuts = [
+  { title: 'Mes dépôts', icon: 'tabler-folder-user', to: 'ged-mes-documents' },
+  { title: 'Favoris', icon: 'tabler-star', to: 'ged-favoris' },
+  { title: 'Récents', icon: 'tabler-history', to: 'ged-recents' },
+  { title: 'À valider', icon: 'tabler-file-check', to: 'ged-a-valider' },
+  { title: 'Recherche', icon: 'tabler-search', to: 'ged-recherche' },
+]
+
 onMounted(async () => {
   await loadTree()
   await loadFolder(null)
@@ -85,10 +93,17 @@ onMounted(async () => {
 <template>
   <div>
     <ParapheurPageHeader
-      title="Explorer les documents"
-      subtitle="Arborescence institutionnelle et catalogue"
+      title="Explorer"
+      subtitle="Parcourez les dossiers institutionnels, puis ouvrez un document"
       icon="tabler-folder-open"
     >
+      <VBtn
+        variant="tonal"
+        prepend-icon="tabler-search"
+        :to="{ name: 'ged-recherche' }"
+      >
+        Recherche
+      </VBtn>
       <VBtn
         color="primary"
         prepend-icon="tabler-upload"
@@ -97,6 +112,19 @@ onMounted(async () => {
         Déposer
       </VBtn>
     </ParapheurPageHeader>
+
+    <div class="d-flex flex-wrap gap-2 mb-4">
+      <VBtn
+        v-for="item in shortcuts"
+        :key="item.to"
+        size="small"
+        variant="tonal"
+        :prepend-icon="item.icon"
+        :to="{ name: item.to }"
+      >
+        {{ item.title }}
+      </VBtn>
+    </div>
 
     <VRow>
       <VCol
@@ -111,8 +139,10 @@ onMounted(async () => {
           <VCardText>
             <VBtn
               size="small"
-              variant="text"
+              :variant="selectedFolder ? 'text' : 'tonal'"
+              color="primary"
               class="mb-2"
+              block
               @click="loadFolder(null)"
             >
               Tous les documents
@@ -139,6 +169,9 @@ onMounted(async () => {
         <VCard class="mb-4 parapheur-section-card">
           <VCardText>
             <div class="d-flex flex-wrap align-center gap-3 mb-3">
+              <div class="text-body-2 font-weight-medium">
+                {{ selectedFolder?.name || 'Tous les documents' }}
+              </div>
               <VBreadcrumbs
                 v-if="breadcrumb.length"
                 :items="[{ title: 'Racine', disabled: false }, ...breadcrumb.map(b => ({ title: b.name, disabled: false }))]"
@@ -167,6 +200,7 @@ onMounted(async () => {
               label="Filtrer dans le dossier…"
               prepend-inner-icon="tabler-search"
               clearable
+              hide-details
               @keyup.enter="loadFolder(selectedFolder?.id ?? null)"
             />
           </VCardText>
