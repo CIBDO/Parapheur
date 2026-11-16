@@ -403,6 +403,7 @@ declare module 'vue' {
     UserAutocomplete: typeof import('./resources/ts/components/common/UserAutocomplete.vue')['default']
     UserInfoEditDialog: typeof import('./resources/ts/components/dialogs/UserInfoEditDialog.vue')['default']
     UserUpgradePlanDialog: typeof import('./resources/ts/components/dialogs/UserUpgradePlanDialog.vue')['default']
+    VisioUrlField: typeof import('./resources/ts/components/parapheur/VisioUrlField.vue')['default']
     VueApexCharts: typeof import('vue3-apexcharts')['default']
     WorkspaceDocumentActionsDialog: typeof import('./resources/ts/components/espace/WorkspaceDocumentActionsDialog.vue')['default']
     WorkspaceShareDialog: typeof import('./resources/ts/components/espace/WorkspaceShareDialog.vue')['default']

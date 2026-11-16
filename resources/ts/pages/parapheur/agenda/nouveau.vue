@@ -12,12 +12,15 @@ definePage({
 
 const ability = useAbility()
 const router = useRouter()
+const route = useRoute()
 const types = ref<any[]>([])
 const users = ref<any[]>([])
 const saving = ref(false)
 const error = ref('')
 const conflicts = ref<any[]>([])
 const suggestions = ref<any>(null)
+
+const prefilledStart = typeof route.query.start_at === 'string' ? route.query.start_at : ''
 
 const form = ref({
   as_request: !ability.can('manage', 'Appointment'),
@@ -29,7 +32,7 @@ const form = ref({
   confidentiality: 'normal',
   meeting_mode: 'presentiel',
   location: 'Cabinet DG',
-  start_at: '',
+  start_at: prefilledStart,
   duration_minutes: 30,
   requested_date: '',
   intake_channel: 'saisie_secretariat',
@@ -42,7 +45,8 @@ const form = ref({
   context_note: '',
   points_to_discuss: '',
   participant_ids: [] as number[],
-  direct_schedule: false,
+  visio_url: '',
+  direct_schedule: Boolean(prefilledStart) && ability.can('manage', 'Appointment'),
   force: false,
 })
 
@@ -202,6 +206,11 @@ onMounted(loadMeta)
             <VTextField
               v-model="form.location"
               label="Lieu"
+              class="mb-3"
+            />
+            <VTextField
+              v-model="form.visio_url"
+              label="Lien visioconférence"
               class="mb-3"
             />
             <VTextField

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import ParapheurPageHeader from '@/components/parapheur/ParapheurPageHeader.vue'
+import VisioUrlField from '@/components/parapheur/VisioUrlField.vue'
 import UserAutocomplete from '@/components/common/UserAutocomplete.vue'
 import { appointmentStatusColor, appointmentStatusLabel, formatAppointmentSlot } from '@/utils/appointmentsUi'
 
@@ -32,6 +33,16 @@ const structures = ref<any[]>([])
 const availableDocs = ref<any[]>([])
 const documentId = ref<number | null>(null)
 const uploadFile = ref<File[] | File | null>(null)
+const participantForm = ref({
+  user_id: null as number | null,
+  participation_type: 'interne',
+  role: 'participant',
+  first_name: '',
+  last_name: '',
+  organization: '',
+  email: '',
+})
+const visioUrl = ref('')
 
 const rescheduleDialog = ref(false)
 const redirectDialog = ref(false)
@@ -58,6 +69,7 @@ const load = async () => {
   loading.value = true
   try {
     appointment.value = await $api(`/appointments/${id.value}`)
+    visioUrl.value = appointment.value.visio_url || ''
     if (appointment.value.start_at) {
       slotForm.value.start_at = toLocalInput(appointment.value.start_at)
       slotForm.value.duration_minutes = appointment.value.duration_minutes || 30
@@ -185,6 +197,66 @@ const convertMeeting = () => run(async () => {
     window.location.href = `/parapheur/reunions/${res.meeting.id}`
 })
 
+const saveVisioUrl = () => run(async () => {
+  await $api(`/appointments/${id.value}`, {
+    method: 'PUT',
+    body: { visio_url: visioUrl.value || null },
+  })
+})
+
+const addParticipant = () => run(async () => {
+  const body: Record<string, unknown> = {
+    participation_type: participantForm.value.participation_type,
+    role: participantForm.value.role,
+  }
+  if (participantForm.value.participation_type === 'interne') {
+    if (!participantForm.value.user_id)
+      return
+    body.user_id = participantForm.value.user_id
+  }
+  else {
+    body.first_name = participantForm.value.first_name
+    body.last_name = participantForm.value.last_name
+    body.organization = participantForm.value.organization
+    body.email = participantForm.value.email
+  }
+  await $api(`/appointments/${id.value}/participants`, { method: 'POST', body })
+  participantForm.value = {
+    user_id: null,
+    participation_type: 'interne',
+    role: 'participant',
+    first_name: '',
+    last_name: '',
+    organization: '',
+    email: '',
+  }
+})
+
+const removeParticipant = (participantId: number) => run(() =>
+  $api(`/appointments/${id.value}/participants/${participantId}`, { method: 'DELETE' }),
+)
+
+const downloadIcal = async () => {
+  try {
+    const res = await fetch(`/api/appointments/${id.value}/ical`, {
+      credentials: 'include',
+      headers: { Accept: 'text/calendar', 'X-Requested-With': 'XMLHttpRequest' },
+    })
+    if (!res.ok)
+      throw new Error('Export iCal impossible')
+    const blob = await res.blob()
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `rdv-${appointment.value?.reference || id.value}.ics`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+  catch (e: any) {
+    error.value = e?.message || 'Export iCal impossible'
+  }
+}
+
 const loadPreparation = async () => {
   preparation.value = await $api(`/appointments/${id.value}/preparation`)
 }
@@ -232,6 +304,14 @@ onMounted(async () => {
         >
           {{ appointmentStatusLabel(appointment.status) }}
         </VChip>
+        <VBtn
+          v-if="appointment?.start_at"
+          variant="tonal"
+          prepend-icon="tabler-calendar-plus"
+          @click="downloadIcal"
+        >
+          iCal
+        </VBtn>
       </template>
     </ParapheurPageHeader>
 
@@ -409,6 +489,13 @@ onMounted(async () => {
                   </p>
                   <p><strong>Lieu / mode :</strong> {{ appointment.location || '—' }} · {{ appointment.meeting_mode_label }}</p>
                   <p><strong>Confidentialité :</strong> {{ appointment.confidentiality }}</p>
+                  <VisioUrlField
+                    v-model="visioUrl"
+                    class="mb-3"
+                    :current-url="appointment.visio_url"
+                    :loading="busy"
+                    @save="saveVisioUrl"
+                  />
                   <p v-if="appointment.reschedule_reason">
                     <strong>Motif de report :</strong> {{ appointment.reschedule_reason }}
                   </p>
@@ -483,15 +570,98 @@ onMounted(async () => {
 
         <VWindowItem value="participants">
           <VCard>
-            <VList>
-              <VListItem
-                v-for="p in appointment.participants || []"
-                :key="p.id"
+            <VCardText>
+              <VBtnToggle
+                v-model="participantForm.participation_type"
+                mandatory
+                density="compact"
+                variant="tonal"
+                divided
+                class="mb-4"
               >
-                <VListItemTitle>{{ p.display_name }}</VListItemTitle>
-                <VListItemSubtitle>{{ p.role }} · {{ p.organization || p.position || p.participation_type }}</VListItemSubtitle>
-              </VListItem>
-            </VList>
+                <VBtn value="interne">
+                  Interne
+                </VBtn>
+                <VBtn value="externe">
+                  Externe
+                </VBtn>
+              </VBtnToggle>
+              <div v-if="participantForm.participation_type === 'interne'">
+                <UserAutocomplete
+                  v-model="participantForm.user_id"
+                  :items="users"
+                  label="Utilisateur"
+                  class="mb-3"
+                />
+              </div>
+              <VRow v-else>
+                <VCol
+                  cols="12"
+                  md="6"
+                >
+                  <VTextField
+                    v-model="participantForm.first_name"
+                    label="Prénom"
+                  />
+                </VCol>
+                <VCol
+                  cols="12"
+                  md="6"
+                >
+                  <VTextField
+                    v-model="participantForm.last_name"
+                    label="Nom"
+                  />
+                </VCol>
+                <VCol
+                  cols="12"
+                  md="6"
+                >
+                  <VTextField
+                    v-model="participantForm.organization"
+                    label="Organisation"
+                  />
+                </VCol>
+                <VCol
+                  cols="12"
+                  md="6"
+                >
+                  <VTextField
+                    v-model="participantForm.email"
+                    label="E-mail"
+                  />
+                </VCol>
+              </VRow>
+              <VBtn
+                color="primary"
+                class="mb-6"
+                :loading="busy"
+                @click="addParticipant"
+              >
+                Ajouter
+              </VBtn>
+              <VList>
+                <VListItem
+                  v-for="p in appointment.participants || []"
+                  :key="p.id"
+                >
+                  <VListItemTitle>{{ p.display_name || `${p.first_name || ''} ${p.last_name || ''}`.trim() || p.user?.name }}</VListItemTitle>
+                  <VListItemSubtitle>{{ p.role }} · {{ p.organization || p.position || p.participation_type }}</VListItemSubtitle>
+                  <template #append>
+                    <VBtn
+                      icon
+                      size="small"
+                      variant="text"
+                      color="error"
+                      :loading="busy"
+                      @click="removeParticipant(p.id)"
+                    >
+                      <VIcon icon="tabler-trash" />
+                    </VBtn>
+                  </template>
+                </VListItem>
+              </VList>
+            </VCardText>
           </VCard>
         </VWindowItem>
 

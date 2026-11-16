@@ -69,6 +69,13 @@ export const calendarEventColor = (source?: string, masked?: boolean): string =>
   }
 }
 
+/** Résout le Directeur Général via roleCode (sans hardcoder d’e-mail). */
+export const findDirectorGeneral = (users: Array<{ id: number, roleCode?: string | null, role?: string | null, email?: string | null }>) => {
+  return users.find(u => u.roleCode === 'dg')
+    || users.find(u => (u.role || '').toLowerCase().includes('directeur général') && !(u.role || '').toLowerCase().includes('adjoint'))
+    || null
+}
+
 export const formatAppointmentSlot = (startAt?: string | null, endAt?: string | null): string => {
   if (!startAt)
     return '—'

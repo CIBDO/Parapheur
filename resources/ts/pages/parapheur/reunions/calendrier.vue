@@ -115,8 +115,27 @@ onMounted(load)
         >
           <VIcon icon="tabler-chevron-right" />
         </VBtn>
+        <VBtn
+          variant="tonal"
+          prepend-icon="tabler-calendar-event"
+          to="/parapheur/agenda/calendrier"
+        >
+          Agenda unifié
+        </VBtn>
       </template>
     </ParapheurPageHeader>
+
+    <VAlert
+      type="info"
+      variant="tonal"
+      class="mb-4"
+      density="compact"
+    >
+      Pour une vue croisée RDV + réunions + indisponibilités, ouvrez l’
+      <RouterLink to="/parapheur/agenda/calendrier">
+        agenda unifié
+      </RouterLink>.
+    </VAlert>
 
     <VRow>
       <VCol

@@ -190,6 +190,13 @@ export default [
         action: 'read',
         subject: 'Meeting',
       },
+      {
+        title: 'Rapports',
+        icon: { icon: 'tabler-chart-bar' },
+        to: 'parapheur-reunions-rapports',
+        action: 'read',
+        subject: 'Meeting',
+      },
     ],
   },
   {
@@ -238,6 +245,13 @@ export default [
         icon: { icon: 'tabler-calendar-off' },
         to: 'parapheur-agenda-indisponibilites',
         action: 'manage',
+        subject: 'Appointment',
+      },
+      {
+        title: 'Rapports',
+        icon: { icon: 'tabler-chart-dots' },
+        to: 'parapheur-agenda-rapports',
+        action: 'read',
         subject: 'Appointment',
       },
     ],

@@ -87,6 +87,7 @@ declare global {
   const expectedActionOptions: typeof import('./resources/ts/utils/parapheurUi')['expectedActionOptions']
   const exportKindLabels: typeof import('./resources/ts/utils/meetingsUi')['exportKindLabels']
   const extendRef: typeof import('@vueuse/core')['extendRef']
+  const findDirectorGeneral: typeof import('./resources/ts/utils/appointmentsUi')['findDirectorGeneral']
   const folderMeta: typeof import('./resources/ts/utils/parapheurUi')['folderMeta']
   const formatAppointmentSlot: typeof import('./resources/ts/utils/appointmentsUi')['formatAppointmentSlot']
   const formatBytes: typeof import('./resources/ts/utils/workspaceUi')['formatBytes']
@@ -585,6 +586,7 @@ declare module 'vue' {
     readonly expectedActionOptions: UnwrapRef<typeof import('./resources/ts/utils/parapheurUi')['expectedActionOptions']>
     readonly exportKindLabels: UnwrapRef<typeof import('./resources/ts/utils/meetingsUi')['exportKindLabels']>
     readonly extendRef: UnwrapRef<typeof import('@vueuse/core')['extendRef']>
+    readonly findDirectorGeneral: UnwrapRef<typeof import('./resources/ts/utils/appointmentsUi')['findDirectorGeneral']>
     readonly folderMeta: UnwrapRef<typeof import('./resources/ts/utils/parapheurUi')['folderMeta']>
     readonly formatAppointmentSlot: UnwrapRef<typeof import('./resources/ts/utils/appointmentsUi')['formatAppointmentSlot']>
     readonly formatBytes: UnwrapRef<typeof import('./resources/ts/utils/workspaceUi')['formatBytes']>

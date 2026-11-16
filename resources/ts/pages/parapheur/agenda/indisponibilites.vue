@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import ParapheurPageHeader from '@/components/parapheur/ParapheurPageHeader.vue'
 import UserAutocomplete from '@/components/common/UserAutocomplete.vue'
+import { findDirectorGeneral } from '@/utils/appointmentsUi'
 
 definePage({
   meta: {
@@ -34,7 +35,7 @@ const load = async () => {
     items.value = list.data ?? list
     users.value = u
     if (!form.value.user_id && u[0])
-      form.value.user_id = u.find((x: any) => x.email === 'dg@dgtcp.local')?.id || u[0].id
+      form.value.user_id = findDirectorGeneral(u)?.id || u[0].id
   }
   finally {
     loading.value = false

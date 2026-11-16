@@ -9,9 +9,11 @@ use App\Http\Requests\UpdateMeetingRequest;
 use App\Models\AuditLog;
 use App\Models\Meeting;
 use App\Models\MeetingType;
+use App\Services\CalendarIcsService;
 use App\Services\MeetingAccessService;
 use App\Services\MeetingDocumentRenderer;
 use App\Services\MeetingService;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use InvalidArgumentException;
@@ -22,6 +24,7 @@ class MeetingController extends Controller
         private readonly MeetingService $meetings,
         private readonly MeetingAccessService $access,
         private readonly MeetingDocumentRenderer $renderer,
+        private readonly CalendarIcsService $ics,
     ) {}
 
     public function index(Request $request): JsonResponse
@@ -284,10 +287,28 @@ class MeetingController extends Controller
             default => abort(404),
         };
 
+        if ($request->string('format')->toString() === 'pdf') {
+            $filename = $kind.'-'.($meeting->reference ?: $meeting->id).'.pdf';
+
+            return Pdf::loadHTML($html)
+                ->setPaper('a4')
+                ->download($filename);
+        }
+
         return response($html, 200, [
             'Content-Type' => 'text/html; charset=UTF-8',
             'Content-Disposition' => 'inline; filename="'.$kind.'-'.$meeting->reference.'.html"',
         ]);
+    }
+
+    public function ical(Request $request, Meeting $meeting)
+    {
+        $this->access->authorizeView($request->user(), $meeting);
+
+        return $this->ics->response(
+            $this->ics->meeting($meeting),
+            'reunion-'.($meeting->reference ?: $meeting->id).'.ics'
+        );
     }
 
     public function exportDecisionsCsv(Request $request)

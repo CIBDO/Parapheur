@@ -460,6 +460,9 @@ Route::middleware(['auth:sanctum', 'auth.idle', 'password.changed'])->group(func
     Route::post('/appointments/{appointment}/convert-to-meeting', [AppointmentController::class, 'convertToMeeting']);
     Route::get('/appointments/{appointment}/preparation', [AppointmentController::class, 'preparation']);
     Route::get('/appointments/{appointment}/audit', [AppointmentController::class, 'audit']);
+    Route::get('/appointments/{appointment}/ical', [AppointmentController::class, 'ical']);
+
+    Route::get('/calendar/ical', [\App\Http\Controllers\Api\CalendarFeedController::class, 'ical']);
 
     Route::get('/meetings/dashboard', [MeetingController::class, 'dashboard']);
     Route::get('/meetings/calendar', [MeetingController::class, 'calendar']);
@@ -477,6 +480,7 @@ Route::middleware(['auth:sanctum', 'auth.idle', 'password.changed'])->group(func
     Route::post('/meetings/{meeting}/cancel', [MeetingController::class, 'cancel']);
     Route::get('/meetings/{meeting}/audit', [MeetingController::class, 'audit']);
     Route::get('/meetings/{meeting}/export/{kind}', [MeetingController::class, 'export']);
+    Route::get('/meetings/{meeting}/ical', [MeetingController::class, 'ical']);
 
     Route::post('/meetings/{meeting}/agenda', [MeetingAgendaController::class, 'store']);
     Route::put('/meetings/{meeting}/agenda/{agendaItem}', [MeetingAgendaController::class, 'update']);

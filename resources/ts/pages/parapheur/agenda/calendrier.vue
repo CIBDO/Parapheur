@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import ParapheurPageHeader from '@/components/parapheur/ParapheurPageHeader.vue'
 import UserAutocomplete from '@/components/common/UserAutocomplete.vue'
-import { calendarEventColor } from '@/utils/appointmentsUi'
+import { calendarEventColor, findDirectorGeneral } from '@/utils/appointmentsUi'
 
 definePage({
   meta: {
@@ -11,12 +11,14 @@ definePage({
 })
 
 const view = ref<'month' | 'week' | 'day'>('day')
+const layoutMode = ref<'cards' | 'grid'>('cards')
 const cursor = ref(new Date())
 const events = ref<any[]>([])
 const types = ref<any[]>([])
 const users = ref<any[]>([])
 const structures = ref<any[]>([])
 const search = ref('')
+const hours = Array.from({ length: 12 }, (_, i) => i + 7) // 7h → 18h
 
 const filters = ref({
   appointment_type_id: null as number | null,
@@ -141,6 +143,42 @@ const openEvent = (event: any) => {
   window.location.href = event.url
 }
 
+const createAt = (day: Date, hour?: number) => {
+  const d = new Date(day)
+  d.setHours(hour ?? 9, 0, 0, 0)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  const start = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+  window.location.href = `/parapheur/agenda/nouveau?start_at=${encodeURIComponent(start)}`
+}
+
+const eventHour = (event: any) => {
+  if (!event.time)
+    return 9
+  const [h] = String(event.time).split(':')
+  const n = Number(h)
+
+  return Number.isFinite(n) ? n : 9
+}
+
+const eventsForHour = (dayKey: string, hour: number) =>
+  (eventsByDay.value[dayKey] || []).filter((e: any) => eventHour(e) === hour)
+
+const downloadFeed = async () => {
+  const res = await fetch('/api/calendar/ical', {
+    credentials: 'include',
+    headers: { Accept: 'text/calendar', 'X-Requested-With': 'XMLHttpRequest' },
+  })
+  if (!res.ok)
+    return
+  const blob = await res.blob()
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = 'agenda-parapheur.ics'
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
 const resetFilters = () => {
   filters.value = {
     appointment_type_id: null,
@@ -167,7 +205,7 @@ onMounted(async () => {
   types.value = t
   users.value = u
   structures.value = s
-  const dg = u.find((x: any) => x.email === 'dg@dgtcp.local')
+  const dg = findDirectorGeneral(u)
   if (dg)
     filters.value.director_id = dg.id
   await load()
@@ -182,12 +220,32 @@ onMounted(async () => {
       icon="tabler-calendar"
     >
       <template #actions>
+        <VBtn
+          color="primary"
+          prepend-icon="tabler-plus"
+          to="/parapheur/agenda/nouveau"
+        >
+          Nouveau RDV
+        </VBtn>
+        <VBtn
+          variant="tonal"
+          prepend-icon="tabler-download"
+          @click="downloadFeed"
+        >
+          iCal
+        </VBtn>
+      </template>
+    </ParapheurPageHeader>
+
+    <VCard class="mb-4">
+      <VCardText class="d-flex flex-wrap align-center gap-3 py-3">
         <VBtnToggle
           v-model="view"
           mandatory
-          density="compact"
+          density="comfortable"
           variant="tonal"
           divided
+          class="flex-shrink-0"
         >
           <VBtn value="day">
             Jour
@@ -199,28 +257,54 @@ onMounted(async () => {
             Mois
           </VBtn>
         </VBtnToggle>
-        <VBtn
-          icon
-          variant="text"
-          @click="shift(-1)"
+
+        <VBtnToggle
+          v-if="view !== 'month'"
+          v-model="layoutMode"
+          mandatory
+          density="comfortable"
+          variant="outlined"
+          divided
+          class="agenda-layout-toggle flex-shrink-0"
         >
-          <VIcon icon="tabler-chevron-left" />
-        </VBtn>
-        <VBtn
-          icon
-          variant="text"
-          @click="shift(1)"
-        >
-          <VIcon icon="tabler-chevron-right" />
-        </VBtn>
-        <VBtn
-          variant="tonal"
-          @click="cursor = new Date()"
-        >
-          Aujourd’hui
-        </VBtn>
-      </template>
-    </ParapheurPageHeader>
+          <VBtn
+            value="cards"
+            prepend-icon="tabler-list"
+          >
+            Liste
+          </VBtn>
+          <VBtn
+            value="grid"
+            prepend-icon="tabler-calendar-time"
+          >
+            Grille
+          </VBtn>
+        </VBtnToggle>
+
+        <div class="d-flex align-center gap-1 flex-shrink-0">
+          <VBtn
+            icon
+            variant="text"
+            @click="shift(-1)"
+          >
+            <VIcon icon="tabler-chevron-left" />
+          </VBtn>
+          <VBtn
+            variant="tonal"
+            @click="cursor = new Date()"
+          >
+            Aujourd’hui
+          </VBtn>
+          <VBtn
+            icon
+            variant="text"
+            @click="shift(1)"
+          >
+            <VIcon icon="tabler-chevron-right" />
+          </VBtn>
+        </div>
+      </VCardText>
+    </VCard>
 
     <VCard class="mb-4">
       <VCardText>
@@ -357,7 +441,44 @@ onMounted(async () => {
       </VCardText>
     </VCard>
 
-    <VRow>
+    <div
+      v-if="layoutMode === 'grid' && view !== 'month'"
+      class="agenda-time-grid mb-4"
+    >
+      <div
+        v-for="day in days"
+        :key="`grid-${day.toISOString()}`"
+        class="agenda-time-grid__day"
+      >
+        <div class="text-subtitle-2 mb-2 px-2">
+          {{ day.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' }) }}
+        </div>
+        <div
+          v-for="hour in hours"
+          :key="`${day.toISOString()}-${hour}`"
+          class="agenda-time-grid__slot"
+          @click="createAt(day, hour)"
+        >
+          <div class="agenda-time-grid__hour">
+            {{ String(hour).padStart(2, '0') }}:00
+          </div>
+          <div class="agenda-time-grid__events">
+            <VChip
+              v-for="event in eventsForHour(day.toISOString().slice(0, 10), hour)"
+              :key="event.id"
+              size="small"
+              class="ma-1"
+              :color="calendarEventColor(event.source, event.masked)"
+              @click.stop="openEvent(event)"
+            >
+              {{ event.time }} {{ event.title }}
+            </VChip>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <VRow v-else>
       <VCol
         v-for="day in days"
         :key="day.toISOString()"
@@ -366,10 +487,23 @@ onMounted(async () => {
         :md="view === 'month' ? 3 : 12"
         :lg="view === 'month' ? 12 / 7 : 12"
       >
-        <VCard min-height="160">
+        <VCard
+          min-height="160"
+          class="agenda-day-card"
+        >
           <VCardText>
-            <div class="text-subtitle-2 mb-3">
-              {{ day.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' }) }}
+            <div class="d-flex justify-space-between align-center mb-3">
+              <div class="text-subtitle-2">
+                {{ day.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' }) }}
+              </div>
+              <VBtn
+                size="x-small"
+                variant="tonal"
+                prepend-icon="tabler-plus"
+                @click="createAt(day)"
+              >
+                Créneau
+              </VBtn>
             </div>
             <div
               v-for="event in eventsByDay[day.toISOString().slice(0, 10)] || []"
@@ -401,7 +535,7 @@ onMounted(async () => {
               v-if="!(eventsByDay[day.toISOString().slice(0, 10)] || []).length"
               class="text-caption text-medium-emphasis"
             >
-              Aucun engagement
+              Aucun engagement — cliquez « Créneau » pour planifier
             </div>
           </VCardText>
         </VCard>
@@ -409,3 +543,44 @@ onMounted(async () => {
     </VRow>
   </div>
 </template>
+
+<style scoped lang="scss">
+.agenda-layout-toggle {
+  overflow: visible;
+
+  :deep(.v-btn) {
+    min-inline-size: 6.5rem;
+    white-space: nowrap;
+  }
+}
+
+.agenda-time-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.agenda-time-grid__slot {
+  display: grid;
+  grid-template-columns: 52px 1fr;
+  min-block-size: 44px;
+  border-block-end: 1px dashed rgba(var(--v-border-color), var(--v-border-opacity));
+  cursor: pointer;
+
+  &:hover {
+    background: rgba(var(--v-theme-primary), 0.04);
+  }
+}
+
+.agenda-time-grid__hour {
+  padding: 0.35rem 0.25rem;
+  color: rgba(var(--v-theme-on-surface), 0.55);
+  font-size: 0.75rem;
+}
+
+.agenda-time-grid__events {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+}
+</style>

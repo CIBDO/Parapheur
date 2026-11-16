@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import ParapheurPageHeader from '@/components/parapheur/ParapheurPageHeader.vue'
 import OnlyOfficeEditor from '@/components/parapheur/OnlyOfficeEditor.vue'
+import VisioUrlField from '@/components/parapheur/VisioUrlField.vue'
 import UserAutocomplete from '@/components/common/UserAutocomplete.vue'
 import { formatDateFr, formatDateTimeFr } from '@/utils/parapheurUi'
 import {
@@ -47,11 +48,16 @@ const tabs = [
   { value: 'documents', title: 'Documents' },
   { value: 'notes', title: 'Notes' },
   { value: 'decisions', title: 'Décisions' },
+  { value: 'recommandations', title: 'Recommandations' },
   { value: 'minutes', title: 'Compte rendu' },
   { value: 'historique', title: 'Historique' },
 ]
 
 const agendaForm = ref({ title: '', description: '', presenter_id: null as number | null, duration_minutes: 15 })
+const editingAgendaId = ref<number | null>(null)
+const agendaEditForm = ref({ title: '', description: '', duration_minutes: 15 as number | null })
+const visioUrl = ref('')
+const recommendationForm = ref({ title: '', body: '', agenda_item_id: null as number | null })
 const participantUserId = ref<number | null>(null)
 const participantType = ref<'interne' | 'externe'>('interne')
 const externalForm = ref({
@@ -78,6 +84,7 @@ const minutesBody = ref('')
 const load = async () => {
   meeting.value = await $api(`/meetings/${id.value}`)
   minutesBody.value = meeting.value.minutes?.[0]?.body || ''
+  visioUrl.value = meeting.value.visio_url || ''
 }
 
 onMounted(async () => {
@@ -114,6 +121,116 @@ const addAgenda = () => run(async () => {
   await $api(`/meetings/${id.value}/agenda`, { method: 'POST', body: agendaForm.value })
   agendaForm.value = { title: '', description: '', presenter_id: null, duration_minutes: 15 }
 })
+
+const startEditAgenda = (item: any) => {
+  editingAgendaId.value = item.id
+  agendaEditForm.value = {
+    title: item.title || '',
+    description: item.description || '',
+    duration_minutes: item.duration_minutes ?? 15,
+  }
+}
+
+const saveAgendaItem = () => run(async () => {
+  if (!editingAgendaId.value)
+    return
+  await $api(`/meetings/${id.value}/agenda/${editingAgendaId.value}`, {
+    method: 'PUT',
+    body: agendaEditForm.value,
+  })
+  editingAgendaId.value = null
+})
+
+const deleteAgendaItem = (agendaItemId: number) => run(() =>
+  $api(`/meetings/${id.value}/agenda/${agendaItemId}`, { method: 'DELETE' }),
+)
+
+const reorderAgenda = (agendaItemId: number, direction: -1 | 1) => run(async () => {
+  const items = [...(meeting.value?.agenda_items || [])]
+  const index = items.findIndex((i: any) => i.id === agendaItemId)
+  const target = index + direction
+  if (index < 0 || target < 0 || target >= items.length)
+    return
+  const ordered = [...items]
+  const [moved] = ordered.splice(index, 1)
+  ordered.splice(target, 0, moved)
+  await $api(`/meetings/${id.value}/agenda/reorder`, {
+    method: 'POST',
+    body: { ordered_ids: ordered.map((i: any) => i.id) },
+  })
+})
+
+const saveVisioUrl = () => run(async () => {
+  await $api(`/meetings/${id.value}`, {
+    method: 'PUT',
+    body: { visio_url: visioUrl.value || null },
+  })
+})
+
+const addRecommendation = () => run(async () => {
+  await $api(`/meetings/${id.value}/recommendations`, { method: 'POST', body: recommendationForm.value })
+  recommendationForm.value = { title: '', body: '', agenda_item_id: null }
+})
+
+const convertRecommendation = (recommendationId: number) => run(() =>
+  $api(`/meetings/${id.value}/recommendations/${recommendationId}/convert`, {
+    method: 'POST',
+    body: { create_instruction: false },
+  }),
+)
+
+const validateDecisionExecution = (decisionId: number) => run(() =>
+  $api(`/meetings/${id.value}/decisions/${decisionId}/validate-execution`, { method: 'POST' }),
+)
+
+const markDecisionExecuted = (decisionId: number) => run(() =>
+  $api(`/meetings/${id.value}/decisions/${decisionId}`, {
+    method: 'PUT',
+    body: { status: 'executee' },
+  }),
+)
+
+const downloadIcal = async () => {
+  try {
+    const res = await fetch(`/api/meetings/${id.value}/ical`, {
+      credentials: 'include',
+      headers: { Accept: 'text/calendar', 'X-Requested-With': 'XMLHttpRequest' },
+    })
+    if (!res.ok)
+      throw new Error('Export iCal impossible')
+    const blob = await res.blob()
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `reunion-${meeting.value?.reference || id.value}.ics`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+  catch (e: any) {
+    errorMessage.value = e?.message || 'Export iCal impossible'
+  }
+}
+
+const downloadPdfExport = async (kind: string) => {
+  try {
+    const res = await fetch(`/api/meetings/${id.value}/export/${kind}?format=pdf`, {
+      credentials: 'include',
+      headers: { Accept: 'application/pdf', 'X-Requested-With': 'XMLHttpRequest' },
+    })
+    if (!res.ok)
+      throw new Error('Export PDF impossible')
+    const blob = await res.blob()
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${kind}-${meeting.value?.reference || id.value}.pdf`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+  catch (e: any) {
+    errorMessage.value = e?.message || 'Export PDF impossible'
+  }
+}
 const addParticipant = () => run(async () => {
   if (participantType.value === 'interne') {
     if (!participantUserId.value)
@@ -334,8 +451,15 @@ const statusLabel = computed(() => meetingStatusLabels[meeting.value?.status] ||
             <VListItem
               v-for="(label, kind) in exportKindLabels"
               :key="kind"
-              :title="label"
+              :title="`${label} (HTML)`"
               @click="openExport(String(kind))"
+            />
+            <VDivider />
+            <VListItem
+              v-for="(label, kind) in exportKindLabels"
+              :key="`pdf-${kind}`"
+              :title="`${label} (PDF)`"
+              @click="downloadPdfExport(String(kind))"
             />
             <VDivider />
             <VListItem
@@ -345,6 +469,10 @@ const statusLabel = computed(() => meetingStatusLabels[meeting.value?.status] ||
             <VListItem
               title="Télécharger la présence"
               @click="downloadExport('attendance')"
+            />
+            <VListItem
+              title="Ajouter au calendrier (iCal)"
+              @click="downloadIcal"
             />
           </VList>
         </VMenu>
@@ -423,6 +551,14 @@ const statusLabel = computed(() => meetingStatusLabels[meeting.value?.status] ||
                   <VCol cols="6"><strong>Secrétaire</strong><div>{{ meeting.secretary?.name || '—' }}</div></VCol>
                   <VCol cols="6"><strong>Confidentialité</strong><div>{{ meeting.confidentiality }}</div></VCol>
                   <VCol cols="6"><strong>Type</strong><div>{{ meeting.type?.name || '—' }}</div></VCol>
+                  <VCol cols="12">
+                    <VisioUrlField
+                      v-model="visioUrl"
+                      :current-url="meeting.visio_url"
+                      :loading="busy"
+                      @save="saveVisioUrl"
+                    />
+                  </VCol>
                 </VRow>
                 <p
                   v-if="meeting.description"
@@ -534,35 +670,114 @@ const statusLabel = computed(() => meetingStatusLabels[meeting.value?.status] ||
         <VCard>
           <VCardText>
             <div
-              v-for="item in meeting.agenda_items"
+              v-for="(item, index) in meeting.agenda_items"
               :key="item.id"
               class="mb-4 pa-3"
               style="border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity)); border-radius: 10px"
             >
-              <div class="d-flex justify-space-between">
+              <div class="d-flex justify-space-between align-start gap-2 flex-wrap">
                 <strong>{{ item.item_number }}. {{ item.title }}</strong>
-                <VChip
-                  v-if="item.is_follow_up"
-                  size="small"
-                  color="warning"
-                >
-                  Suivi
-                </VChip>
+                <div class="d-flex flex-wrap gap-1">
+                  <VChip
+                    v-if="item.is_follow_up"
+                    size="small"
+                    color="warning"
+                  >
+                    Suivi
+                  </VChip>
+                  <VBtn
+                    icon
+                    size="x-small"
+                    variant="text"
+                    :disabled="index === 0 || busy"
+                    @click="reorderAgenda(item.id, -1)"
+                  >
+                    <VIcon icon="tabler-arrow-up" />
+                  </VBtn>
+                  <VBtn
+                    icon
+                    size="x-small"
+                    variant="text"
+                    :disabled="index === (meeting.agenda_items?.length || 0) - 1 || busy"
+                    @click="reorderAgenda(item.id, 1)"
+                  >
+                    <VIcon icon="tabler-arrow-down" />
+                  </VBtn>
+                  <VBtn
+                    size="x-small"
+                    variant="tonal"
+                    @click="startEditAgenda(item)"
+                  >
+                    Modifier
+                  </VBtn>
+                  <VBtn
+                    size="x-small"
+                    color="error"
+                    variant="text"
+                    :loading="busy"
+                    @click="deleteAgendaItem(item.id)"
+                  >
+                    Supprimer
+                  </VBtn>
+                </div>
               </div>
               <div class="text-caption text-medium-emphasis">
                 {{ item.presenter?.name || '—' }} · {{ item.duration_minutes ? `${item.duration_minutes} min` : '' }}
               </div>
               <div
-                v-if="item.description"
+                v-if="item.description && editingAgendaId !== item.id"
                 class="mt-2"
               >
                 {{ item.description }}
+              </div>
+              <div
+                v-if="editingAgendaId === item.id"
+                class="mt-3"
+              >
+                <AppTextField
+                  v-model="agendaEditForm.title"
+                  label="Titre"
+                  class="mb-2"
+                />
+                <AppTextarea
+                  v-model="agendaEditForm.description"
+                  label="Description"
+                  class="mb-2"
+                />
+                <AppTextField
+                  v-model="agendaEditForm.duration_minutes"
+                  type="number"
+                  label="Durée (min)"
+                  class="mb-2"
+                />
+                <div class="d-flex gap-2">
+                  <VBtn
+                    color="primary"
+                    size="small"
+                    :loading="busy"
+                    @click="saveAgendaItem"
+                  >
+                    Enregistrer
+                  </VBtn>
+                  <VBtn
+                    size="small"
+                    variant="text"
+                    @click="editingAgendaId = null"
+                  >
+                    Annuler
+                  </VBtn>
+                </div>
               </div>
             </div>
             <div class="parapheur-form-section mt-4 mb-0">
               <AppTextField
                 v-model="agendaForm.title"
                 label="Nouveau point"
+                class="mb-2"
+              />
+              <AppTextarea
+                v-model="agendaForm.description"
+                label="Description"
                 class="mb-2"
               />
               <VBtn
@@ -952,6 +1167,102 @@ const statusLabel = computed(() => meetingStatusLabels[meeting.value?.status] ||
                   · {{ formatDateFr(d.due_date) }}
                   <span v-if="d.instruction"> · instruction #{{ d.instruction.id }}</span>
                 </VListItemSubtitle>
+                <template #append>
+                  <div class="d-flex flex-wrap gap-1">
+                    <VBtn
+                      v-if="!['executee', 'cloturee', 'annulee'].includes(d.status)"
+                      size="small"
+                      variant="tonal"
+                      :loading="busy"
+                      @click="markDecisionExecuted(d.id)"
+                    >
+                      Marquer exécutée
+                    </VBtn>
+                    <VBtn
+                      v-if="['executee', 'partiellement_executee'].includes(d.status) && !d.execution_validated_at"
+                      size="small"
+                      color="primary"
+                      :loading="busy"
+                      @click="validateDecisionExecution(d.id)"
+                    >
+                      Valider l’exécution
+                    </VBtn>
+                    <VBtn
+                      v-if="d.instruction?.id"
+                      size="small"
+                      variant="text"
+                      :to="`/taches/instructions/${d.instruction.id}`"
+                    >
+                      Instruction
+                    </VBtn>
+                  </div>
+                </template>
+              </VListItem>
+            </VList>
+          </VCardText>
+        </VCard>
+      </VWindowItem>
+
+      <VWindowItem value="recommandations">
+        <VCard>
+          <VCardText>
+            <AppTextField
+              v-model="recommendationForm.title"
+              label="Libellé de la recommandation"
+              class="mb-2"
+            />
+            <AppTextarea
+              v-model="recommendationForm.body"
+              label="Description"
+              class="mb-2"
+            />
+            <AppSelect
+              v-model="recommendationForm.agenda_item_id"
+              :items="meeting.agenda_items || []"
+              item-title="title"
+              item-value="id"
+              label="Point d’ordre du jour"
+              clearable
+              class="mb-2"
+            />
+            <VBtn
+              color="primary"
+              class="mb-6"
+              :loading="busy"
+              @click="addRecommendation"
+            >
+              Nouvelle recommandation
+            </VBtn>
+            <VList>
+              <VListItem
+                v-for="r in meeting.recommendations || []"
+                :key="r.id"
+              >
+                <VListItemTitle>{{ r.title }}</VListItemTitle>
+                <VListItemSubtitle>
+                  {{ r.status || 'ouverte' }}
+                  · {{ r.creator?.name || '—' }}
+                  <span v-if="r.body"> · {{ r.body }}</span>
+                </VListItemSubtitle>
+                <template #append>
+                  <VBtn
+                    v-if="r.status !== 'convertie'"
+                    size="small"
+                    variant="tonal"
+                    :loading="busy"
+                    @click="convertRecommendation(r.id)"
+                  >
+                    Convertir en décision
+                  </VBtn>
+                  <VChip
+                    v-else
+                    size="small"
+                    color="success"
+                    variant="tonal"
+                  >
+                    Convertie
+                  </VChip>
+                </template>
               </VListItem>
             </VList>
           </VCardText>

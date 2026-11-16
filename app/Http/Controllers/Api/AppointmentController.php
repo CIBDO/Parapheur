@@ -17,6 +17,7 @@ use App\Services\AppointmentAccessService;
 use App\Services\AppointmentService;
 use App\Services\CalendarAggregationService;
 use App\Services\CalendarConflictService;
+use App\Services\CalendarIcsService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -30,6 +31,7 @@ class AppointmentController extends Controller
         private AppointmentAccessService $access,
         private CalendarAggregationService $calendar,
         private CalendarConflictService $conflicts,
+        private CalendarIcsService $ics,
     ) {}
 
     public function index(Request $request): JsonResponse
@@ -573,5 +575,16 @@ class AppointmentController extends Controller
         $unavailability->delete();
 
         return response()->json(['message' => 'Indisponibilité supprimée.']);
+    }
+
+    public function ical(Request $request, Appointment $appointment)
+    {
+        $this->access->authorizeView($request->user(), $appointment);
+        abort_unless($appointment->start_at, 422, 'Aucun créneau à exporter.');
+
+        return $this->ics->response(
+            $this->ics->appointment($appointment),
+            'rdv-'.($appointment->reference ?: $appointment->id).'.ics'
+        );
     }
 }

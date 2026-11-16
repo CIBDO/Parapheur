@@ -15,9 +15,12 @@ const stats = ref<any>({})
 const status = ref<string | null>(null)
 const lateOnly = ref(false)
 const loading = ref(false)
+const busyId = ref<number | null>(null)
+const errorMessage = ref('')
 
 const load = async () => {
   loading.value = true
+  errorMessage.value = ''
   try {
     const res = await $api('/meetings/decisions', {
       query: {
@@ -32,6 +35,34 @@ const load = async () => {
     loading.value = false
   }
 }
+
+const runDecision = async (decision: any, fn: () => Promise<unknown>) => {
+  busyId.value = decision.id
+  errorMessage.value = ''
+  try {
+    await fn()
+    await load()
+  }
+  catch (e: any) {
+    errorMessage.value = e?.data?.message || e?.message || 'Action impossible'
+  }
+  finally {
+    busyId.value = null
+  }
+}
+
+const markExecuted = (decision: any) => runDecision(decision, () =>
+  $api(`/meetings/${decision.meeting_id || decision.meeting?.id}/decisions/${decision.id}`, {
+    method: 'PUT',
+    body: { status: 'executee' },
+  }),
+)
+
+const validateExecution = (decision: any) => runDecision(decision, () =>
+  $api(`/meetings/${decision.meeting_id || decision.meeting?.id}/decisions/${decision.id}/validate-execution`, {
+    method: 'POST',
+  }),
+)
 
 const exportCsv = async () => {
   const res = await fetch('/api/meetings/decisions/export', {
@@ -68,6 +99,17 @@ watch([status, lateOnly], load)
         </VBtn>
       </template>
     </ParapheurPageHeader>
+
+    <VAlert
+      v-if="errorMessage"
+      type="error"
+      variant="tonal"
+      class="mb-4"
+      closable
+      @click:close="errorMessage = ''"
+    >
+      {{ errorMessage }}
+    </VAlert>
 
     <VRow class="mb-6">
       <VCol
@@ -112,7 +154,7 @@ watch([status, lateOnly], load)
       </VCardText>
     </VCard>
 
-    <VCard>
+    <VCard :loading="loading">
       <VTable>
         <thead>
           <tr>
@@ -122,6 +164,7 @@ watch([status, lateOnly], load)
             <th>Responsable</th>
             <th>Échéance</th>
             <th>Statut</th>
+            <th>Actions</th>
           </tr>
         </thead>
         <tbody>
@@ -146,6 +189,36 @@ watch([status, lateOnly], load)
               >
                 {{ d.status_label || decisionStatusLabels[d.status] }}
               </VChip>
+            </td>
+            <td>
+              <div class="d-flex flex-wrap gap-1">
+                <VBtn
+                  v-if="!['executee', 'cloturee', 'annulee'].includes(d.status)"
+                  size="x-small"
+                  variant="tonal"
+                  :loading="busyId === d.id"
+                  @click="markExecuted(d)"
+                >
+                  Exécutée
+                </VBtn>
+                <VBtn
+                  v-if="['executee', 'partiellement_executee'].includes(d.status) && !d.execution_validated_at"
+                  size="x-small"
+                  color="primary"
+                  :loading="busyId === d.id"
+                  @click="validateExecution(d)"
+                >
+                  Valider
+                </VBtn>
+                <VBtn
+                  v-if="d.instruction?.id"
+                  size="x-small"
+                  variant="text"
+                  :to="`/taches/instructions/${d.instruction.id}`"
+                >
+                  Instruction
+                </VBtn>
+              </div>
             </td>
           </tr>
         </tbody>
