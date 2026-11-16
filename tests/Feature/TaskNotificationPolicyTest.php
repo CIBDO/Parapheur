@@ -2,29 +2,33 @@
 
 namespace Tests\Feature;
 
+use App\Models\Structure;
 use App\Models\User;
 use App\Notifications\TaskAssignedNotification;
 use App\Notifications\TaskStatusNotification;
-use Database\Seeders\TaskPermissionSeeder;
+use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Notification;
 use Laravel\Sanctum\Sanctum;
-use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
 class TaskNotificationPolicyTest extends TestCase
 {
     use RefreshDatabase;
 
+    private Structure $structure;
+
     protected function setUp(): void
     {
         parent::setUp();
 
-        foreach (['Administrateur', 'Directeur Général', 'Directeur', 'Chef de division', 'Agent'] as $role) {
-            Role::findOrCreate($role);
-        }
-
-        $this->seed(TaskPermissionSeeder::class);
+        $this->seed(RbacSeeder::class);
+        $this->structure = Structure::query()->create([
+            'code' => 'TST',
+            'name' => 'Structure test',
+            'is_active' => true,
+            'is_access_boundary' => true,
+        ]);
     }
 
     public function test_assignment_sends_mail_to_assignee_only(): void
@@ -106,7 +110,7 @@ class TaskNotificationPolicyTest extends TestCase
         Notification::fake();
 
         [$chef, $agent] = $this->chefAndAgent();
-        $other = User::factory()->create();
+        $other = User::factory()->create(['structure_id' => $this->structure->id]);
         $other->assignRole('Agent');
 
         Sanctum::actingAs($chef);
@@ -165,9 +169,9 @@ class TaskNotificationPolicyTest extends TestCase
      */
     private function chefAndAgent(): array
     {
-        $chef = User::factory()->create();
+        $chef = User::factory()->create(['structure_id' => $this->structure->id]);
         $chef->assignRole('Chef de division');
-        $agent = User::factory()->create(['structure_id' => $chef->structure_id]);
+        $agent = User::factory()->create(['structure_id' => $this->structure->id]);
         $agent->assignRole('Agent');
 
         return [$chef, $agent];

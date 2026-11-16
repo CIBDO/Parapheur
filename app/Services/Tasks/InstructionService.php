@@ -26,6 +26,7 @@ class InstructionService
         private readonly NumberingService $numbering,
         private readonly AuditLogger $audit,
         private readonly TaskService $tasks,
+        private readonly TaskScopeResolver $scope,
     ) {}
 
     /**
@@ -41,11 +42,19 @@ class InstructionService
             'structure:id,code,name',
         ]);
 
-        if (! $actor->can('instruction.view') && ! $actor->can('instructions.manage') && ! $actor->can('admin.access') && ! $actor->can('task.view_all')) {
-            $query->where(function ($q) use ($actor) {
+        if (! $this->scope->isGlobal($actor) && ! $actor->can('instructions.manage')) {
+            $structureIds = $this->scope->structureIds($actor);
+
+            $query->where(function ($q) use ($actor, $structureIds) {
                 $q->where('assignee_id', $actor->id)
                     ->orWhere('issuer_id', $actor->id)
-                    ->orWhere('coordinator_id', $actor->id);
+                    ->orWhere('coordinator_id', $actor->id)
+                    ->orWhereHas('recipients', fn ($r) => $r->where('user_id', $actor->id));
+
+                // instruction.view = périmètre org, plus catalogue plateforme.
+                if ($actor->can('instruction.view') && $structureIds !== []) {
+                    $q->orWhereIn('structure_id', $structureIds);
+                }
             });
         }
 

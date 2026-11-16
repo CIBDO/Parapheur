@@ -12,6 +12,7 @@ export type Subjects =
   | 'DashboardDirection'
   | 'Instruction'
   | 'Task'
+  | 'TaskTeam'
   | 'MyWork'
   | 'Production'
   | 'Announcement'

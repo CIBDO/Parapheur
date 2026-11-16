@@ -67,6 +67,9 @@ class AbilityMapper
             ['action' => 'read', 'subject' => 'AuditLog'],
             ['action' => 'read', 'subject' => 'Notification'],
             ['action' => 'read', 'subject' => 'Parapheur'],
+            ['action' => 'read', 'subject' => 'Task'],
+            ['action' => 'read', 'subject' => 'TaskTeam'],
+            ['action' => 'read', 'subject' => 'MyWork'],
         ];
     }
 
@@ -335,6 +338,12 @@ class AbilityMapper
                 'rules' => [
                     ['action' => 'read', 'subject' => 'Task'],
                     ['action' => 'read', 'subject' => 'MyWork'],
+                ],
+            ],
+            [
+                'permissions' => ['task.view_team', 'task.view_all', 'task.manage'],
+                'rules' => [
+                    ['action' => 'read', 'subject' => 'TaskTeam'],
                 ],
             ],
             [

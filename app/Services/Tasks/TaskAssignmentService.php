@@ -25,6 +25,11 @@ class TaskAssignmentService
             abort(403);
         }
 
+        $assignee = User::query()->findOrFail($assigneeId);
+        if (! $this->access->canAssignTo($actor, $assignee)) {
+            abort(403, 'Cet utilisateur est hors de votre périmètre de collaboration.');
+        }
+
         return DB::transaction(function () use ($actor, $task, $assigneeId, $structureId, $motif) {
             $previous = $task->assignee_id;
             $from = $task->status;

@@ -9,6 +9,10 @@ use App\Models\User;
 
 class TaskAccessService
 {
+    public function __construct(
+        private readonly TaskScopeResolver $scope,
+    ) {}
+
     public function isAdmin(User $user): bool
     {
         return $user->can('task.manage') || $user->can('admin.access');
@@ -16,7 +20,7 @@ class TaskAccessService
 
     public function canView(User $user, Task $task): bool
     {
-        if ($this->isAdmin($user) || $user->can('task.view_all')) {
+        if ($this->scope->isGlobal($user)) {
             return true;
         }
 
@@ -26,7 +30,7 @@ class TaskAccessService
 
         if ($task->confidentiality === DocumentConfidentiality::Confidentiel
             || $task->confidentiality === DocumentConfidentiality::TresConfidentiel) {
-            if (! $this->isDirectParticipant($user, $task) && ! $user->can('task.view_all')) {
+            if (! $this->isDirectParticipant($user, $task)) {
                 return false;
             }
         }
@@ -35,7 +39,9 @@ class TaskAccessService
             return true;
         }
 
-        if ($user->can('task.view_team') && $user->structure_id && (int) $task->structure_id === (int) $user->structure_id) {
+        if ($user->can('task.view_team')
+            && $task->structure_id
+            && $this->scope->appliesToStructure($user, (int) $task->structure_id)) {
             return true;
         }
 
@@ -63,6 +69,14 @@ class TaskAccessService
             || $user->can('task.assign')
             || $user->can('task.reassign')
             || (int) $task->created_by === (int) $user->id;
+    }
+
+    /**
+     * Vérifie que l'utilisateur cible est dans le périmètre de collaboration.
+     */
+    public function canAssignTo(User $actor, User $assignee): bool
+    {
+        return $this->scope->canCollaborateWith($actor, $assignee);
     }
 
     public function canTakeCharge(User $user, Task $task): bool

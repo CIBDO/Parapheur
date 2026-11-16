@@ -32,6 +32,7 @@ class TaskService
         private readonly TaskNotificationService $notifications,
         private readonly PrivateDocumentStorage $storage,
         private readonly TaskReminderService $reminders,
+        private readonly TaskScopeResolver $scope,
     ) {}
 
     /**
@@ -56,9 +57,16 @@ class TaskService
             $query->overdue();
         }
         if (! empty($filters['team'])) {
-            if ($actor->can('task.view_team') || $actor->can('task.view_all') || $this->access->isAdmin($actor)) {
-                if ($actor->structure_id && empty($filters['structure_id'])) {
-                    $query->where('structure_id', $actor->structure_id);
+            if ($actor->can('task.view_team') || $this->scope->isGlobal($actor)) {
+                if (empty($filters['structure_id'])) {
+                    $structureIds = $this->scope->structureIds($actor);
+                    if (! $this->scope->isGlobal($actor)) {
+                        if ($structureIds === []) {
+                            $query->whereRaw('1 = 0');
+                        } else {
+                            $query->whereIn('structure_id', $structureIds);
+                        }
+                    }
                 }
             } else {
                 $query->whereRaw('1 = 0');
@@ -168,6 +176,28 @@ class TaskService
         return DB::transaction(function () use ($actor, $data) {
             $asDraft = (bool) ($data['as_draft'] ?? false);
             $assigneeId = $data['assignee_id'] ?? null;
+
+            if ($assigneeId) {
+                $assignee = User::query()->findOrFail((int) $assigneeId);
+                if (! $this->access->canAssignTo($actor, $assignee)) {
+                    abort(403, 'Cet utilisateur est hors de votre périmètre de collaboration.');
+                }
+            }
+
+            foreach ($data['contributor_ids'] ?? [] as $contributorId) {
+                $contributor = User::query()->find((int) $contributorId);
+                if ($contributor && ! $this->access->canAssignTo($actor, $contributor)) {
+                    abort(403, 'Un contributeur est hors de votre périmètre de collaboration.');
+                }
+            }
+
+            if (! empty($data['validator_id'])) {
+                $validator = User::query()->find((int) $data['validator_id']);
+                if ($validator && ! $this->access->canAssignTo($actor, $validator)) {
+                    abort(403, 'Le validateur est hors de votre périmètre de collaboration.');
+                }
+            }
+
             $status = $asDraft || ! $assigneeId
                 ? TaskStatus::Brouillon
                 : TaskStatus::Imputee;
@@ -262,7 +292,7 @@ class TaskService
             abort(403);
         }
 
-        $mentionIds = $this->extractMentionUserIds($body);
+        $mentionIds = $this->extractMentionUserIds($body, $actor);
 
         $comment = $task->comments()->create([
             'user_id' => $actor->id,
@@ -289,7 +319,7 @@ class TaskService
     /**
      * @return list<int>
      */
-    public function extractMentionUserIds(string $body): array
+    public function extractMentionUserIds(string $body, ?User $actor = null): array
     {
         // Formats : @42 ou @"Nom Complet"
         preg_match_all('/@(\d+)\b/', $body, $idMatches);
@@ -303,7 +333,20 @@ class TaskService
             }
         }
 
-        return array_values(array_unique(array_filter($ids)));
+        $ids = array_values(array_unique(array_filter($ids)));
+
+        if ($actor === null || $ids === []) {
+            return $ids;
+        }
+
+        return array_values(array_filter(
+            $ids,
+            function (int $id) use ($actor) {
+                $other = User::query()->find($id);
+
+                return $other && $this->scope->canCollaborateWith($actor, $other);
+            }
+        ));
     }
 
     /**

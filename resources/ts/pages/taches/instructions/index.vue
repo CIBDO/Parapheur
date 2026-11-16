@@ -54,7 +54,7 @@ const load = async () => {
 watch(kindFilter, load)
 
 const loadUsers = async () => {
-  const res = await $api('/meta/users')
+  const res = await $api('/meta/users', { query: { context: 'tasks' } })
   users.value = res.data ?? res
 }
 

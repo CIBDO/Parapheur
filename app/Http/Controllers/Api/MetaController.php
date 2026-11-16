@@ -7,11 +7,16 @@ use App\Models\DocumentType;
 use App\Models\Structure;
 use App\Models\User;
 use App\Models\Workflow;
+use App\Services\Tasks\TaskScopeResolver;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class MetaController extends Controller
 {
+    public function __construct(
+        private readonly TaskScopeResolver $taskScope,
+    ) {}
+
     public function documentTypes(): JsonResponse
     {
         return response()->json(
@@ -43,6 +48,11 @@ class MetaController extends Controller
 
         if ($request->filled('structure_id')) {
             $query->where('structure_id', $request->integer('structure_id'));
+        }
+
+        $context = $request->string('context')->toString();
+        if ($context === 'tasks' && $request->user()) {
+            $this->taskScope->constrainUsersQuery($query, $request->user());
         }
 
         $clearance = $request->string('clearance')->toString();

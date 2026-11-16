@@ -223,22 +223,40 @@ class Task extends Model
 
     public function scopeVisibleTo(Builder $query, User $user): Builder
     {
-        if ($user->can('task.view_all') || $user->can('task.manage') || $user->can('admin.access')) {
+        $scope = app(\App\Services\Tasks\TaskScopeResolver::class);
+
+        if ($scope->isGlobal($user)) {
             return $query;
         }
 
-        return $query->where(function (Builder $q) use ($user) {
+        $structureIds = $user->can('task.view_team') ? $scope->structureIds($user) : [];
+
+        $query->where(function (Builder $q) use ($user, $structureIds) {
             $q->where('created_by', $user->id)
                 ->orWhere('assignee_id', $user->id)
                 ->orWhere('validator_id', $user->id)
                 ->orWhereHas('contributors', fn (Builder $c) => $c->where('users.id', $user->id));
 
-            if ($user->can('task.view_team') && $user->structure_id) {
-                $q->orWhere('structure_id', $user->structure_id);
+            if ($structureIds !== []) {
+                $q->orWhereIn('structure_id', $structureIds);
             }
         })->where(function (Builder $q) use ($user) {
             $q->where('status', '!=', TaskStatus::Brouillon->value)
                 ->orWhere('created_by', $user->id);
+        });
+
+        // Confidentialité : hors participants, exclure du listing (aligné sur canView).
+        $confidential = [
+            DocumentConfidentiality::Confidentiel->value,
+            DocumentConfidentiality::TresConfidentiel->value,
+        ];
+
+        return $query->where(function (Builder $q) use ($user, $confidential) {
+            $q->whereNotIn('confidentiality', $confidential)
+                ->orWhere('created_by', $user->id)
+                ->orWhere('assignee_id', $user->id)
+                ->orWhere('validator_id', $user->id)
+                ->orWhereHas('contributors', fn (Builder $c) => $c->where('users.id', $user->id));
         });
     }
 

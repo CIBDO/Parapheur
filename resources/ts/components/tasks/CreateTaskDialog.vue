@@ -49,7 +49,7 @@ const loadUsers = async () => {
   if (usersLoaded.value)
     return
   const [res, types] = await Promise.all([
-    $api('/meta/users'),
+    $api('/meta/users', { query: { context: 'tasks' } }),
     $api('/task-types'),
   ])
   users.value = res.data ?? res

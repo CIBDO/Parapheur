@@ -178,7 +178,7 @@ const loadRelatedOptions = async () => {
 
 const loadUsers = async () => {
   try {
-    const res = await $api('/meta/users')
+    const res = await $api('/meta/users', { query: { context: 'tasks' } })
     users.value = res.data ?? res ?? []
   }
   catch {

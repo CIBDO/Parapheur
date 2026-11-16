@@ -46,7 +46,7 @@ export default [
         icon: { icon: 'tabler-users' },
         to: { name: 'taches', query: { view: 'team' } },
         action: 'read',
-        subject: 'Task',
+        subject: 'TaskTeam',
       },
       {
         title: 'Calendrier',
