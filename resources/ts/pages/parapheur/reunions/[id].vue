@@ -8,8 +8,7 @@ import {
   attendanceLabels,
   decisionStatusLabels,
   documentKindLabels,
-  downloadMeetingHtml,
-  exportKindLabels,
+  institutionalExportLabels,
   isOnlyOfficeEditableDocument,
   meetingStatusColor,
   meetingStatusLabels,
@@ -211,24 +210,24 @@ const downloadIcal = async () => {
   }
 }
 
-const downloadPdfExport = async (kind: string) => {
+const downloadInstitutionalState = async (kind: string) => {
   try {
     const res = await fetch(`/api/meetings/${id.value}/export/${kind}?format=pdf`, {
       credentials: 'include',
       headers: { Accept: 'application/pdf', 'X-Requested-With': 'XMLHttpRequest' },
     })
     if (!res.ok)
-      throw new Error('Export PDF impossible')
+      throw new Error('Génération de l’état institutionnel impossible')
     const blob = await res.blob()
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `${kind}-${meeting.value?.reference || id.value}.pdf`
+    a.download = `etat-${kind}-${meeting.value?.reference || id.value}.pdf`
     a.click()
     URL.revokeObjectURL(url)
   }
   catch (e: any) {
-    errorMessage.value = e?.message || 'Export PDF impossible'
+    errorMessage.value = e?.message || 'Génération de l’état institutionnel impossible'
   }
 }
 const addParticipant = () => run(async () => {
@@ -360,27 +359,6 @@ const diffuseMinutes = () => run(async () => {
   await $api(`/meetings/${id.value}/minutes/${current.id}/diffuse`, { method: 'POST' })
 })
 
-const openExport = async (kind: string, print = false) => {
-  try {
-    await openMeetingHtml(`/api/meetings/${id.value}/export/${kind}`, { print })
-  }
-  catch (e: any) {
-    errorMessage.value = e?.message || 'Export impossible'
-  }
-}
-
-const downloadExport = async (kind: string) => {
-  try {
-    await downloadMeetingHtml(
-      `/api/meetings/${id.value}/export/${kind}`,
-      `${kind}-${meeting.value?.reference || id.value}`,
-    )
-  }
-  catch (e: any) {
-    errorMessage.value = e?.message || 'Téléchargement impossible'
-  }
-}
-
 const previewMinutes = async (print = false) => {
   const current = meeting.value?.minutes?.[0]
   if (!current)
@@ -448,30 +426,18 @@ const statusLabel = computed(() => meetingStatusLabels[meeting.value?.status] ||
             </VBtn>
           </template>
           <VList density="compact">
+            <VListSubheader>États institutionnels (PDF)</VListSubheader>
             <VListItem
-              v-for="(label, kind) in exportKindLabels"
+              v-for="(label, kind) in institutionalExportLabels"
               :key="kind"
-              :title="`${label} (HTML)`"
-              @click="openExport(String(kind))"
+              :title="label"
+              prepend-icon="tabler-file-type-pdf"
+              @click="downloadInstitutionalState(String(kind))"
             />
             <VDivider />
-            <VListItem
-              v-for="(label, kind) in exportKindLabels"
-              :key="`pdf-${kind}`"
-              :title="`${label} (PDF)`"
-              @click="downloadPdfExport(String(kind))"
-            />
-            <VDivider />
-            <VListItem
-              title="Imprimer l’ordre du jour"
-              @click="openExport('agenda', true)"
-            />
-            <VListItem
-              title="Télécharger la présence"
-              @click="downloadExport('attendance')"
-            />
             <VListItem
               title="Ajouter au calendrier (iCal)"
+              prepend-icon="tabler-calendar-plus"
               @click="downloadIcal"
             />
           </VList>

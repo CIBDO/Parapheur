@@ -279,26 +279,22 @@ class MeetingController extends Controller
     public function export(Request $request, Meeting $meeting, string $kind)
     {
         $this->access->authorizeView($request->user(), $meeting);
-        $html = match ($kind) {
-            'convocation' => $this->renderer->convocation($meeting, $meeting->chair),
-            'agenda' => $this->renderer->agenda($meeting),
-            'attendance' => $this->renderer->attendanceList($meeting),
-            'decisions' => $this->renderer->decisionsExtract($meeting),
-            default => abort(404),
-        };
+        abort_unless(in_array($kind, ['convocation', 'agenda', 'attendance', 'decisions'], true), 404);
 
-        if ($request->string('format')->toString() === 'pdf') {
-            $filename = $kind.'-'.($meeting->reference ?: $meeting->id).'.pdf';
+        $html = $this->renderer->institutionalState($meeting, $kind, $meeting->chair);
+        $format = $request->string('format')->toString() ?: 'pdf';
+        $basename = $kind.'-'.($meeting->reference ?: $meeting->id);
 
-            return Pdf::loadHTML($html)
-                ->setPaper('a4')
-                ->download($filename);
+        if ($format === 'html') {
+            return response($html, 200, [
+                'Content-Type' => 'text/html; charset=UTF-8',
+                'Content-Disposition' => 'inline; filename="'.$basename.'.html"',
+            ]);
         }
 
-        return response($html, 200, [
-            'Content-Type' => 'text/html; charset=UTF-8',
-            'Content-Disposition' => 'inline; filename="'.$kind.'-'.$meeting->reference.'.html"',
-        ]);
+        return Pdf::loadHTML($html)
+            ->setPaper('a4')
+            ->download($basename.'.pdf');
     }
 
     public function ical(Request $request, Meeting $meeting)

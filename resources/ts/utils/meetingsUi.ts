@@ -80,6 +80,14 @@ export const exportKindLabels: Record<string, string> = {
   decisions: 'Relevé de décisions',
 }
 
+/** États institutionnels PDF (entête MEF / DGTCP / République du Mali). */
+export const institutionalExportLabels: Record<string, string> = {
+  convocation: 'État — Convocation',
+  agenda: 'État — Ordre du jour',
+  attendance: 'État — Liste de présence',
+  decisions: 'État — Relevé de décisions',
+}
+
 /** Ouvre un export HTML authentifié (cookie Sanctum) dans un nouvel onglet. */
 export async function openMeetingHtml(url: string, opts?: { print?: boolean }) {
   const res = await fetch(url, {

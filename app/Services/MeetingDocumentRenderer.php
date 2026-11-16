@@ -7,52 +7,37 @@ use App\Models\MeetingMinute;
 use App\Models\MeetingParticipant;
 use App\Models\MeetingTemplate;
 use App\Models\User;
+use Illuminate\Support\Facades\View;
 
 class MeetingDocumentRenderer
 {
+    /**
+     * État institutionnel PDF-ready (entête République du Mali / MEF / DGTCP).
+     */
+    public function institutionalState(Meeting $meeting, string $kind, ?User $signatory = null): string
+    {
+        return match ($kind) {
+            'convocation' => $this->institutionalConvocation($meeting, $signatory),
+            'agenda' => $this->institutionalAgenda($meeting),
+            'attendance' => $this->institutionalAttendance($meeting),
+            'decisions' => $this->institutionalDecisions($meeting),
+            default => abort(404, 'Type d’état inconnu.'),
+        };
+    }
+
     public function convocation(Meeting $meeting, ?User $signatory = null): string
     {
-        $meeting->loadMissing(['type', 'chair', 'secretary', 'structure', 'agendaItems.presenter', 'participants.user']);
-
-        $placeholders = $this->placeholders($meeting, $signatory);
-
-        return $this->renderKind('convocation', $placeholders, $this->defaultConvocation($placeholders));
+        return $this->institutionalConvocation($meeting, $signatory);
     }
 
     public function attendanceList(Meeting $meeting): string
     {
-        $meeting->loadMissing(['participants.user', 'chair', 'structure', 'type', 'secretary', 'agendaItems']);
-        $rows = '';
-        foreach ($meeting->participants as $participant) {
-            $rows .= '<tr><td>'.e($participant->displayName()).'</td><td>'.e($participant->user?->structure?->name ?: $participant->external_structure ?: '—').'</td><td>'.e($participant->attendance_status ?: '—').'</td><td>'.e($participant->representative_name ?: $participant->representative?->name ?: '—').'</td></tr>';
-        }
-
-        $fallback = $this->wrap('Liste de présence', $meeting, <<<HTML
-<table>
-  <thead><tr><th>Participant</th><th>Structure</th><th>Présence</th><th>Représentation</th></tr></thead>
-  <tbody>{$rows}</tbody>
-</table>
-HTML);
-
-        return $this->renderKind('attendance', $this->placeholders($meeting), $fallback);
+        return $this->institutionalAttendance($meeting);
     }
 
     public function agenda(Meeting $meeting): string
     {
-        $meeting->loadMissing(['agendaItems.presenter', 'type', 'chair', 'secretary', 'structure', 'participants.user']);
-        $rows = '';
-        foreach ($meeting->agendaItems as $item) {
-            $rows .= '<tr><td>'.e($item->item_number).'</td><td>'.e($item->title).'</td><td>'.e($item->presenter?->name ?: '—').'</td><td>'.e($item->duration_minutes ? $item->duration_minutes.' min' : '—').'</td></tr>';
-        }
-
-        $fallback = $this->wrap('Ordre du jour', $meeting, <<<HTML
-<table>
-  <thead><tr><th>N°</th><th>Point</th><th>Présentateur</th><th>Durée</th></tr></thead>
-  <tbody>{$rows}</tbody>
-</table>
-HTML);
-
-        return $this->renderKind('agenda', $this->placeholders($meeting), $fallback);
+        return $this->institutionalAgenda($meeting);
     }
 
     public function minutes(Meeting $meeting, MeetingMinute $minute): string
@@ -62,20 +47,149 @@ HTML);
 
     public function decisionsExtract(Meeting $meeting): string
     {
-        $meeting->loadMissing(['decisions.assignee', 'decisions.structure', 'type', 'chair', 'secretary', 'structure', 'participants.user', 'agendaItems']);
-        $rows = '';
-        foreach ($meeting->decisions as $decision) {
-            $rows .= '<tr><td>'.e($decision->reference ?: '#'.$decision->id).'</td><td>'.e($decision->title).'</td><td>'.e($decision->assignee?->name ?: '—').'</td><td>'.e(optional($decision->due_date)->format('d/m/Y') ?: '—').'</td><td>'.e($decision->effectiveStatus()->label()).'</td></tr>';
+        return $this->institutionalDecisions($meeting);
+    }
+
+    private function institutionalConvocation(Meeting $meeting, ?User $signatory = null): string
+    {
+        $meeting->loadMissing(['type', 'chair', 'secretary', 'structure', 'agendaItems.presenter', 'participants.user']);
+        $placeholders = $this->placeholders($meeting, $signatory);
+
+        $agendaRows = '';
+        foreach ($meeting->agendaItems as $item) {
+            $agendaRows .= '<tr><td style="text-align:center">'.e((string) $item->item_number).'</td><td>'.e($item->title).'</td><td>'.e($item->presenter?->name ?: '—').'</td><td style="text-align:center">'.e($item->duration_minutes ? $item->duration_minutes.' min' : '—').'</td></tr>';
+        }
+        if ($agendaRows === '') {
+            $agendaRows = '<tr><td colspan="4">Aucun point inscrit.</td></tr>';
         }
 
-        $fallback = $this->wrap('Relevé de décisions', $meeting, <<<HTML
-<table>
-  <thead><tr><th>Réf.</th><th>Décision</th><th>Responsable</th><th>Échéance</th><th>Statut</th></tr></thead>
-  <tbody>{$rows}</tbody>
-</table>
-HTML);
+        $body = '<h2>Ordre du jour</h2>
+<table class="data">
+  <thead><tr><th>N°</th><th>Point</th><th>Présentateur</th><th>Durée</th></tr></thead>
+  <tbody>'.$agendaRows.'</tbody>
+</table>';
+        if ($placeholders['observations'] !== '') {
+            $body .= '<h2>Observations</h2><p>'.nl2br(e($placeholders['observations'])).'</p>';
+        }
 
-        return $this->renderKind('decisions', $this->placeholders($meeting), $fallback);
+        return $this->renderInstitutional([
+            'title' => 'Convocation',
+            'subtitle' => $placeholders['object'],
+            'metaRows' => [
+                ['label' => 'Référence', 'value' => $placeholders['reference']],
+                ['label' => 'Date', 'value' => $placeholders['date']],
+                ['label' => 'Heure', 'value' => trim($placeholders['time'].($placeholders['end_time'] ? ' — '.$placeholders['end_time'] : ''))],
+                ['label' => 'Lieu', 'value' => $placeholders['location'] ?: '—'],
+                ['label' => 'Président', 'value' => $placeholders['chair'] ?: '—'],
+                ['label' => 'Destinataires', 'value' => $placeholders['participants'] ?: '—'],
+            ],
+            'body' => $body,
+            'signatory' => $placeholders['signatory'],
+            'signatoryLabel' => "L'autorité de convocation",
+            'reference' => $placeholders['reference'],
+            'date' => $placeholders['date'],
+        ]);
+    }
+
+    private function institutionalAgenda(Meeting $meeting): string
+    {
+        $meeting->loadMissing(['agendaItems.presenter', 'type', 'chair', 'secretary', 'structure', 'participants.user']);
+        $rows = '';
+        foreach ($meeting->agendaItems as $item) {
+            $rows .= '<tr><td style="text-align:center">'.e((string) $item->item_number).'</td><td>'.e($item->title).'</td><td>'.e($item->presenter?->name ?: '—').'</td><td style="text-align:center">'.e($item->duration_minutes ? $item->duration_minutes.' min' : '—').'</td></tr>';
+            if ($item->description) {
+                $rows .= '<tr><td></td><td colspan="3"><em>'.nl2br(e($item->description)).'</em></td></tr>';
+            }
+        }
+        if ($rows === '') {
+            $rows = '<tr><td colspan="4">Aucun point inscrit à l’ordre du jour.</td></tr>';
+        }
+
+        return $this->renderInstitutional([
+            'title' => 'Ordre du jour',
+            'subtitle' => $meeting->displayTitle(),
+            'metaRows' => $this->commonMeta($meeting),
+            'body' => '<table class="data"><thead><tr><th>N°</th><th>Point</th><th>Présentateur</th><th>Durée</th></tr></thead><tbody>'.$rows.'</tbody></table>',
+            'reference' => (string) ($meeting->reference ?: ''),
+            'date' => optional($meeting->meeting_date)->format('d/m/Y') ?: '',
+        ]);
+    }
+
+    private function institutionalAttendance(Meeting $meeting): string
+    {
+        $meeting->loadMissing(['participants.user.structure', 'chair', 'structure', 'type', 'secretary']);
+        $rows = '';
+        foreach ($meeting->participants as $participant) {
+            $rows .= '<tr>'
+                .'<td>'.e($participant->displayName()).'</td>'
+                .'<td>'.e($participant->user?->structure?->name ?: $participant->external_structure ?: '—').'</td>'
+                .'<td style="text-align:center">'.e($participant->attendance_status ?: '—').'</td>'
+                .'<td>'.e($participant->representative_name ?: $participant->representative?->name ?: '—').'</td>'
+                .'</tr>';
+        }
+        if ($rows === '') {
+            $rows = '<tr><td colspan="4">Aucun participant enregistré.</td></tr>';
+        }
+
+        return $this->renderInstitutional([
+            'title' => 'Liste de présence',
+            'subtitle' => $meeting->displayTitle(),
+            'metaRows' => $this->commonMeta($meeting),
+            'body' => '<table class="data"><thead><tr><th>Participant</th><th>Structure</th><th>Présence</th><th>Représentation</th></tr></thead><tbody>'.$rows.'</tbody></table>',
+            'reference' => (string) ($meeting->reference ?: ''),
+            'date' => optional($meeting->meeting_date)->format('d/m/Y') ?: '',
+        ]);
+    }
+
+    private function institutionalDecisions(Meeting $meeting): string
+    {
+        $meeting->loadMissing(['decisions.assignee', 'decisions.structure', 'type', 'chair', 'secretary', 'structure']);
+        $rows = '';
+        foreach ($meeting->decisions as $decision) {
+            $rows .= '<tr>'
+                .'<td>'.e($decision->reference ?: '#'.$decision->id).'</td>'
+                .'<td>'.e($decision->title).'</td>'
+                .'<td>'.e($decision->assignee?->name ?: '—').'</td>'
+                .'<td style="text-align:center">'.e(optional($decision->due_date)->format('d/m/Y') ?: '—').'</td>'
+                .'<td style="text-align:center">'.e($decision->effectiveStatus()->label()).'</td>'
+                .'</tr>';
+        }
+        if ($rows === '') {
+            $rows = '<tr><td colspan="5">Aucune décision enregistrée.</td></tr>';
+        }
+
+        return $this->renderInstitutional([
+            'title' => 'Relevé de décisions',
+            'subtitle' => $meeting->displayTitle(),
+            'metaRows' => $this->commonMeta($meeting),
+            'body' => '<table class="data"><thead><tr><th>Réf.</th><th>Décision</th><th>Responsable</th><th>Échéance</th><th>Statut</th></tr></thead><tbody>'.$rows.'</tbody></table>',
+            'reference' => (string) ($meeting->reference ?: ''),
+            'date' => optional($meeting->meeting_date)->format('d/m/Y') ?: '',
+        ]);
+    }
+
+    /**
+     * @return list<array{label: string, value: string}>
+     */
+    private function commonMeta(Meeting $meeting): array
+    {
+        return [
+            ['label' => 'Référence', 'value' => (string) ($meeting->reference ?: '—')],
+            ['label' => 'Type', 'value' => (string) ($meeting->type?->name ?: '—')],
+            ['label' => 'Date', 'value' => optional($meeting->meeting_date)->format('d/m/Y') ?: '—'],
+            ['label' => 'Heure', 'value' => trim((string) $meeting->meeting_time.($meeting->end_time ? ' — '.$meeting->end_time : '')) ?: '—'],
+            ['label' => 'Lieu', 'value' => (string) ($meeting->location ?: '—')],
+            ['label' => 'Président', 'value' => (string) ($meeting->chair?->name ?: '—')],
+            ['label' => 'Secrétaire', 'value' => (string) ($meeting->secretary?->name ?: '—')],
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    private function renderInstitutional(array $data): string
+    {
+        return View::make('meetings.institutional-state', $data)->render();
     }
 
     public function buildMinutesBody(Meeting $meeting, string $kind = 'cr_detaille'): string
@@ -142,15 +256,24 @@ Secrétaire : {$this->e($meeting->secretary?->name)}</p>
 <h2>IV. Ordre du jour et déroulement</h2>
 HTML;
 
-        $fallback = $this->wrap($title, $meeting, $intro.$agendaBlocks.<<<HTML
+        $body = $intro.$agendaBlocks.<<<HTML
 <h2>Synthèse des décisions</h2>
-<table>
+<table class="data">
   <thead><tr><th>Réf.</th><th>Décision</th><th>Responsable</th><th>Échéance</th></tr></thead>
   <tbody>{$decisionRows}</tbody>
 </table>
-HTML);
+HTML;
 
-        return $this->renderKind($kind, $this->placeholders($meeting), $fallback);
+        $institutional = $this->renderInstitutional([
+            'title' => $title,
+            'subtitle' => $meeting->displayTitle(),
+            'metaRows' => $this->commonMeta($meeting),
+            'body' => $body,
+            'reference' => (string) ($meeting->reference ?: ''),
+            'date' => optional($meeting->meeting_date)->format('d/m/Y') ?: '',
+        ]);
+
+        return $this->renderKind($kind, $this->placeholders($meeting), $institutional);
     }
 
     /**
@@ -206,74 +329,6 @@ HTML);
             'observations' => (string) ($meeting->observations ?: ''),
             'signatory' => (string) ($signatory?->name ?: $meeting->chair?->name ?: ''),
         ];
-    }
-
-    /**
-     * @param  array<string, string>  $p
-     */
-    private function defaultConvocation(array $p): string
-    {
-        return <<<HTML
-<!DOCTYPE html>
-<html lang="fr"><head><meta charset="utf-8"><title>Convocation {$p['reference']}</title>
-<style>
-  body { font-family: DejaVu Sans, sans-serif; color: #14261A; margin: 32px; }
-  .header { border-bottom: 3px solid #0B6B3A; padding-bottom: 12px; margin-bottom: 24px; }
-  .gold { color: #C9A227; }
-  h1 { color: #0B6B3A; font-size: 20px; }
-  table { width: 100%; border-collapse: collapse; }
-  td { padding: 4px 0; vertical-align: top; }
-</style></head>
-<body>
-  <div class="header">
-    <strong>RÉPUBLIQUE DE CÔTE D'IVOIRE</strong><br>
-    Union – Discipline – Travail<br>
-    <span class="gold">Direction Générale du Trésor et de la Comptabilité Publique</span>
-  </div>
-  <h1>CONVOCATION</h1>
-  <p>Référence : {$this->e($p['reference'])}</p>
-  <table>
-    <tr><td width="160"><strong>Objet</strong></td><td>{$this->e($p['object'])}</td></tr>
-    <tr><td><strong>Date</strong></td><td>{$this->e($p['date'])}</td></tr>
-    <tr><td><strong>Heure</strong></td><td>{$this->e($p['time'])} — {$this->e($p['end_time'])}</td></tr>
-    <tr><td><strong>Lieu</strong></td><td>{$this->e($p['location'])}</td></tr>
-    <tr><td><strong>Président</strong></td><td>{$this->e($p['chair'])}</td></tr>
-    <tr><td><strong>Destinataires</strong></td><td>{$this->e($p['participants'])}</td></tr>
-  </table>
-  <h2>Ordre du jour</h2>
-  <p>{$p['agenda']}</p>
-  <p>{$this->e($p['observations'])}</p>
-  <p style="margin-top:48px">L'autorité de convocation<br><strong>{$this->e($p['signatory'])}</strong></p>
-</body></html>
-HTML;
-    }
-
-    private function wrap(string $title, Meeting $meeting, string $inner): string
-    {
-        $ref = e($meeting->reference ?: '');
-        $date = e(optional($meeting->meeting_date)->format('d/m/Y') ?: '');
-
-        return <<<HTML
-<!DOCTYPE html>
-<html lang="fr"><head><meta charset="utf-8"><title>{$this->e($title)}</title>
-<style>
-  body { font-family: DejaVu Sans, sans-serif; color: #14261A; margin: 32px; }
-  .header { border-bottom: 3px solid #0B6B3A; padding-bottom: 12px; margin-bottom: 24px; }
-  h1, h2, h3 { color: #0B6B3A; }
-  table { width: 100%; border-collapse: collapse; margin-top: 12px; }
-  th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
-  th { background: #E8F5EE; }
-</style></head>
-<body>
-  <div class="header">
-    <strong>DGTCP</strong> — E-Tresor<br>
-    {$ref} · {$date}
-  </div>
-  <h1>{$this->e($title)}</h1>
-  <h2>{$this->e($meeting->displayTitle())}</h2>
-  {$inner}
-</body></html>
-HTML;
     }
 
     private function e(?string $value): string

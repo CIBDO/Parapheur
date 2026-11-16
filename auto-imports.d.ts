@@ -128,6 +128,7 @@ declare global {
   const ignorableWatch: typeof import('@vueuse/core')['ignorableWatch']
   const inject: typeof import('vue')['inject']
   const injectLocal: typeof import('@vueuse/core')['injectLocal']
+  const institutionalExportLabels: typeof import('./resources/ts/utils/meetingsUi')['institutionalExportLabels']
   const instructionStatusLabels: typeof import('./resources/ts/utils/tasksUi')['instructionStatusLabels']
   const integerValidator: typeof import('./resources/ts/@core/utils/validators')['integerValidator']
   const isCorrespondenceAssigned: typeof import('./resources/ts/utils/courrierUi')['isCorrespondenceAssigned']
@@ -620,6 +621,7 @@ declare module 'vue' {
     readonly ignorableWatch: UnwrapRef<typeof import('@vueuse/core')['ignorableWatch']>
     readonly inject: UnwrapRef<typeof import('vue')['inject']>
     readonly injectLocal: UnwrapRef<typeof import('@vueuse/core')['injectLocal']>
+    readonly institutionalExportLabels: UnwrapRef<typeof import('./resources/ts/utils/meetingsUi')['institutionalExportLabels']>
     readonly instructionStatusLabels: UnwrapRef<typeof import('./resources/ts/utils/tasksUi')['instructionStatusLabels']>
     readonly integerValidator: UnwrapRef<typeof import('./resources/ts/@core/utils/validators')['integerValidator']>
     readonly isCorrespondenceAssigned: UnwrapRef<typeof import('./resources/ts/utils/courrierUi')['isCorrespondenceAssigned']>
