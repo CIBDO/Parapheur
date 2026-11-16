@@ -52,9 +52,6 @@ export const canNavigate = (to: RouteLocationNormalized) => {
 
   if (ability.can(action, subject)) return true;
 
-  // Parapheur fallback: any authenticated user with Parapheur read can open parapheur pages
-  if (String(to.path).startsWith('/parapheur') && ability.can('read', 'Parapheur')) return true;
-
   // Mon espace : ne pas court-circuiter les pages admin / bibliothèque
   const espacePath = String(to.path);
   if (espacePath.startsWith('/espace')) {

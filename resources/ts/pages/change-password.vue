@@ -34,14 +34,7 @@ const logoSrc = typeof logoDgtcp === 'string'
 
 const userData = useCookie<any>('userData')
 
-const homeForRole = (role: string) => {
-  if (role === 'Administrateur')
-    return '/parapheur/admin'
-  if (role === 'Directeur Général' || role === 'Directeur Général')
-    return '/parapheur/dg'
-
-  return '/parapheur'
-}
+const homeForRole = () => String(userData.value?.homeRoute || '/parapheur')
 
 const changePassword = async () => {
   isSubmitting.value = true
@@ -83,8 +76,7 @@ const changePassword = async () => {
       }
     }
 
-    const role = String(res?.userData?.role ?? userData.value?.role ?? '')
-    await router.replace(homeForRole(role))
+    await router.replace(homeForRole())
   }
   catch {
     if (!errors.value.current_password && !errors.value.password)

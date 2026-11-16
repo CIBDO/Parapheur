@@ -65,7 +65,9 @@ class MetaController extends Controller
             'structure_id' => $user->structure_id,
             'position_title' => $user->position_title,
             'role' => $user->getRoleNames()->first() ?? 'agent',
+            'roleCode' => $user->primaryRole()?->code,
             'roles' => $user->getRoleNames()->values(),
+            'homeRoute' => $user->homeRoute(),
             'structure' => $user->structure?->only(['id', 'code', 'name']),
         ]));
     }

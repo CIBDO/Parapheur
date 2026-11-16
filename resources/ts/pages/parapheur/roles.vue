@@ -11,49 +11,22 @@ definePage({
 interface PermissionItem {
   id: number
   name: string
+  label: string
+  module: string | null
+  module_label: string | null
+  is_system: boolean
 }
 
 interface RoleItem {
   id: number
   name: string
+  code: string | null
+  is_system: boolean
+  home_route: string | null
   users_count: number
   permissions: string[]
   permission_ids: number[]
-}
-
-const permissionLabels: Record<string, string> = {
-  'admin.access': 'Accès administration',
-  'documents.create': 'Créer des documents',
-  'documents.act': 'Traiter des documents',
-  'documents.vise': 'Viser des documents',
-  'documents.validate': 'Valider des documents',
-  'dashboard.dg': 'Tableau de bord DG',
-  'dashboard.direction': 'Tableau de bord direction',
-  'instructions.manage': 'Gérer les instructions',
-  'task.view': 'Voir les tâches',
-  'task.create': 'Créer une tâche',
-  'task.update': 'Modifier une tâche',
-  'task.assign': 'Imputer une tâche',
-  'task.reassign': 'Réaffecter une tâche',
-  'task.take_charge': 'Prendre en charge une tâche',
-  'task.comment': 'Commenter une tâche',
-  'task.complete': 'Terminer une tâche',
-  'task.validate': 'Valider une tâche',
-  'task.return': 'Retourner une tâche',
-  'task.cancel': 'Annuler une tâche',
-  'task.view_team': 'Voir les tâches de l’équipe',
-  'task.view_all': 'Voir toutes les tâches',
-  'task.view_reports': 'Rapports tâches',
-  'task.manage': 'Administrer les tâches',
-  'instruction.view': 'Voir les instructions',
-  'instruction.create': 'Créer une instruction',
-  'instruction.assign': 'Affecter une instruction',
-  'instruction.update': 'Modifier une instruction',
-  'instruction.close': 'Clôturer une instruction',
-  'instruction.cancel': 'Annuler une instruction',
-  'meetings.manage': 'Gérer les réunions',
-  'reporting.view': 'Consulter le reporting',
-  'delegations.manage': 'Gérer les délégations',
+  permission_labels: Record<string, string>
 }
 
 const roles = ref<RoleItem[]>([])
@@ -68,18 +41,38 @@ const editingRoleId = ref<number | null>(null)
 
 const roleForm = ref({
   name: '',
+  code: '',
+  home_route: '/parapheur',
   permissions: [] as string[],
 })
 
 const permissionForm = ref({
   name: '',
+  label: '',
+  module: '',
 })
 
 const dialogTitle = computed(() =>
   editingRoleId.value ? 'Modifier le rôle' : 'Nouveau rôle',
 )
 
-const labelFor = (name: string) => permissionLabels[name] || name
+const labelFor = (name: string, role?: RoleItem) =>
+  role?.permission_labels?.[name]
+  || permissions.value.find(p => p.name === name)?.label
+  || name
+
+const permissionsByModule = computed(() => {
+  const groups = new Map<string, PermissionItem[]>()
+
+  for (const permission of permissions.value) {
+    const key = permission.module_label || permission.module || 'Autres'
+    if (!groups.has(key))
+      groups.set(key, [])
+    groups.get(key)!.push(permission)
+  }
+
+  return [...groups.entries()].sort(([a], [b]) => a.localeCompare(b, 'fr'))
+})
 
 const extractError = (e: any) => {
   const errors = e?.data?.errors
@@ -109,7 +102,7 @@ const load = async () => {
 }
 
 const resetRoleForm = () => {
-  roleForm.value = { name: '', permissions: [] }
+  roleForm.value = { name: '', code: '', home_route: '/parapheur', permissions: [] }
   editingRoleId.value = null
   errorMessage.value = ''
 }
@@ -123,6 +116,8 @@ const openEditRole = (role: RoleItem) => {
   editingRoleId.value = role.id
   roleForm.value = {
     name: role.name,
+    code: role.code || '',
+    home_route: role.home_route || '/parapheur',
     permissions: [...role.permissions],
   }
   errorMessage.value = ''
@@ -151,17 +146,24 @@ const saveRole = async () => {
   successMessage.value = ''
 
   try {
+    const body = {
+      name: roleForm.value.name,
+      code: roleForm.value.code || undefined,
+      home_route: roleForm.value.home_route || '/parapheur',
+      permissions: roleForm.value.permissions,
+    }
+
     if (editingRoleId.value) {
       await $api(`/roles/${editingRoleId.value}`, {
         method: 'PUT',
-        body: roleForm.value,
+        body,
       })
       successMessage.value = 'Rôle mis à jour'
     }
     else {
       await $api('/roles', {
         method: 'POST',
-        body: roleForm.value,
+        body,
       })
       successMessage.value = 'Rôle créé'
     }
@@ -204,7 +206,7 @@ const savePermission = async () => {
       method: 'POST',
       body: permissionForm.value,
     })
-    permissionForm.value = { name: '' }
+    permissionForm.value = { name: '', label: '', module: '' }
     isPermissionDialogOpen.value = false
     successMessage.value = 'Permission créée'
     await load()
@@ -218,7 +220,7 @@ const savePermission = async () => {
 }
 
 const removePermission = async (permission: PermissionItem) => {
-  if (!confirm(`Supprimer la permission « ${permission.name} » ?`))
+  if (!confirm(`Supprimer la permission « ${permission.label} » ?`))
     return
 
   errorMessage.value = ''
@@ -263,7 +265,6 @@ onMounted(load)
       </template>
     </ParapheurPageHeader>
 
-
     <VAlert
       v-if="successMessage"
       type="success"
@@ -302,12 +303,31 @@ onMounted(load)
             :loading="loading"
             :headers="[
               { title: 'Rôle', key: 'name' },
+              { title: 'Code', key: 'code' },
               { title: 'Utilisateurs', key: 'users_count' },
               { title: 'Permissions', key: 'permissions' },
               { title: '', key: 'actions', sortable: false },
             ]"
             item-value="id"
           >
+            <template #item.name="{ item }">
+              <div>
+                <div class="font-weight-medium">
+                  {{ item.name }}
+                </div>
+                <div
+                  v-if="item.is_system"
+                  class="text-caption text-medium-emphasis"
+                >
+                  Système
+                </div>
+              </div>
+            </template>
+
+            <template #item.code="{ item }">
+              <code class="text-caption">{{ item.code || '—' }}</code>
+            </template>
+
             <template #item.permissions="{ item }">
               <div class="d-flex flex-wrap gap-1 py-2">
                 <VChip
@@ -318,7 +338,7 @@ onMounted(load)
                   color="primary"
                   variant="tonal"
                 >
-                  {{ labelFor(perm) }}
+                  {{ labelFor(perm, item) }}
                 </VChip>
                 <VChip
                   v-if="item.permissions.length > 3"
@@ -342,7 +362,7 @@ onMounted(load)
                 </IconBtn>
                 <IconBtn
                   color="error"
-                  :disabled="item.name === 'Administrateur'"
+                  :disabled="item.is_system"
                   @click="removeRole(item)"
                 >
                   <VIcon icon="tabler-trash" />
@@ -360,34 +380,40 @@ onMounted(load)
         <VCard>
           <VCardItem>
             <VCardTitle>Permissions</VCardTitle>
-            <VCardSubtitle>Droits atomiques du système</VCardSubtitle>
+            <VCardSubtitle>Libellés FR — codes techniques stables</VCardSubtitle>
           </VCardItem>
 
           <VList lines="two">
-            <VListItem
-              v-for="permission in permissions"
-              :key="permission.id"
+            <template
+              v-for="[moduleLabel, items] in permissionsByModule"
+              :key="moduleLabel"
             >
-              <VListItemTitle>{{ labelFor(permission.name) }}</VListItemTitle>
-              <VListItemSubtitle>{{ permission.name }}</VListItemSubtitle>
-              <template #append>
-                <IconBtn
-                  color="error"
-                  @click="removePermission(permission)"
-                >
-                  <VIcon icon="tabler-trash" />
-                </IconBtn>
-              </template>
-            </VListItem>
+              <VListSubheader>{{ moduleLabel }}</VListSubheader>
+              <VListItem
+                v-for="permission in items"
+                :key="permission.id"
+              >
+                <VListItemTitle>{{ permission.label }}</VListItemTitle>
+                <VListItemSubtitle>{{ permission.name }}</VListItemSubtitle>
+                <template #append>
+                  <IconBtn
+                    color="error"
+                    :disabled="permission.is_system"
+                    @click="removePermission(permission)"
+                  >
+                    <VIcon icon="tabler-trash" />
+                  </IconBtn>
+                </template>
+              </VListItem>
+            </template>
           </VList>
         </VCard>
       </VCol>
     </VRow>
 
-    <!-- Dialog rôle -->
     <VDialog
       v-model="isRoleDialogOpen"
-      max-width="720"
+      max-width="820"
       persistent
     >
       <VCard>
@@ -405,12 +431,44 @@ onMounted(load)
             {{ errorMessage }}
           </VAlert>
 
-          <AppTextField
-            v-model="roleForm.name"
-            label="Nom du rôle"
-            class="mb-4"
-            placeholder="Ex. Chef de bureau"
-          />
+          <VRow dense>
+            <VCol
+              cols="12"
+              md="6"
+            >
+              <AppTextField
+                v-model="roleForm.name"
+                label="Nom du rôle"
+                class="mb-4"
+                placeholder="Ex. Chef de bureau"
+              />
+            </VCol>
+            <VCol
+              cols="12"
+              md="3"
+            >
+              <AppTextField
+                v-model="roleForm.code"
+                label="Code stable"
+                class="mb-4"
+                placeholder="ex. chef_bureau"
+                :disabled="!!editingRoleId && roles.find(r => r.id === editingRoleId)?.is_system"
+                hint="Identifiant technique (a-z, 0-9, _)"
+                persistent-hint
+              />
+            </VCol>
+            <VCol
+              cols="12"
+              md="3"
+            >
+              <AppTextField
+                v-model="roleForm.home_route"
+                label="Page d’accueil"
+                class="mb-4"
+                placeholder="/parapheur"
+              />
+            </VCol>
+          </VRow>
 
           <div class="d-flex flex-wrap justify-space-between align-center gap-2 mb-3">
             <h6 class="text-h6 mb-0">
@@ -434,25 +492,34 @@ onMounted(load)
             </div>
           </div>
 
-          <VRow dense>
-            <VCol
-              v-for="permission in permissions"
-              :key="permission.id"
-              cols="12"
-              sm="6"
-            >
-              <VCheckbox
-                :model-value="roleForm.permissions.includes(permission.name)"
-                :label="labelFor(permission.name)"
-                density="compact"
-                hide-details
-                @update:model-value="togglePermission(permission.name)"
-              />
-              <div class="text-caption text-medium-emphasis ms-8 mb-2">
-                {{ permission.name }}
-              </div>
-            </VCol>
-          </VRow>
+          <div
+            v-for="[moduleLabel, items] in permissionsByModule"
+            :key="moduleLabel"
+            class="mb-4"
+          >
+            <div class="text-subtitle-2 mb-2">
+              {{ moduleLabel }}
+            </div>
+            <VRow dense>
+              <VCol
+                v-for="permission in items"
+                :key="permission.id"
+                cols="12"
+                sm="6"
+              >
+                <VCheckbox
+                  :model-value="roleForm.permissions.includes(permission.name)"
+                  :label="permission.label"
+                  density="compact"
+                  hide-details
+                  @update:model-value="togglePermission(permission.name)"
+                />
+                <div class="text-caption text-medium-emphasis ms-8 mb-2">
+                  {{ permission.name }}
+                </div>
+              </VCol>
+            </VRow>
+          </div>
         </VCardText>
 
         <VCardActions class="px-6 pb-5">
@@ -474,10 +541,9 @@ onMounted(load)
       </VCard>
     </VDialog>
 
-    <!-- Dialog permission -->
     <VDialog
       v-model="isPermissionDialogOpen"
-      max-width="480"
+      max-width="520"
       persistent
     >
       <VCard>
@@ -498,9 +564,21 @@ onMounted(load)
           <AppTextField
             v-model="permissionForm.name"
             label="Code permission"
+            class="mb-4"
             placeholder="ex. documents.archive"
             hint="Minuscules, chiffres, points ou tirets uniquement"
             persistent-hint
+          />
+          <AppTextField
+            v-model="permissionForm.label"
+            label="Libellé français"
+            class="mb-4"
+            placeholder="ex. Archiver des documents"
+          />
+          <AppTextField
+            v-model="permissionForm.module"
+            label="Module"
+            placeholder="ex. documents"
           />
         </VCardText>
 

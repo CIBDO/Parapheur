@@ -87,7 +87,7 @@ class ProductionDashboardService
             || $actor->can('production.manage')
             || $actor->can('dashboard.dg')
             || $actor->can('admin.access')
-            || $actor->hasRole(['Directeur Général', 'DGA']),
+            || $actor->hasRoleWithCode(['dg', 'dga']),
             403
         );
 

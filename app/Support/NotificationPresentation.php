@@ -44,12 +44,12 @@ final class NotificationPresentation
         }
 
         $pair = match (true) {
-            $notifiable->hasRole('Directeur Général') => ['Monsieur le Directeur Général', 'Madame la Directrice Générale'],
-            $notifiable->hasRole('DGA') => ['Monsieur le Directeur Général Adjoint', 'Madame la Directrice Générale Adjointe'],
-            $notifiable->hasRole('Directeur') => ['Monsieur le Directeur', 'Madame la Directrice'],
-            $notifiable->hasRole('Chef de division') => ['Monsieur le Chef de division', 'Madame la Cheffe de division'],
-            $notifiable->hasRole('Chef de section') => ['Monsieur le Chef de section', 'Madame la Cheffe de section'],
-            $notifiable->hasRole('Secrétariat DG') => ['Monsieur', 'Madame'],
+            method_exists($notifiable, 'hasRoleWithCode') && $notifiable->hasRoleWithCode('dg') => ['Monsieur le Directeur Général', 'Madame la Directrice Générale'],
+            method_exists($notifiable, 'hasRoleWithCode') && $notifiable->hasRoleWithCode('dga') => ['Monsieur le Directeur Général Adjoint', 'Madame la Directrice Générale Adjointe'],
+            method_exists($notifiable, 'hasRoleWithCode') && $notifiable->hasRoleWithCode('directeur') => ['Monsieur le Directeur', 'Madame la Directrice'],
+            method_exists($notifiable, 'hasRoleWithCode') && $notifiable->hasRoleWithCode('chef_division') => ['Monsieur le Chef de division', 'Madame la Cheffe de division'],
+            method_exists($notifiable, 'hasRoleWithCode') && $notifiable->hasRoleWithCode('chef_section') => ['Monsieur le Chef de section', 'Madame la Cheffe de section'],
+            method_exists($notifiable, 'hasRoleWithCode') && $notifiable->hasRoleWithCode('secretariat_dg') => ['Monsieur', 'Madame'],
             default => null,
         };
 

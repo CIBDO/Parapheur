@@ -6,7 +6,7 @@ use App\Enums\AccessScopeType;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Spatie\Permission\Models\Role;
+use App\Models\Role;
 
 class OrganizationalRoleAssignment extends Model
 {

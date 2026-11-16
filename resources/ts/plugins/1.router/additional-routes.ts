@@ -7,13 +7,13 @@ export const redirects: RouteRecordRaw[] = [
     name: 'index',
     redirect: to => {
       const userData = useCookie<Record<string, unknown> | null | undefined>('userData');
-      const userRole = String(userData.value?.role ?? '');
 
       if (!userData.value) return { name: 'login', query: to.query };
 
-      if (userRole === 'Administrateur') return { name: 'parapheur-admin' };
+      const homeRoute = String(userData.value?.homeRoute || '/parapheur');
 
-      if (userRole === 'Directeur Général' || userRole === 'DGA') return { name: 'parapheur-dg' };
+      if (homeRoute.includes('/admin')) return { name: 'parapheur-admin' };
+      if (homeRoute.includes('/dg')) return { name: 'parapheur-dg' };
 
       return { name: 'parapheur' };
     },

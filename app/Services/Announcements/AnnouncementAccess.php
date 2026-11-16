@@ -129,13 +129,13 @@ final class AnnouncementAccess
 
     public function seesAllStatistics(User $user): bool
     {
-        return $user->hasAnyRole(['Directeur Général', 'DGA', 'Secrétariat DG', 'Administrateur'])
+        return $user->hasRoleWithCode(['dg', 'dga', 'secretariat_dg', 'admin'])
             || $user->can('announcement.manage');
     }
 
     public function hidesSensitiveAggregates(User $user): bool
     {
-        return $user->can('admin.access') && ! $user->hasAnyRole(['Directeur Général', 'DGA', 'Secrétariat DG']);
+        return $user->can('admin.access') && ! $user->hasRoleWithCode(['dg', 'dga', 'secretariat_dg']);
     }
 
     public function isCurrentRecipient(User $user, Announcement $announcement): bool
@@ -166,6 +166,6 @@ final class AnnouncementAccess
 
     public function isInstitutionalActor(User $user): bool
     {
-        return $user->hasAnyRole(['Directeur Général', 'DGA', 'Secrétariat DG', 'Administrateur']);
+        return $user->hasRoleWithCode(['dg', 'dga', 'secretariat_dg', 'admin']);
     }
 }

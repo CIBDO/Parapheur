@@ -128,13 +128,13 @@ class TaskEscalationService
             $manager = User::query()
                 ->where('structure_id', $task->structure_id)
                 ->whereHas('roles', function ($q) {
-                    $q->whereIn('name', [
-                        'Chef de section',
-                        'Chef de division',
-                        'Directeur',
-                        'Directeur Général',
-                        'Directeur Général Adjoint',
-                        'Secrétariat DG',
+                    $q->whereIn('code', [
+                        'chef_section',
+                        'chef_division',
+                        'directeur',
+                        'dg',
+                        'dga',
+                        'secretariat_dg',
                     ]);
                 })
                 ->where('id', '!=', $task->assignee_id)

@@ -3,13 +3,15 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Permission;
+use App\Models\Role;
 use App\Models\User;
+use App\Support\Rbac\PermissionCatalog;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
-use Spatie\Permission\Models\Permission;
-use Spatie\Permission\Models\Role;
 use Spatie\Permission\PermissionRegistrar;
 
 class RolePermissionController extends Controller
@@ -19,17 +21,10 @@ class RolePermissionController extends Controller
         $userCounts = $this->roleUserCounts();
 
         $roles = Role::query()
-            ->with('permissions:id,name')
+            ->with('permissions:id,name,label,module')
             ->orderBy('name')
             ->get()
-            ->map(fn (Role $role) => [
-                'id' => $role->id,
-                'name' => $role->name,
-                'guard_name' => $role->guard_name,
-                'users_count' => (int) ($userCounts[$role->id] ?? 0),
-                'permissions' => $role->permissions->pluck('name')->values(),
-                'permission_ids' => $role->permissions->pluck('id')->values(),
-            ]);
+            ->map(fn (Role $role) => $this->rolePayload($role, (int) ($userCounts[$role->id] ?? 0)));
 
         return response()->json($roles);
     }
@@ -38,6 +33,8 @@ class RolePermissionController extends Controller
     {
         $data = $request->validate([
             'name' => ['required', 'string', 'max:125', 'unique:roles,name'],
+            'code' => ['nullable', 'string', 'max:64', 'regex:/^[a-z0-9_]+$/', 'unique:roles,code'],
+            'home_route' => ['nullable', 'string', 'max:255'],
             'permissions' => ['nullable', 'array'],
             'permissions.*' => ['string', 'exists:permissions,name'],
         ]);
@@ -45,6 +42,9 @@ class RolePermissionController extends Controller
         $role = Role::create([
             'name' => $data['name'],
             'guard_name' => 'web',
+            'code' => $data['code'] ?? Str::slug($data['name'], '_'),
+            'is_system' => false,
+            'home_route' => $data['home_route'] ?? '/parapheur',
         ]);
 
         $role->syncPermissions($data['permissions'] ?? []);
@@ -57,11 +57,26 @@ class RolePermissionController extends Controller
     {
         $data = $request->validate([
             'name' => ['required', 'string', 'max:125', Rule::unique('roles', 'name')->ignore($role->id)],
+            'code' => ['nullable', 'string', 'max:64', 'regex:/^[a-z0-9_]+$/', Rule::unique('roles', 'code')->ignore($role->id)],
+            'home_route' => ['nullable', 'string', 'max:255'],
             'permissions' => ['nullable', 'array'],
             'permissions.*' => ['string', 'exists:permissions,name'],
         ]);
 
-        $role->update(['name' => $data['name']]);
+        if ($role->is_system) {
+            // Les rôles système gardent leur code ; le nom affiché peut évoluer.
+            $role->update([
+                'name' => $data['name'],
+                'home_route' => $data['home_route'] ?? $role->home_route,
+            ]);
+        } else {
+            $role->update([
+                'name' => $data['name'],
+                'code' => $data['code'] ?? $role->code,
+                'home_route' => $data['home_route'] ?? $role->home_route,
+            ]);
+        }
+
         $role->syncPermissions($data['permissions'] ?? []);
         app()[PermissionRegistrar::class]->forgetCachedPermissions();
 
@@ -70,9 +85,9 @@ class RolePermissionController extends Controller
 
     public function destroyRole(Role $role): JsonResponse
     {
-        if ($role->name === 'Administrateur') {
+        if ($role->is_system || $role->code === 'admin') {
             return response()->json([
-                'message' => 'Le rôle Administrateur ne peut pas être supprimé.',
+                'message' => 'Ce rôle système ne peut pas être supprimé.',
             ], 422);
         }
 
@@ -92,8 +107,23 @@ class RolePermissionController extends Controller
     public function permissions(): JsonResponse
     {
         $permissions = Permission::query()
+            ->orderBy('module')
+            ->orderBy('label')
             ->orderBy('name')
-            ->get(['id', 'name', 'guard_name', 'created_at']);
+            ->get(['id', 'name', 'label', 'module', 'description', 'is_system', 'guard_name', 'created_at'])
+            ->map(fn (Permission $permission) => [
+                'id' => $permission->id,
+                'name' => $permission->name,
+                'label' => $permission->label ?: PermissionCatalog::defaultLabel($permission->name),
+                'module' => $permission->module,
+                'module_label' => $permission->module
+                    ? PermissionCatalog::moduleLabel($permission->module)
+                    : null,
+                'description' => $permission->description,
+                'is_system' => (bool) $permission->is_system,
+                'guard_name' => $permission->guard_name,
+                'created_at' => $permission->created_at,
+            ]);
 
         return response()->json($permissions);
     }
@@ -102,27 +132,39 @@ class RolePermissionController extends Controller
     {
         $data = $request->validate([
             'name' => ['required', 'string', 'max:125', 'unique:permissions,name', 'regex:/^[a-z0-9_.-]+$/'],
+            'label' => ['nullable', 'string', 'max:255'],
+            'module' => ['nullable', 'string', 'max:64'],
+            'description' => ['nullable', 'string', 'max:255'],
         ]);
+
+        $module = $data['module'] ?? Str::before($data['name'], '.') ?: 'autre';
 
         $permission = Permission::create([
             'name' => $data['name'],
             'guard_name' => 'web',
+            'label' => $data['label'] ?? PermissionCatalog::defaultLabel($data['name']),
+            'module' => $module,
+            'description' => $data['description'] ?? null,
+            'is_system' => false,
         ]);
 
         app()[PermissionRegistrar::class]->forgetCachedPermissions();
 
-        return response()->json($permission, 201);
+        return response()->json([
+            'id' => $permission->id,
+            'name' => $permission->name,
+            'label' => $permission->label,
+            'module' => $permission->module,
+            'module_label' => PermissionCatalog::moduleLabel($permission->module),
+            'description' => $permission->description,
+            'is_system' => false,
+            'guard_name' => $permission->guard_name,
+        ], 201);
     }
 
     public function destroyPermission(Permission $permission): JsonResponse
     {
-        $protected = [
-            'admin.access',
-            'documents.create',
-            'documents.act',
-        ];
-
-        if (in_array($permission->name, $protected, true)) {
+        if ($permission->is_system || in_array($permission->name, PermissionCatalog::systemPermissionNames(), true)) {
             return response()->json([
                 'message' => 'Cette permission système ne peut pas être supprimée.',
             ], 422);
@@ -138,22 +180,29 @@ class RolePermissionController extends Controller
         return response()->json(['message' => 'Permission supprimée']);
     }
 
-    private function rolePayload(Role $role): array
+    private function rolePayload(Role $role, ?int $usersCount = null): array
     {
+        $role->loadMissing('permissions:id,name,label,module');
+
         return [
             'id' => $role->id,
             'name' => $role->name,
+            'code' => $role->code,
+            'is_system' => (bool) $role->is_system,
+            'home_route' => $role->home_route,
             'guard_name' => $role->guard_name,
-            'users_count' => $this->countUsersForRole($role->id),
+            'users_count' => $usersCount ?? $this->countUsersForRole($role->id),
             'permissions' => $role->permissions->pluck('name')->values(),
             'permission_ids' => $role->permissions->pluck('id')->values(),
+            'permission_labels' => $role->permissions
+                ->mapWithKeys(fn (Permission $p) => [
+                    $p->name => $p->label ?: PermissionCatalog::defaultLabel($p->name),
+                ])
+                ->all(),
         ];
     }
 
     /**
-     * Compte les utilisateurs par rôle sans passer par Role::users(),
-     * qui échoue avec withCount() (guard_name absent → modèle null).
-     *
      * @return array<int, int>
      */
     private function roleUserCounts(): array

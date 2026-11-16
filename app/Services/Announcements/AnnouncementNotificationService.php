@@ -167,7 +167,8 @@ final class AnnouncementNotificationService
         if ($circuit === 'institutional') {
             $permission = $step >= 2 ? 'announcement.publish' : 'announcement.approve';
 
-            return $query->role(['Directeur Général', 'DGA', 'Secrétariat DG'])
+            return $query
+                ->whereHas('roles', fn ($q) => $q->whereIn('code', ['dg', 'dga', 'secretariat_dg']))
                 ->get()
                 ->filter(fn (User $user) => $user->can($permission))
                 ->values()
@@ -176,7 +177,7 @@ final class AnnouncementNotificationService
 
         return $query
             ->where('structure_id', $announcement->structure_id)
-            ->role(['Directeur', 'Chef de division', 'Directeur Général', 'DGA'])
+            ->whereHas('roles', fn ($q) => $q->whereIn('code', ['directeur', 'chef_division', 'dg', 'dga']))
             ->get()
             ->filter(fn (User $user) => $user->can('announcement.approve'))
             ->values()

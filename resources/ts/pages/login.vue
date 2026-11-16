@@ -86,10 +86,7 @@ const login = async () => {
       return
     }
 
-    const role = String(userData?.role ?? '')
-    const fallback = role === 'Administrateur'
-      ? '/parapheur/admin'
-      : (role === 'Directeur Général' || role === 'DGA' ? '/parapheur/dg' : '/parapheur')
+    const fallback = String(userData?.homeRoute || '/parapheur')
 
     await nextTick(() => {
       router.replace(route.query.to ? String(route.query.to) : fallback)
@@ -203,8 +200,8 @@ onMounted(() => {
               v-if="idleMessage"
               type="warning"
               variant="tonal"
-              class="mb-4"
-              density="comfortable"
+              density="compact"
+              class="login-idle-alert mb-4"
             >
               {{ idleMessage }}
             </VAlert>
@@ -461,6 +458,23 @@ onMounted(() => {
   color: rgba(20, 38, 26, 0.55);
   font-size: 0.75rem;
   line-height: 1.45;
+}
+
+.login-idle-alert {
+  padding-block: 0.5rem;
+  padding-inline: 0.75rem;
+  font-size: 0.8125rem;
+  line-height: 1.35;
+
+  :deep(.v-alert__prepend) {
+    margin-inline-end: 0.5rem;
+    align-self: flex-start;
+    margin-block-start: 0.1rem;
+  }
+
+  :deep(.v-alert__content) {
+    min-inline-size: 0;
+  }
 }
 
 .login-meta {
