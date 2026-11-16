@@ -101,6 +101,8 @@ class DocumentController extends Controller
 
     public function store(Request $request): JsonResponse
     {
+        $this->authorize('create', Document::class);
+
         $data = $request->validate([
             'object' => ['required', 'string', 'max:500'],
             'reference' => ['nullable', 'string', 'max:100', 'unique:documents,reference'],
@@ -108,7 +110,7 @@ class DocumentController extends Controller
             'structure_id' => ['nullable', 'exists:structures,id'],
             'priority' => ['nullable', Rule::in(['normale', 'importante', 'urgente', 'tres_urgente'])],
             'confidentiality' => ['nullable', Rule::in(['normal', 'restreint', 'confidentiel', 'tres_confidentiel'])],
-            'expected_action' => ['nullable', Rule::in(array_column(ExpectedAction::cases(), 'value'))],
+            'expected_action' => ['nullable', Rule::in(array_map(fn (ExpectedAction $c) => $c->value, ExpectedAction::selectable()))],
             'document_date' => ['nullable', 'date'],
             'due_date' => ['nullable', 'date'],
             'keywords' => ['nullable'],
@@ -277,7 +279,7 @@ class DocumentController extends Controller
             'to_user_ids' => ['nullable', 'array', 'max:25'],
             'to_user_ids.*' => ['integer', 'distinct', 'exists:users,id'],
             'workflow_id' => ['nullable', 'exists:workflows,id'],
-            'expected_action' => ['required', Rule::in(array_column(ExpectedAction::cases(), 'value'))],
+            'expected_action' => ['required', Rule::in(array_map(fn (ExpectedAction $c) => $c->value, ExpectedAction::selectable()))],
             'message' => ['nullable', 'string'],
         ]);
 
@@ -316,7 +318,7 @@ class DocumentController extends Controller
 
         $data = $request->validate([
             'to_user_id' => ['required', 'exists:users,id'],
-            'expected_action' => ['required', Rule::in(array_column(ExpectedAction::cases(), 'value'))],
+            'expected_action' => ['required', Rule::in(array_map(fn (ExpectedAction $c) => $c->value, ExpectedAction::selectable()))],
             'message' => ['nullable', 'string'],
         ]);
 

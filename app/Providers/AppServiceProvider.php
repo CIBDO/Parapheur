@@ -99,6 +99,18 @@ class AppServiceProvider extends ServiceProvider
             }
         }
 
+        RateLimiter::for('api', function (Request $request) {
+            $key = optional($request->user())->getAuthIdentifier() ?: $request->ip();
+
+            return Limit::perMinute(120)->by((string) $key);
+        });
+
+        RateLimiter::for('uploads', function (Request $request) {
+            $key = optional($request->user())->getAuthIdentifier() ?: $request->ip();
+
+            return Limit::perMinute(20)->by('uploads|'.$key);
+        });
+
         RateLimiter::for('login', function (Request $request) {
             $email = (string) $request->input('email');
 

@@ -125,5 +125,14 @@ return [
 
     'idle_timeout' => (int) env('AUTH_IDLE_TIMEOUT', 30),
 
+    /*
+    |--------------------------------------------------------------------------
+    | MFA TOTP (optionnel)
+    |--------------------------------------------------------------------------
+    | Désactivé par défaut. Activer AUTH_MFA_ENABLED=true pour exposer
+    | /api/auth/mfa/* et exiger le second facteur si l’utilisateur l’a activé.
+    */
+    'mfa_enabled' => (bool) env('AUTH_MFA_ENABLED', false),
+
 ];
 

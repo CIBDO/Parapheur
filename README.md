@@ -1,6 +1,7 @@
 #E-TRESOR
 
-Plateforme de dématérialisation des circuits de consultation, visa et validation administrative (Temps 1 — sans intégrations externes ni signature électronique qualifiée).
+Plateforme de dématérialisation des circuits de consultation, visa et validation administrative (Temps 1).  
+**Pas de signature électronique** (non permise au Mali) — actes = visa / validation administrative traçables.
 
 ## Stack
 

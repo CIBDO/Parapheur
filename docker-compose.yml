@@ -9,9 +9,8 @@
 
 services:
   onlyoffice:
-    # Évitez `docker compose pull` sans besoin : :latest peut changer le comportement.
-    # Pour figer : onlyoffice/documentserver:8.2.0 (vérifier le tag sur Docker Hub).
-    image: onlyoffice/documentserver:latest
+    # Image pinnée (éviter :latest en prod / CI). Mettre à jour volontairement après tests.
+    image: onlyoffice/documentserver:8.2.2
     container_name: eparapheur-onlyoffice
     ports:
       - "127.0.0.1:8080:80"

@@ -96,6 +96,8 @@ use Illuminate\Support\Facades\Route;
 
 Route::post('/auth/login', [AuthController::class, 'login'])
     ->middleware('throttle:login');
+Route::post('/auth/mfa/verify', [AuthController::class, 'verifyMfa'])
+    ->middleware('throttle:login');
 Route::post('/auth/forgot-password', [AuthController::class, 'forgotPassword'])
     ->middleware('throttle:forgot-password');
 Route::post('/auth/reset-password', [AuthController::class, 'resetPassword'])
@@ -106,6 +108,9 @@ Route::middleware(['auth:sanctum', 'auth.idle'])->group(function () {
     Route::put('/auth/profile', [AuthController::class, 'updateProfile']);
     Route::post('/auth/logout', [AuthController::class, 'logout']);
     Route::post('/auth/change-password', [AuthController::class, 'changePassword']);
+    Route::post('/auth/mfa/setup', [AuthController::class, 'mfaSetup']);
+    Route::post('/auth/mfa/confirm', [AuthController::class, 'mfaConfirm']);
+    Route::post('/auth/mfa/disable', [AuthController::class, 'mfaDisable']);
 });
 
 Route::middleware(['auth:sanctum', 'auth.idle', 'password.changed'])->group(function () {
@@ -209,10 +214,10 @@ Route::middleware(['auth:sanctum', 'auth.idle', 'password.changed'])->group(func
     Route::get('/dashboard/direction', [DashboardController::class, 'direction']);
 
     Route::get('/parapheur/counts', [DocumentController::class, 'counts']);
-    Route::post('/parapheur/documents', [DocumentController::class, 'store']);
+    Route::post('/parapheur/documents', [DocumentController::class, 'store'])
+        ->middleware('throttle:uploads');
     Route::get('/parapheur/documents', [DocumentController::class, 'index']);
     Route::get('/parapheur/documents/{document}', [DocumentController::class, 'show']);
-
     // ——— GED (référentiel documentaire transversal) ———
     Route::get('/ged/dashboard', GedDashboardController::class);
     Route::get('/ged/audit-logs', GedAuditController::class);
@@ -310,8 +315,10 @@ Route::middleware(['auth:sanctum', 'auth.idle', 'password.changed'])->group(func
     Route::post('/parapheur/documents/{document}/reject', [DocumentController::class, 'reject']);
     Route::post('/parapheur/documents/{document}/archive', [DocumentController::class, 'archive']);
     Route::get('/parapheur/documents/{document}/archive-pack', [DocumentController::class, 'downloadArchivePack']);
-    Route::post('/parapheur/documents/{document}/versions', [DocumentController::class, 'addVersion']);
-    Route::post('/parapheur/documents/{document}/attachments', [DocumentController::class, 'addAttachment']);
+    Route::post('/parapheur/documents/{document}/versions', [DocumentController::class, 'addVersion'])
+        ->middleware('throttle:uploads');
+    Route::post('/parapheur/documents/{document}/attachments', [DocumentController::class, 'addAttachment'])
+        ->middleware('throttle:uploads');
     Route::post('/parapheur/documents/{document}/instructions', [DocumentController::class, 'createInstruction']);
 
     Route::get('/parapheur/documents/{document}/onlyoffice/config', [OnlyOfficeController::class, 'config']);

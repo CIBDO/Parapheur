@@ -7,7 +7,7 @@
     "build": "vite build",
     "build:icons": "tsx resources/ts/plugins/iconify/build-icons.ts",
     "dev": "vite",
-    "postinstall": "npm run build:icons && npm run msw:init",
+    "postinstall": "npm run build:icons",
     "lint": "eslint . -c .eslintrc.cjs --fix --rulesdir eslint-internal-rules/ --ext .ts,.js,.cjs,.vue,.tsx,.jsx",
     "msw:init": "msw init public/ --save",
     "typecheck": "vue-tsc --noEmit"

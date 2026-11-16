@@ -5,10 +5,13 @@ namespace App\Http\Controllers\Api;
 use App\Contracts\IdentityProvider;
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Services\Mfa\TotpService;
+use App\Support\AuthTokenCookie;
+use App\Support\Civilities;
 use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use App\Support\Civilities;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Str;
@@ -20,6 +23,7 @@ class AuthController extends Controller
 {
     public function __construct(
         private readonly IdentityProvider $identity,
+        private readonly TotpService $totp,
     ) {}
 
     public function login(Request $request): JsonResponse
@@ -38,13 +42,47 @@ class AuthController extends Controller
         }
 
         $user->load(['structure', 'roles']);
-        $token = $user->createToken('spa')->plainTextToken;
 
-        return response()->json([
-            'accessToken' => $token,
-            'userData' => $this->userPayload($user),
-            'userAbilityRules' => $user->abilityRules(),
+        if ($user->mfa_enabled && filled($user->mfa_secret)) {
+            $challenge = Str::random(64);
+            Cache::put($this->mfaChallengeKey($challenge), $user->id, now()->addMinutes(5));
+
+            return response()->json([
+                'requiresMfa' => true,
+                'mfaChallenge' => $challenge,
+                'userData' => [
+                    'email' => $user->email,
+                    'fullName' => $user->name,
+                ],
+            ]);
+        }
+
+        return $this->issueSession($user);
+    }
+
+    public function verifyMfa(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'mfa_challenge' => ['required', 'string'],
+            'code' => ['required', 'string', 'size:6'],
         ]);
+
+        $userId = Cache::pull($this->mfaChallengeKey($data['mfa_challenge']));
+        if (! $userId) {
+            throw ValidationException::withMessages([
+                'code' => ['Défi MFA expiré. Reconnectez-vous.'],
+            ]);
+        }
+
+        /** @var User|null $user */
+        $user = User::query()->with(['structure', 'roles'])->find($userId);
+        if (! $user || ! $user->mfa_enabled || ! $this->totp->verify((string) $user->mfa_secret, $data['code'])) {
+            throw ValidationException::withMessages([
+                'code' => ['Code MFA invalide.'],
+            ]);
+        }
+
+        return $this->issueSession($user);
     }
 
     public function me(Request $request): JsonResponse
@@ -109,7 +147,91 @@ class AuthController extends Controller
     {
         $request->user()?->currentAccessToken()?->delete();
 
-        return response()->json(['message' => 'Déconnecté']);
+        return AuthTokenCookie::clear(
+            response()->json(['message' => 'Déconnecté'])
+        );
+    }
+
+    public function mfaSetup(Request $request): JsonResponse
+    {
+        abort_unless((bool) config('auth.mfa_enabled', false), 503, 'MFA désactivé.');
+
+        /** @var User $user */
+        $user = $request->user();
+        $secret = $this->totp->generateSecret();
+        $user->forceFill([
+            'mfa_secret' => $secret,
+            'mfa_enabled' => false,
+            'mfa_confirmed_at' => null,
+        ])->save();
+
+        return response()->json([
+            'secret' => $secret,
+            'otpauth_url' => $this->totp->provisioningUri($secret, $user->email, (string) config('app.name', 'E-Tresor')),
+        ]);
+    }
+
+    public function mfaConfirm(Request $request): JsonResponse
+    {
+        abort_unless((bool) config('auth.mfa_enabled', false), 503, 'MFA désactivé.');
+
+        /** @var User $user */
+        $user = $request->user();
+        $data = $request->validate([
+            'code' => ['required', 'string', 'size:6'],
+        ]);
+
+        if (! filled($user->mfa_secret) || ! $this->totp->verify((string) $user->mfa_secret, $data['code'])) {
+            throw ValidationException::withMessages([
+                'code' => ['Code MFA invalide.'],
+            ]);
+        }
+
+        $user->forceFill([
+            'mfa_enabled' => true,
+            'mfa_confirmed_at' => now(),
+        ])->save();
+
+        return response()->json([
+            'message' => 'MFA activé.',
+            'userData' => $this->userPayload($user->fresh(['structure', 'roles'])),
+        ]);
+    }
+
+    public function mfaDisable(Request $request): JsonResponse
+    {
+        /** @var User $user */
+        $user = $request->user();
+        $data = $request->validate([
+            'password' => ['required', 'string'],
+            'code' => ['nullable', 'string', 'size:6'],
+        ]);
+
+        if (! Hash::check($data['password'], $user->password)) {
+            throw ValidationException::withMessages([
+                'password' => ['Mot de passe incorrect.'],
+            ]);
+        }
+
+        if ($user->mfa_enabled && filled($user->mfa_secret)) {
+            $code = $data['code'] ?? '';
+            if ($code === '' || ! $this->totp->verify((string) $user->mfa_secret, $code)) {
+                throw ValidationException::withMessages([
+                    'code' => ['Code MFA requis pour désactiver.'],
+                ]);
+            }
+        }
+
+        $user->forceFill([
+            'mfa_secret' => null,
+            'mfa_enabled' => false,
+            'mfa_confirmed_at' => null,
+        ])->save();
+
+        return response()->json([
+            'message' => 'MFA désactivé.',
+            'userData' => $this->userPayload($user->fresh(['structure', 'roles'])),
+        ]);
     }
 
     public function changePassword(Request $request): JsonResponse
@@ -213,6 +335,26 @@ class AuthController extends Controller
         ]);
     }
 
+    private function issueSession(User $user): JsonResponse
+    {
+        $token = $user->createToken('spa')->plainTextToken;
+
+        // Le token n’est plus exposé au JS : cookie HttpOnly uniquement.
+        return AuthTokenCookie::attach(
+            response()->json([
+                'authenticated' => true,
+                'userData' => $this->userPayload($user),
+                'userAbilityRules' => $user->abilityRules(),
+            ]),
+            $token
+        );
+    }
+
+    private function mfaChallengeKey(string $challenge): string
+    {
+        return 'auth:mfa:challenge:'.$challenge;
+    }
+
     private function userPayload(User $user): array
     {
         return [
@@ -232,6 +374,7 @@ class AuthController extends Controller
             'mailContext' => app(\App\Services\Organization\OrganizationalContextResolver::class)->present($user),
             'position_title' => $user->position_title,
             'mustChangePassword' => (bool) $user->must_change_password,
+            'mfaEnabled' => (bool) $user->mfa_enabled,
             'avatar' => null,
         ];
     }

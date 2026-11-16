@@ -2092,7 +2092,7 @@ async function archiveCorrespondence() {
               </div>
               <div class="d-flex flex-wrap align-center justify-space-between gap-3 mb-4">
                 <p class="text-body-2 text-medium-emphasis mb-0">
-                  Récapitulatif des imputations du courrier : agent, service, annotation et signature.
+                  Récapitulatif des imputations du courrier : agent, service, annotation et validation.
                 </p>
                 <VBtn
                   color="primary"

@@ -29,6 +29,8 @@ const credentials = ref({
   password: '',
 })
 
+const mfaChallenge = ref<string | null>(null)
+const mfaCode = ref('')
 const rememberMe = ref(false)
 
 const idleMessage = computed(() =>
@@ -71,26 +73,14 @@ const login = async () => {
       },
     })
 
-    const { accessToken, userData, userAbilityRules } = res
-
-    useCookie('userAbilityRules').value = userAbilityRules
-    useCookie('userData').value = userData
-    useCookie('accessToken').value = accessToken
-    ability.update(userAbilityRules || [])
-
-    if (userData?.mustChangePassword) {
-      await nextTick(() => {
-        router.replace({ name: 'change-password' })
-      })
+    if (res?.requiresMfa) {
+      mfaChallenge.value = String(res.mfaChallenge || '')
+      mfaCode.value = ''
 
       return
     }
 
-    const fallback = String(userData?.homeRoute || '/parapheur')
-
-    await nextTick(() => {
-      router.replace(route.query.to ? String(route.query.to) : fallback)
-    })
+    await completeLogin(res)
   }
   catch {
     if (!errors.value.email && !errors.value.password)
@@ -101,7 +91,69 @@ const login = async () => {
   }
 }
 
+const verifyMfa = async () => {
+  if (!mfaChallenge.value || mfaCode.value.length !== 6)
+    return
+
+  isSubmitting.value = true
+  errors.value = { email: undefined, password: undefined }
+
+  try {
+    const res = await $api('/auth/mfa/verify', {
+      method: 'POST',
+      body: {
+        mfa_challenge: mfaChallenge.value,
+        code: mfaCode.value,
+      },
+      onResponseError({ response }) {
+        const payload = response._data?.errors || {}
+        errors.value.password = Array.isArray(payload.code) ? payload.code[0] : (payload.code || response._data?.message || 'Code MFA invalide.')
+      },
+    })
+
+    await completeLogin(res)
+  }
+  catch {
+    if (!errors.value.password)
+      errors.value.password = 'Code MFA invalide ou expiré.'
+  }
+  finally {
+    isSubmitting.value = false
+  }
+}
+
+const completeLogin = async (res: any) => {
+  const { userData, userAbilityRules } = res
+
+  useCookie('userAbilityRules').value = userAbilityRules
+  useCookie('userData').value = userData
+  useCookie('accessToken').value = '1' // marqueur non secret (auth réelle = cookie HttpOnly)
+  ability.update(userAbilityRules || [])
+  mfaChallenge.value = null
+  mfaCode.value = ''
+
+  if (userData?.mustChangePassword) {
+    await nextTick(() => {
+      router.replace({ name: 'change-password' })
+    })
+
+    return
+  }
+
+  const fallback = String(userData?.homeRoute || '/parapheur')
+
+  await nextTick(() => {
+    router.replace(route.query.to ? String(route.query.to) : fallback)
+  })
+}
+
 const onSubmit = () => {
+  if (mfaChallenge.value) {
+    verifyMfa()
+
+    return
+  }
+
   refVForm.value?.validate().then(({ valid: isValid }) => {
     if (isValid)
       login()
@@ -210,47 +262,65 @@ onMounted(() => {
               ref="refVForm"
               @submit.prevent="onSubmit"
             >
-              <AppTextField
-                v-model="credentials.email"
-                label="Adresse e-mail"
-                placeholder="prenom.nom@dgtcp.ml"
-                type="email"
-                autofocus
-                autocomplete="username"
-                class="mb-4"
-                :rules="[requiredValidator, emailValidator]"
-                :error-messages="errors.email"
-              />
+              <template v-if="!mfaChallenge">
+                <AppTextField
+                  v-model="credentials.email"
+                  label="Adresse e-mail"
+                  placeholder="prenom.nom@dgtcp.ml"
+                  type="email"
+                  autofocus
+                  autocomplete="username"
+                  class="mb-4"
+                  :rules="[requiredValidator, emailValidator]"
+                  :error-messages="errors.email"
+                />
 
-              <AppTextField
-                v-model="credentials.password"
-                label="Mot de passe"
-                placeholder="············"
-                autocomplete="current-password"
-                class="mb-4"
-                :rules="[requiredValidator]"
-                :type="isPasswordVisible ? 'text' : 'password'"
-                :error-messages="errors.password"
-                :append-inner-icon="isPasswordVisible ? 'tabler-eye-off' : 'tabler-eye'"
-                @click:append-inner="isPasswordVisible = !isPasswordVisible"
-              />
+                <AppTextField
+                  v-model="credentials.password"
+                  label="Mot de passe"
+                  placeholder="············"
+                  autocomplete="current-password"
+                  class="mb-4"
+                  :rules="[requiredValidator]"
+                  :type="isPasswordVisible ? 'text' : 'password'"
+                  :error-messages="errors.password"
+                  :append-inner-icon="isPasswordVisible ? 'tabler-eye-off' : 'tabler-eye'"
+                  @click:append-inner="isPasswordVisible = !isPasswordVisible"
+                />
 
-              <div class="login-meta mb-4">
-                <label class="login-meta__remember">
-                  <input
-                    v-model="rememberMe"
-                    type="checkbox"
-                    class="login-meta__check"
+                <div class="login-meta mb-4">
+                  <label class="login-meta__remember">
+                    <input
+                      v-model="rememberMe"
+                      type="checkbox"
+                      class="login-meta__check"
+                    >
+                    <span>Se souvenir de moi</span>
+                  </label>
+                  <RouterLink
+                    class="login-meta__forgot text-primary"
+                    :to="{ name: 'forgot-password' }"
                   >
-                  <span>Se souvenir de moi</span>
-                </label>
-                <RouterLink
-                  class="login-meta__forgot text-primary"
-                  :to="{ name: 'forgot-password' }"
-                >
-                  Mot de passe oublié ?
-                </RouterLink>
-              </div>
+                    Mot de passe oublié ?
+                  </RouterLink>
+                </div>
+              </template>
+
+              <template v-else>
+                <p class="text-body-2 text-medium-emphasis mb-4 text-center">
+                  Saisissez le code à 6 chiffres de votre application d’authentification.
+                </p>
+                <AppTextField
+                  v-model="mfaCode"
+                  label="Code MFA"
+                  placeholder="123456"
+                  inputmode="numeric"
+                  autocomplete="one-time-code"
+                  class="mb-4"
+                  :error-messages="errors.password"
+                  maxlength="6"
+                />
+              </template>
 
               <VBtn
                 block
@@ -258,7 +328,7 @@ onMounted(() => {
                 color="primary"
                 :loading="isSubmitting"
               >
-                Ouvrir mon espace
+                {{ mfaChallenge ? 'Valider le code' : 'Ouvrir mon espace' }}
               </VBtn>
             </VForm>
           </div>

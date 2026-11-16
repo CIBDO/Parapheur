@@ -55,6 +55,7 @@ class UserController extends Controller
         $data = $this->validated($request);
         $role = $data['role'];
         unset($data['role'], $data['password']);
+        $this->assertCanAssignRole($request->user(), $role);
 
         $plainPassword = Str::password(12);
 
@@ -106,6 +107,10 @@ class UserController extends Controller
             return response()->json([
                 'message' => 'Vous ne pouvez pas désactiver votre propre compte.',
             ], 422);
+        }
+
+        if ($role) {
+            $this->assertCanAssignRole($request->user(), $role);
         }
 
         $user->update($data);
@@ -182,6 +187,23 @@ class UserController extends Controller
             'role.required' => 'Le rôle est obligatoire.',
             'role.exists' => 'Le rôle sélectionné est invalide.',
         ]);
+    }
+
+    private function assertCanAssignRole(?User $actor, string $roleName): void
+    {
+        $role = Role::query()->where('name', $roleName)->first();
+        if (! $role) {
+            return;
+        }
+
+        $isAdminRole = $role->code === 'admin' || $role->name === 'Administrateur';
+        if (! $isAdminRole) {
+            return;
+        }
+
+        if (! $actor || ! $actor->can('admin.access') || ! $actor->hasRoleWithCode('admin')) {
+            abort(403, 'Seuls les administrateurs système peuvent attribuer le rôle Administrateur.');
+        }
     }
 
     private function resolveName(array $data, ?User $user = null): string

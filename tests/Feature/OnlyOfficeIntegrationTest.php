@@ -163,6 +163,44 @@ class OnlyOfficeIntegrationTest extends TestCase
         ])->assertForbidden();
     }
 
+    public function test_callback_rejects_ssrf_url_outside_allowlist(): void
+    {
+        $this->enableOnlyOffice();
+        [$agent, $document] = $this->createDocxDocument();
+
+        Http::fake();
+
+        $jwt = app(OnlyOfficeJwt::class)->encode([
+            'status' => 2,
+            'url' => 'http://169.254.169.254/latest/meta-data/',
+            'users' => [(string) $agent->id],
+            'actions' => [['type' => 0, 'userid' => (string) $agent->id]],
+        ]);
+
+        $this->postJson("/api/onlyoffice/callback/{$document->id}", [
+            'status' => 2,
+            'url' => 'http://169.254.169.254/latest/meta-data/',
+            'users' => [(string) $agent->id],
+        ], [
+            'Authorization' => 'Bearer '.$jwt,
+        ])->assertForbidden();
+
+        Http::assertNothingSent();
+        $this->assertSame(1, $document->fresh()->current_version);
+    }
+
+    public function test_download_from_document_server_allows_configured_host_only(): void
+    {
+        $this->enableOnlyOffice();
+
+        /** @var \App\Services\OnlyOffice\OnlyOfficeService $service */
+        $service = app(\App\Services\OnlyOffice\OnlyOfficeService::class);
+
+        $this->assertTrue($service->isAllowedDocumentServerUrl('http://onlyoffice.test/cache/files/out.docx'));
+        $this->assertFalse($service->isAllowedDocumentServerUrl('http://evil.example/cache/files/out.docx'));
+        $this->assertFalse($service->isAllowedDocumentServerUrl('http://127.0.0.1:9/secrets'));
+    }
+
     public function test_callback_status_2_creates_new_version(): void
     {
         $this->enableOnlyOffice();

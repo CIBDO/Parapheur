@@ -129,7 +129,10 @@ class TaskService
             $query->whereDate('created_at', '<=', $filters['created_to']);
         }
 
-        $sort = $filters['sort'] ?? 'due_at';
+        $allowedSorts = ['due_at', 'created_at', 'updated_at', 'priority', 'status', 'title', 'id'];
+        $sort = in_array(($filters['sort'] ?? 'due_at'), $allowedSorts, true)
+            ? ($filters['sort'] ?? 'due_at')
+            : 'due_at';
         $dir = ($filters['dir'] ?? 'asc') === 'desc' ? 'desc' : 'asc';
         if ($sort === 'due_at') {
             $query->orderByRaw('due_at is null')->orderBy('due_at', $dir)->orderByDesc('id');

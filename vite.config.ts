@@ -136,6 +136,26 @@ export default defineConfig({
   build: {
     chunkSizeWarningLimit: 5000,
   },
+  // Évite [::1] (CSP) ; CORS doit autoriser l’origine Laravel (:8000), pas seulement Vite.
+  server: {
+    host: '127.0.0.1',
+    port: 5173,
+    strictPort: true,
+    origin: 'http://127.0.0.1:5173',
+    cors: {
+      origin: [
+        'http://127.0.0.1:8000',
+        'http://localhost:8000',
+        'http://127.0.0.1:5173',
+        'http://localhost:5173',
+      ],
+    },
+    hmr: {
+      host: '127.0.0.1',
+      protocol: 'ws',
+      clientPort: 5173,
+    },
+  },
   optimizeDeps: {
     exclude: ['vuetify'],
     entries: ['./resources/ts/**/*.vue'],

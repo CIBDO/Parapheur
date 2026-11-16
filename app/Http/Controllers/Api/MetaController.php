@@ -66,19 +66,29 @@ class MetaController extends Controller
             $query->permission([$permission, 'admin.access']);
         }
 
+        $actor = $request->user();
+        $canSeeEmail = $actor && $actor->can('admin.access');
+
         $users = $query->orderBy('name')->get(['id', 'name', 'email', 'structure_id', 'position_title']);
 
-        return response()->json($users->map(fn (User $user) => [
-            'id' => $user->id,
-            'name' => $user->name,
-            'email' => $user->email,
-            'structure_id' => $user->structure_id,
-            'position_title' => $user->position_title,
-            'role' => $user->getRoleNames()->first() ?? 'agent',
-            'roleCode' => $user->primaryRole()?->code,
-            'roles' => $user->getRoleNames()->values(),
-            'homeRoute' => $user->homeRoute(),
-            'structure' => $user->structure?->only(['id', 'code', 'name']),
-        ]));
+        return response()->json($users->map(function (User $user) use ($canSeeEmail) {
+            $payload = [
+                'id' => $user->id,
+                'name' => $user->name,
+                'structure_id' => $user->structure_id,
+                'position_title' => $user->position_title,
+                'role' => $user->getRoleNames()->first() ?? 'agent',
+                'roleCode' => $user->primaryRole()?->code,
+                'structure' => $user->structure?->only(['id', 'code', 'name']),
+            ];
+
+            if ($canSeeEmail) {
+                $payload['email'] = $user->email;
+                $payload['roles'] = $user->getRoleNames()->values();
+                $payload['homeRoute'] = $user->homeRoute();
+            }
+
+            return $payload;
+        }));
     }
 }

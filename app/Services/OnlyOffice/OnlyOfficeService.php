@@ -420,6 +420,7 @@ class OnlyOfficeService
      * Télécharge le fichier modifié depuis Document Server.
      * Essaie l’URL d’origine puis l’URL réécrite ; avec JWT inbox puis sans
      * (URLs cache signées md5/expires).
+     * Anti-SSRF : hôtes limités à ONLYOFFICE_URL / INTERNAL_URL, redirects revalidés.
      */
     public function downloadFromDocumentServer(string $url): string
     {
@@ -428,8 +429,16 @@ class OnlyOfficeService
             $this->rewriteDocumentServerUrl($url),
         ])));
 
+        $candidates = array_values(array_filter(
+            $candidates,
+            fn (string $candidate) => $this->isAllowedDocumentServerUrl($candidate),
+        ));
+
+        if ($candidates === []) {
+            throw new InvalidArgumentException('URL ONLYOFFICE refusée (hôte hors allowlist).');
+        }
+
         $lastStatus = 0;
-        $lastBody = '';
 
         foreach ($candidates as $candidate) {
             $authVariants = [null];
@@ -442,25 +451,18 @@ class OnlyOfficeService
             }
 
             foreach ($authVariants as $jwtPayload) {
-                $request = Http::timeout(120)->withOptions([
-                    'allow_redirects' => true,
-                    'http_errors' => false,
-                ]);
-
+                $headers = [];
                 if (is_array($jwtPayload)) {
                     $header = (string) config('onlyoffice.jwt_header', 'Authorization');
-                    $token = $this->jwt->encode($jwtPayload);
-                    $request = $request->withHeaders([
-                        $header => 'Bearer '.$token,
-                    ]);
+                    $headers[$header] = 'Bearer '.$this->jwt->encode($jwtPayload);
                 }
 
-                $response = $request->get($candidate);
-                $lastStatus = $response->status();
-                $lastBody = $response->body();
-
-                if ($response->successful()) {
-                    return $lastBody;
+                try {
+                    return $this->fetchDocumentServerUrl($candidate, $headers);
+                } catch (RuntimeException $e) {
+                    if (preg_match('/HTTP (\d+)/', $e->getMessage(), $m)) {
+                        $lastStatus = (int) $m[1];
+                    }
                 }
             }
         }
@@ -468,6 +470,122 @@ class OnlyOfficeService
         throw new RuntimeException(
             'Téléchargement fichier ONLYOFFICE impossible (HTTP '.$lastStatus.').'
         );
+    }
+
+    /**
+     * @param  array<string, string>  $headers
+     */
+    private function fetchDocumentServerUrl(string $url, array $headers = [], int $redirectsLeft = 3): string
+    {
+        if (! $this->isAllowedDocumentServerUrl($url)) {
+            throw new InvalidArgumentException('URL ONLYOFFICE refusée (hôte hors allowlist).');
+        }
+
+        $request = Http::timeout(120)->withOptions([
+            'allow_redirects' => false,
+            'http_errors' => false,
+        ]);
+
+        if ($headers !== []) {
+            $request = $request->withHeaders($headers);
+        }
+
+        $response = $request->get($url);
+        $status = $response->status();
+
+        if ($response->successful()) {
+            return $response->body();
+        }
+
+        if ($redirectsLeft > 0 && $status >= 300 && $status < 400) {
+            $location = (string) $response->header('Location');
+            if ($location !== '') {
+                $next = $this->resolveRedirectUrl($url, $location);
+
+                return $this->fetchDocumentServerUrl($next, $headers, $redirectsLeft - 1);
+            }
+        }
+
+        throw new RuntimeException(
+            'Téléchargement fichier ONLYOFFICE impossible (HTTP '.$status.').'
+        );
+    }
+
+    public function isAllowedDocumentServerUrl(string $url): bool
+    {
+        $parts = parse_url($url);
+        if (! is_array($parts) || empty($parts['scheme']) || empty($parts['host'])) {
+            return false;
+        }
+
+        $scheme = strtolower((string) $parts['scheme']);
+        if (! in_array($scheme, ['http', 'https'], true)) {
+            return false;
+        }
+
+        $host = strtolower((string) $parts['host']);
+        $port = isset($parts['port'])
+            ? (int) $parts['port']
+            : ($scheme === 'https' ? 443 : 80);
+
+        foreach ($this->allowedDocumentServerEndpoints() as $allowed) {
+            if ($host === $allowed['host'] && $port === $allowed['port']) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @return list<array{host: string, port: int}>
+     */
+    private function allowedDocumentServerEndpoints(): array
+    {
+        $bases = array_filter([
+            (string) config('onlyoffice.url'),
+            (string) config('onlyoffice.internal_url'),
+        ]);
+
+        $endpoints = [];
+        foreach ($bases as $base) {
+            $parts = parse_url($base);
+            if (! is_array($parts) || empty($parts['host'])) {
+                continue;
+            }
+            $scheme = strtolower((string) ($parts['scheme'] ?? 'http'));
+            $host = strtolower((string) $parts['host']);
+            $port = isset($parts['port'])
+                ? (int) $parts['port']
+                : ($scheme === 'https' ? 443 : 80);
+            $endpoints[$host.':'.$port] = ['host' => $host, 'port' => $port];
+        }
+
+        return array_values($endpoints);
+    }
+
+    private function resolveRedirectUrl(string $current, string $location): string
+    {
+        if (preg_match('#^https?://#i', $location)) {
+            return $location;
+        }
+
+        $base = parse_url($current);
+        if (! is_array($base) || empty($base['scheme']) || empty($base['host'])) {
+            return $location;
+        }
+
+        $origin = $base['scheme'].'://'.$base['host']
+            .(isset($base['port']) ? ':'.$base['port'] : '');
+
+        if (str_starts_with($location, '/')) {
+            return $origin.$location;
+        }
+
+        $path = $base['path'] ?? '/';
+        $dir = rtrim(str_replace('\\', '/', dirname($path)), '/');
+
+        return $origin.($dir === '' ? '' : $dir).'/'.$location;
     }
 
     /**

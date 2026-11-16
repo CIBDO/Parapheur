@@ -39,6 +39,9 @@ class RolePermissionController extends Controller
             'permissions.*' => ['string', 'exists:permissions,name'],
         ]);
 
+        $permissions = $data['permissions'] ?? [];
+        $this->assertCanAssignPermissions($request->user(), $permissions);
+
         $role = Role::create([
             'name' => $data['name'],
             'guard_name' => 'web',
@@ -47,7 +50,7 @@ class RolePermissionController extends Controller
             'home_route' => $data['home_route'] ?? '/parapheur',
         ]);
 
-        $role->syncPermissions($data['permissions'] ?? []);
+        $role->syncPermissions($permissions);
         app()[PermissionRegistrar::class]->forgetCachedPermissions();
 
         return response()->json($this->rolePayload($role->fresh('permissions')), 201);
@@ -63,6 +66,9 @@ class RolePermissionController extends Controller
             'permissions.*' => ['string', 'exists:permissions,name'],
         ]);
 
+        $permissions = $data['permissions'] ?? [];
+        $this->assertCanAssignPermissions($request->user(), $permissions);
+
         if ($role->is_system) {
             // Les rôles système gardent leur code ; le nom affiché peut évoluer.
             $role->update([
@@ -77,7 +83,7 @@ class RolePermissionController extends Controller
             ]);
         }
 
-        $role->syncPermissions($data['permissions'] ?? []);
+        $role->syncPermissions($permissions);
         app()[PermissionRegistrar::class]->forgetCachedPermissions();
 
         return response()->json($this->rolePayload($role->fresh('permissions')));
@@ -178,6 +184,26 @@ class RolePermissionController extends Controller
         app()[PermissionRegistrar::class]->forgetCachedPermissions();
 
         return response()->json(['message' => 'Permission supprimée']);
+    }
+
+    /**
+     * Empêche l’élévation vers des permissions système hors compte Administrateur.
+     *
+     * @param  list<string>  $permissions
+     */
+    private function assertCanAssignPermissions(?User $actor, array $permissions): void
+    {
+        $protected = array_values(array_intersect($permissions, [
+            'admin.access',
+        ]));
+
+        if ($protected === []) {
+            return;
+        }
+
+        if (! $actor || ! $actor->can('admin.access') || ! $actor->hasRoleWithCode('admin')) {
+            abort(403, 'Seuls les administrateurs système peuvent attribuer admin.access.');
+        }
     }
 
     private function rolePayload(Role $role, ?int $usersCount = null): array

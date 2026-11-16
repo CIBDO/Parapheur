@@ -55,9 +55,7 @@ export const $api = ofetch.create({
         options.headers = setHeader(options.headers as HeadersInit, 'X-XSRF-TOKEN', xsrfToken)
     }
 
-    const accessToken = useCookie('accessToken').value
-    if (accessToken)
-      options.headers = setHeader(options.headers as HeadersInit, 'Authorization', `Bearer ${accessToken}`)
+    // Auth via cookie HttpOnly `parapheur_token` (credentials: include) — plus de Bearer JS.
 
     // Laisser le navigateur poser le boundary multipart (sinon le fichier est ignoré).
     if (options.body instanceof FormData) {
@@ -69,7 +67,7 @@ export const $api = ofetch.create({
   },
   onResponseError({ response }) {
     if (response.status === 401) {
-      useCookie('accessToken').value = null
+      useCookie('accessToken').value = null // legacy cleanup
       useCookie('userData').value = null
       useCookie('userAbilityRules').value = null
 

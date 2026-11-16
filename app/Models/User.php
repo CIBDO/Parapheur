@@ -28,11 +28,15 @@ class User extends Authenticatable
         'must_change_password',
         'structure_id',
         'position_title',
+        'mfa_secret',
+        'mfa_enabled',
+        'mfa_confirmed_at',
     ];
 
     protected $hidden = [
         'password',
         'remember_token',
+        'mfa_secret',
     ];
 
     protected function casts(): array
@@ -42,6 +46,9 @@ class User extends Authenticatable
             'password' => 'hashed',
             'is_active' => 'boolean',
             'must_change_password' => 'boolean',
+            'mfa_enabled' => 'boolean',
+            'mfa_confirmed_at' => 'datetime',
+            'mfa_secret' => 'encrypted',
         ];
     }
 

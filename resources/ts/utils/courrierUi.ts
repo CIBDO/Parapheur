@@ -205,7 +205,7 @@ export const transmissionSlipNatureLabels: Record<string, string> = {
   pour_traitement: 'Pour traitement',
   pour_information: 'Pour information',
   pour_avis: 'Pour avis',
-  pour_signature: 'Pour signature',
+  pour_signature: 'Pour validation',
   retour: 'Retour',
   autre: 'Autre',
 }

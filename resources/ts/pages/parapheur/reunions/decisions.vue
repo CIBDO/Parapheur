@@ -34,10 +34,9 @@ const load = async () => {
 }
 
 const exportCsv = async () => {
-  const token = useCookie('accessToken').value
   const res = await fetch('/api/meetings/decisions/export', {
     credentials: 'include',
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
   })
   const blob = await res.blob()
   const url = URL.createObjectURL(blob)

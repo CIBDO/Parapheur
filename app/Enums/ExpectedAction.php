@@ -12,6 +12,7 @@ enum ExpectedAction: string
     case Visa = 'visa';
     case Validation = 'validation';
     case Revision = 'revision';
+    /** @deprecated Conservé pour lecture legacy ; migrer vers Validation (pas de SE au Mali). */
     case Signature = 'signature';
 
     public function label(): string
@@ -23,9 +24,17 @@ enum ExpectedAction: string
             self::Observations => 'Pour observations',
             self::Instruction => 'Pour instruction',
             self::Visa => 'Pour visa',
-            self::Validation => 'Pour validation',
+            self::Validation, self::Signature => 'Pour validation',
             self::Revision => 'Pour révision',
-            self::Signature => 'Pour signature',
         };
+    }
+
+    /** Actions proposées à la création / transmission (sans « signature »). */
+    public static function selectable(): array
+    {
+        return array_values(array_filter(
+            self::cases(),
+            fn (self $case) => $case !== self::Signature,
+        ));
     }
 }

@@ -25,9 +25,12 @@ class ParapheurAuthTest extends TestCase
         ]);
 
         $response->assertOk()
-            ->assertJsonStructure(['accessToken', 'userData', 'userAbilityRules']);
+            ->assertJsonStructure(['authenticated', 'userData', 'userAbilityRules'])
+            ->assertCookie('parapheur_token')
+            ->assertJsonMissingPath('accessToken');
 
-        $token = $response->json('accessToken');
+        $dg = User::query()->where('email', 'dg@dgtcp.local')->firstOrFail();
+        $token = $dg->createToken('test')->plainTextToken;
 
         $this->withToken($token)
             ->getJson('/api/parapheur/counts')
@@ -105,13 +108,14 @@ class ParapheurAuthTest extends TestCase
         ]);
 
         $login->assertOk()
-            ->assertJsonPath('userData.mustChangePassword', true);
-
-        $token = $login->json('accessToken');
-        $this->assertNotEmpty($token);
+            ->assertJsonPath('userData.mustChangePassword', true)
+            ->assertCookie('parapheur_token')
+            ->assertJsonMissingPath('accessToken');
 
         $this->app['auth']->forgetGuards();
         $this->flushHeaders();
+
+        $token = $user->createToken('must-change')->plainTextToken;
 
         $this->withToken($token)
             ->getJson('/api/parapheur/counts')

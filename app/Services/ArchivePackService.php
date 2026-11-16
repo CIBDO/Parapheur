@@ -55,7 +55,18 @@ class ArchivePackService
             throw new InvalidArgumentException('Impossible de créer le pack ZIP.');
         }
 
-        $zip->addFromString('manifest.json', json_encode([
+        $versionDigests = $document->versions->map(fn ($version) => [
+            'version_number' => $version->version_number,
+            'original_name' => $version->original_name,
+            'checksum_sha256' => $version->checksum,
+            'is_main' => (bool) $version->is_main,
+            'is_official' => (bool) $version->is_official,
+            'uploaded_at' => optional($version->created_at)->toIso8601String(),
+        ])->values()->all();
+
+        $evidence = [
+            'kind' => 'administrative_archive_pack',
+            'disclaimer' => 'Preuve administrative de circuit (visa/validation). Ne constitue pas une signature électronique.',
             'exported_at' => now()->toIso8601String(),
             'exported_by' => $actor->only(['id', 'name', 'email']),
             'document' => [
@@ -81,13 +92,21 @@ class ArchivePackService
                 'archived_at' => optional($document->archived_at)->toIso8601String(),
                 'retention_until' => optional($document->retention_until)?->toDateString(),
             ],
+            'version_digests' => $versionDigests,
+            'actions_count' => $document->actions->count(),
+            'visas_count' => $document->visas->count(),
+            'approvals_count' => $document->approvals->count(),
             'linked_documents' => $document->outgoingLinks->map(fn ($l) => [
                 'relation' => $l->relation_type,
                 'target_id' => $l->target_document_id,
                 'target_reference' => $l->target?->reference,
                 'target_object' => $l->target?->object,
             ]),
-        ], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+        ];
+
+        $manifestFinal = json_encode($evidence, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+        $zip->addFromString('manifest.json', $manifestFinal);
+        $zip->addFromString('MANIFEST.sha256', hash('sha256', (string) $manifestFinal)."  manifest.json\n");
 
         $zip->addFromString('synthese.txt', implode("\n", [
             'FICHE DE SYNTHÈSE GED',
