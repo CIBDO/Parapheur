@@ -88,11 +88,12 @@
   <table class="grid services">
     @foreach($serviceRows as $row)
       <tr>
-        <td width="4%"></td>
         @foreach($row as $service)
+          <td width="3%" style="padding:2px;"></td>
           <td>{{ $service['label'] }}</td>
         @endforeach
         @for($i = count($row); $i < $perRow; $i++)
+          <td width="3%" style="padding:2px;"></td>
           <td></td>
         @endfor
       </tr>
