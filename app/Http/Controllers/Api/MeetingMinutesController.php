@@ -6,9 +6,12 @@ use App\Http\Controllers\Controller;
 use App\Models\Meeting;
 use App\Models\MeetingMinute;
 use App\Services\MeetingAccessService;
+use App\Services\MeetingDocumentRenderer;
 use App\Services\MeetingService;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\View;
 use Illuminate\Validation\Rule;
 
 class MeetingMinutesController extends Controller
@@ -16,6 +19,7 @@ class MeetingMinutesController extends Controller
     public function __construct(
         private readonly MeetingService $meetings,
         private readonly MeetingAccessService $access,
+        private readonly MeetingDocumentRenderer $renderer,
     ) {}
 
     public function generateConvocation(Request $request, Meeting $meeting): JsonResponse
@@ -109,8 +113,25 @@ class MeetingMinutesController extends Controller
         abort_unless($minute->meeting_id === $meeting->id, 404);
         $this->access->authorizeView($request->user(), $meeting);
 
-        return response($minute->body ?: '', 200, [
+        $body = $minute->body
+            ?: $this->renderer->buildMinutesBody($meeting, $minute->kind ?: 'cr_detaille');
+        $trimmed = ltrim($body);
+        $html = str_starts_with($trimmed, '<!DOCTYPE') || str_contains(strtolower(substr($trimmed, 0, 200)), '<html')
+            ? $body
+            : View::make('meetings.minutes-preview', ['body' => $body])->render();
+
+        $format = $request->string('format')->toString() ?: 'html';
+        $basename = 'cr-'.($meeting->reference ?: $meeting->id).'-v'.$minute->version_number;
+
+        if ($format === 'pdf') {
+            return Pdf::loadHTML($html)
+                ->setPaper('a4')
+                ->download($basename.'.pdf');
+        }
+
+        return response($html, 200, [
             'Content-Type' => 'text/html; charset=UTF-8',
+            'Content-Disposition' => 'inline; filename="'.$basename.'.html"',
         ]);
     }
 }

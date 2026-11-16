@@ -32,6 +32,7 @@ class MeetingService
         private readonly MeetingStateMachine $states,
         private readonly MeetingAccessService $access,
         private readonly MeetingDocumentRenderer $renderer,
+        private readonly MeetingMinutesDocxService $minutesDocx,
         private readonly PrivateDocumentStorage $storage,
         private readonly DocumentWorkflowService $documents,
         private readonly DocumentAccessService $documentAccess,
@@ -572,43 +573,70 @@ class MeetingService
 
     public function generateMinutes(User $actor, Meeting $meeting, string $kind = 'cr_detaille'): MeetingMinute
     {
-        $version = ((int) $meeting->minutes()->where('kind', $kind)->max('version_number')) + 1;
-        $body = $this->renderer->buildMinutesBody($meeting, $kind);
+        return DB::transaction(function () use ($actor, $meeting, $kind) {
+            $version = ((int) $meeting->minutes()->where('kind', $kind)->max('version_number')) + 1;
+            $body = $this->renderer->buildMinutesBody($meeting, $kind);
+            $docxBinary = $this->minutesDocx->build($meeting, $kind);
 
-        $minute = $meeting->minutes()->create([
-            'kind' => $kind,
-            'version_number' => $version,
-            'body' => $body,
-            'payload' => ['kind' => $kind],
-            'status' => 'brouillon',
-            'generated_by' => $actor->id,
-            'generated_at' => now(),
-        ]);
+            $type = DocumentType::query()->where('code', 'CR')->first() ?? DocumentType::query()->firstOrFail();
+            $title = ($kind === 'pv' ? 'Procès-verbal' : 'Compte rendu').' — '.$meeting->displayTitle();
+            $filename = $kind.'-'.$meeting->reference.'-v'.$version.'.docx';
+            $docKind = $kind === 'pv' ? MeetingDocumentKind::Pv : MeetingDocumentKind::CompteRendu;
 
-        if ($meeting->status === MeetingStatus::Terminee) {
-            $meeting->status = MeetingStatus::CrEnRedaction;
+            $document = $this->storeGeneratedDocx(
+                $actor,
+                $meeting,
+                $type,
+                $title,
+                $docxBinary,
+                $filename,
+                $docKind
+            );
+
+            $minute = $meeting->minutes()->create([
+                'kind' => $kind,
+                'version_number' => $version,
+                'body' => $body,
+                'payload' => ['kind' => $kind, 'format' => 'docx'],
+                'status' => 'brouillon',
+                'document_id' => $document->id,
+                'generated_by' => $actor->id,
+                'generated_at' => now(),
+            ]);
+
+            $meeting->minutes_document_id = $document->id;
+            if ($meeting->status === MeetingStatus::Terminee) {
+                $meeting->status = MeetingStatus::CrEnRedaction;
+            }
             $meeting->save();
-        }
 
-        $this->audit->log('meeting.minutes_generated', $minute);
+            $this->audit->log('meeting.minutes_generated', $minute);
 
-        return $minute->load(['generator']);
+            return $minute->load(['generator', 'document.latestVersion']);
+        });
     }
 
     public function submitMinutes(User $actor, Meeting $meeting, MeetingMinute $minute): MeetingMinute
     {
-        $type = DocumentType::query()->where('code', 'CR')->first() ?? DocumentType::query()->firstOrFail();
-        $document = $this->storeGeneratedDocument(
-            $actor,
-            $meeting,
-            $type,
-            ($minute->kind === 'pv' ? 'Procès-verbal' : 'Compte rendu').' — '.$meeting->displayTitle(),
-            $minute->body ?: $this->renderer->buildMinutesBody($meeting, $minute->kind),
-            $minute->kind.'-'.$meeting->reference.'-v'.$minute->version_number.'.html',
-            $minute->kind === 'pv' ? MeetingDocumentKind::Pv : MeetingDocumentKind::CompteRendu
-        );
+        $document = $minute->document_id
+            ? Document::query()->with('latestVersion')->find($minute->document_id)
+            : null;
 
-        $minute->document_id = $document->id;
+        // Compat : anciens CR HTML sans document DOCX
+        if (! $document) {
+            $type = DocumentType::query()->where('code', 'CR')->first() ?? DocumentType::query()->firstOrFail();
+            $document = $this->storeGeneratedDocx(
+                $actor,
+                $meeting,
+                $type,
+                ($minute->kind === 'pv' ? 'Procès-verbal' : 'Compte rendu').' — '.$meeting->displayTitle(),
+                $this->minutesDocx->build($meeting, $minute->kind ?: 'cr_detaille'),
+                $minute->kind.'-'.$meeting->reference.'-v'.$minute->version_number.'.docx',
+                $minute->kind === 'pv' ? MeetingDocumentKind::Pv : MeetingDocumentKind::CompteRendu
+            );
+            $minute->document_id = $document->id;
+        }
+
         $minute->status = 'soumis';
         $minute->submitted_at = now();
         $minute->save();
@@ -629,7 +657,7 @@ class MeetingService
         $this->transition($actor, $meeting, MeetingStatus::CrEnValidation);
         $this->audit->log('meeting.minutes_submitted', $minute);
 
-        return $minute->fresh(['document', 'generator']);
+        return $minute->fresh(['document.latestVersion', 'generator']);
     }
 
     public function validateMinutes(User $actor, Meeting $meeting, MeetingMinute $minute): MeetingMinute
@@ -958,7 +986,8 @@ class MeetingService
             'notes' => $notes,
             'minutes' => $meeting->minutes,
             'convocation_document' => $meeting->convocationDocument,
-            'minutes_document' => $meeting->minutesDocument,
+            'minutes_document' => $this->serializeMinutesDocument($meeting->minutesDocument),
+            'onlyoffice_enabled' => (bool) config('onlyoffice.enabled'),
             'previous_open_decisions' => $previousOpen,
             'stats' => [
                 'participants' => $meeting->participants->count(),
@@ -975,7 +1004,7 @@ class MeetingService
     {
         return $meeting->fresh([
             'type', 'structure', 'chair', 'secretary', 'organizer', 'creator', 'recurrence',
-            'currentAgendaItem', 'convocationDocument.type', 'minutesDocument.type',
+            'currentAgendaItem', 'convocationDocument.type', 'minutesDocument.type', 'minutesDocument.latestVersion',
             'participants.user.structure', 'participants.representative',
             'agendaItems.presenter',
             'documentLinks.document.type',
@@ -1235,6 +1264,79 @@ class MeetingService
         );
 
         return $document->fresh(['type', 'latestVersion']);
+    }
+
+    private function storeGeneratedDocx(
+        User $actor,
+        Meeting $meeting,
+        DocumentType $type,
+        string $object,
+        string $binary,
+        string $filename,
+        MeetingDocumentKind $kind
+    ): Document {
+        $document = $this->documents->createDraft($actor, [
+            'object' => $object,
+            'document_type_id' => $type->id,
+            'structure_id' => $meeting->structure_id ?? $actor->structure_id,
+            'confidentiality' => $meeting->confidentiality?->value ?? 'normal',
+            'priority' => $meeting->priority?->value ?? 'normale',
+            'keywords' => ['reunion', $kind->value, $meeting->reference, 'docx'],
+        ]);
+
+        $stored = $this->storage->storeContent(
+            $binary,
+            $filename,
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'documents/'.$document->uuid
+        );
+        $document->versions()->where('is_main', true)->update(['is_main' => false]);
+        DocumentVersion::query()->create([
+            'document_id' => $document->id,
+            'version_number' => 1,
+            'disk' => $stored['disk'],
+            'path' => $stored['path'],
+            'original_name' => $stored['original_name'],
+            'mime_type' => $stored['mime_type'],
+            'size' => $stored['size'],
+            'checksum' => $stored['checksum'],
+            'is_main' => true,
+            'uploaded_by' => $actor->id,
+            'change_note' => 'Génération DOCX institutionnelle — module Réunions',
+        ]);
+        $document->current_version = 1;
+        $document->save();
+
+        MeetingDocument::query()->updateOrCreate(
+            ['meeting_id' => $meeting->id, 'document_id' => $document->id],
+            ['kind' => $kind->value, 'sort_order' => 0]
+        );
+
+        return $document->fresh(['type', 'latestVersion']);
+    }
+
+    private function serializeMinutesDocument(?Document $document): ?array
+    {
+        if (! $document) {
+            return null;
+        }
+
+        $version = $document->latestVersion;
+
+        return [
+            'id' => $document->id,
+            'uuid' => $document->uuid,
+            'object' => $document->object,
+            'reference' => $document->reference,
+            'status' => $document->status,
+            'type' => $document->type,
+            'latest_version' => $version ? [
+                'id' => $version->id,
+                'version_number' => $version->version_number,
+                'mime_type' => $version->mime_type,
+                'original_name' => $version->original_name,
+            ] : null,
+        ];
     }
 
     private function meetingProfile(?string $role): string

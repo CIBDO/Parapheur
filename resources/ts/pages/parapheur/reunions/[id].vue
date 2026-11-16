@@ -79,11 +79,35 @@ const postponeDialog = ref(false)
 const cancelDialog = ref(false)
 const minutesKind = ref('cr_detaille')
 const minutesBody = ref('')
+const minutesEditorRemountKey = ref(0)
+
+const currentMinute = computed(() => meeting.value?.minutes?.[0] || null)
+const minutesDocument = computed(() => meeting.value?.minutes_document || null)
+const minutesDocIsOffice = computed(() => isOnlyOfficeEditableDocument(minutesDocument.value))
+const canUseOnlyOffice = computed(() =>
+  Boolean(meeting.value?.onlyoffice_enabled && minutesDocument.value?.id && minutesDocIsOffice.value),
+)
+const minutesStatusLabels: Record<string, string> = {
+  brouillon: 'Brouillon',
+  soumis: 'Soumis',
+  valide: 'Validé',
+  diffuse: 'Diffusé',
+}
+const minutesStatusColor = (status?: string) => {
+  if (status === 'valide' || status === 'diffuse')
+    return 'success'
+  if (status === 'soumis')
+    return 'warning'
+
+  return 'secondary'
+}
 
 const load = async () => {
   meeting.value = await $api(`/meetings/${id.value}`)
   minutesBody.value = meeting.value.minutes?.[0]?.body || ''
   visioUrl.value = meeting.value.visio_url || ''
+  if (meeting.value.minutes?.[0]?.kind)
+    minutesKind.value = meeting.value.minutes[0].kind
 }
 
 onMounted(async () => {
@@ -332,35 +356,44 @@ const addDecision = () => run(async () => {
 })
 const generateMinutes = () => run(async () => {
   const minute = await $api(`/meetings/${id.value}/minutes`, { method: 'POST', body: { kind: minutesKind.value } })
-  minutesBody.value = minute.body
+  minutesBody.value = minute.body || ''
+  minutesEditorRemountKey.value += 1
 })
 const saveMinutes = () => run(async () => {
-  const current = meeting.value?.minutes?.[0]
+  const current = currentMinute.value
   if (!current)
     return
+  if (canUseOnlyOffice.value) {
+    // Sauvegarde native OnlyOffice (callback serveur) — on remonte juste l’éditeur
+    minutesEditorRemountKey.value += 1
+
+    return
+  }
   await $api(`/meetings/${id.value}/minutes/${current.id}`, { method: 'PUT', body: { body: minutesBody.value } })
 })
 const submitMinutes = () => run(async () => {
-  const current = meeting.value?.minutes?.[0]
+  const current = currentMinute.value
   if (!current)
     return
+  if (!canUseOnlyOffice.value && minutesBody.value)
+    await $api(`/meetings/${id.value}/minutes/${current.id}`, { method: 'PUT', body: { body: minutesBody.value } })
   await $api(`/meetings/${id.value}/minutes/${current.id}/submit`, { method: 'POST' })
 })
 const validateMinutes = () => run(async () => {
-  const current = meeting.value?.minutes?.[0]
+  const current = currentMinute.value
   if (!current)
     return
   await $api(`/meetings/${id.value}/minutes/${current.id}/validate`, { method: 'POST' })
 })
 const diffuseMinutes = () => run(async () => {
-  const current = meeting.value?.minutes?.[0]
+  const current = currentMinute.value
   if (!current)
     return
   await $api(`/meetings/${id.value}/minutes/${current.id}/diffuse`, { method: 'POST' })
 })
 
 const previewMinutes = async (print = false) => {
-  const current = meeting.value?.minutes?.[0]
+  const current = currentMinute.value
   if (!current)
     return
   try {
@@ -369,6 +402,38 @@ const previewMinutes = async (print = false) => {
   catch (e: any) {
     errorMessage.value = e?.message || 'Aperçu impossible'
   }
+}
+
+const downloadMinutesPdf = async () => {
+  const current = currentMinute.value
+  if (!current)
+    return
+  try {
+    const res = await fetch(`/api/meetings/${id.value}/minutes/${current.id}/preview?format=pdf`, {
+      credentials: 'include',
+      headers: { Accept: 'application/pdf', 'X-Requested-With': 'XMLHttpRequest' },
+    })
+    if (!res.ok)
+      throw new Error('Export PDF impossible')
+    const blob = await res.blob()
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `cr-${meeting.value?.reference || id.value}.pdf`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+  catch (e: any) {
+    errorMessage.value = e?.message || 'Export PDF impossible'
+  }
+}
+
+const onMinutesOnlyOfficeSaved = async () => {
+  await load()
+}
+
+const onMinutesOnlyOfficeReload = () => {
+  minutesEditorRemountKey.value += 1
 }
 
 const postpone = () => run(async () => {
@@ -1236,84 +1301,169 @@ const statusLabel = computed(() => meetingStatusLabels[meeting.value?.status] ||
       </VWindowItem>
 
       <VWindowItem value="minutes">
-        <VCard>
+        <VCard class="minutes-workspace">
           <VCardText>
-            <AppSelect
-              v-model="minutesKind"
-              :items="[
-                { value: 'cr_simple', title: 'Compte rendu simple' },
-                { value: 'cr_detaille', title: 'Compte rendu détaillé' },
-                { value: 'pv', title: 'Procès-verbal' },
-                { value: 'releve_decisions', title: 'Relevé de décisions' },
-              ]"
-              class="mb-3"
-            />
-            <div class="d-flex flex-wrap gap-2 mb-4">
-              <VBtn
-                :loading="busy"
-                @click="generateMinutes"
-              >
-                Générer le projet
-              </VBtn>
-              <VBtn
-                variant="tonal"
-                :loading="busy"
-                @click="saveMinutes"
-              >
-                Enregistrer
-              </VBtn>
-              <VBtn
-                variant="tonal"
-                :loading="busy"
-                @click="submitMinutes"
-              >
-                Soumettre
-              </VBtn>
-              <VBtn
-                color="primary"
-                :loading="busy"
-                @click="validateMinutes"
-              >
-                Valider
-              </VBtn>
-              <VBtn
-                :loading="busy"
-                @click="diffuseMinutes"
-              >
-                Diffuser
-              </VBtn>
-              <VBtn
-                v-if="meeting.minutes?.[0]"
-                variant="tonal"
-                prepend-icon="tabler-eye"
-                @click="previewMinutes()"
-              >
-                Aperçu
-              </VBtn>
-              <VBtn
-                v-if="meeting.minutes?.[0]"
-                variant="tonal"
-                prepend-icon="tabler-printer"
-                @click="previewMinutes(true)"
-              >
-                Imprimer
-              </VBtn>
-              <VBtn
-                v-if="meeting.minutes_document"
-                variant="text"
-                :to="{ name: 'parapheur-id', params: { id: meeting.minutes_document.id } }"
-              >
-                Ouvrir dans le parapheur
-              </VBtn>
+            <div class="d-flex flex-wrap align-center justify-space-between gap-3 mb-4">
+              <div class="d-flex flex-wrap align-center gap-3">
+                <AppSelect
+                  v-model="minutesKind"
+                  :items="[
+                    { value: 'cr_simple', title: 'Compte rendu simple' },
+                    { value: 'cr_detaille', title: 'Compte rendu détaillé' },
+                    { value: 'pv', title: 'Procès-verbal' },
+                    { value: 'releve_decisions', title: 'Relevé de décisions' },
+                  ]"
+                  label="Type d’acte"
+                  style="min-inline-size: 240px"
+                  hide-details
+                />
+                <VChip
+                  v-if="currentMinute"
+                  :color="minutesStatusColor(currentMinute.status)"
+                  variant="tonal"
+                >
+                  {{ minutesStatusLabels[currentMinute.status] || currentMinute.status }}
+                  <span
+                    v-if="currentMinute.version_number"
+                    class="ms-1"
+                  >· v{{ currentMinute.version_number }}</span>
+                </VChip>
+                <VChip
+                  v-if="canUseOnlyOffice"
+                  color="info"
+                  variant="tonal"
+                  size="small"
+                  prepend-icon="tabler-file-word"
+                >
+                  Édition Word (OnlyOffice)
+                </VChip>
+                <VChip
+                  v-else-if="currentMinute"
+                  color="secondary"
+                  variant="tonal"
+                  size="small"
+                >
+                  Mode A4 institutionnel
+                </VChip>
+              </div>
+
+              <div class="d-flex flex-wrap gap-2">
+                <VBtn
+                  color="primary"
+                  :loading="busy"
+                  prepend-icon="tabler-file-plus"
+                  @click="generateMinutes"
+                >
+                  Générer le projet
+                </VBtn>
+                <VBtn
+                  v-if="currentMinute"
+                  variant="tonal"
+                  :loading="busy"
+                  prepend-icon="tabler-device-floppy"
+                  @click="saveMinutes"
+                >
+                  {{ canUseOnlyOffice ? 'Actualiser' : 'Enregistrer' }}
+                </VBtn>
+                <VBtn
+                  v-if="currentMinute && currentMinute.status === 'brouillon'"
+                  variant="tonal"
+                  :loading="busy"
+                  @click="submitMinutes"
+                >
+                  Soumettre
+                </VBtn>
+                <VBtn
+                  v-if="currentMinute && ['soumis', 'brouillon'].includes(currentMinute.status)"
+                  color="primary"
+                  :loading="busy"
+                  @click="validateMinutes"
+                >
+                  Valider
+                </VBtn>
+                <VBtn
+                  v-if="currentMinute && ['valide', 'soumis'].includes(currentMinute.status)"
+                  color="success"
+                  :loading="busy"
+                  @click="diffuseMinutes"
+                >
+                  Diffuser
+                </VBtn>
+                <VMenu v-if="currentMinute">
+                  <template #activator="{ props: menuProps }">
+                    <VBtn
+                      v-bind="menuProps"
+                      variant="text"
+                      icon="tabler-dots-vertical"
+                    />
+                  </template>
+                  <VList density="compact">
+                    <VListItem
+                      title="Aperçu institutionnel"
+                      prepend-icon="tabler-eye"
+                      @click="previewMinutes()"
+                    />
+                    <VListItem
+                      title="Imprimer"
+                      prepend-icon="tabler-printer"
+                      @click="previewMinutes(true)"
+                    />
+                    <VListItem
+                      title="Exporter PDF"
+                      prepend-icon="tabler-file-type-pdf"
+                      @click="downloadMinutesPdf"
+                    />
+                    <VListItem
+                      v-if="minutesDocument?.id"
+                      title="Ouvrir dans le parapheur"
+                      prepend-icon="tabler-folder"
+                      :to="{ name: 'parapheur-id', params: { id: minutesDocument.id } }"
+                    />
+                  </VList>
+                </VMenu>
+              </div>
             </div>
-            <div class="text-body-2 text-medium-emphasis mb-2">
-              Projet de compte rendu
-            </div>
-            <TiptapEditor
-              v-model="minutesBody"
-              placeholder="Générez le projet puis affinez le texte ici…"
-              class="minutes-editor border rounded"
-            />
+
+            <VAlert
+              v-if="!currentMinute"
+              type="info"
+              variant="tonal"
+              class="mb-0"
+            >
+              Choisissez le type d’acte puis générez le projet. Le document inclut l’entête
+              institutionnelle, entièrement modifiable (Word OnlyOffice ou éditeur A4).
+            </VAlert>
+
+            <template v-else>
+              <div
+                v-if="canUseOnlyOffice"
+                class="minutes-office-shell"
+              >
+                <OnlyOfficeEditor
+                  :key="`minutes-oo-${minutesDocument.id}-${minutesEditorRemountKey}`"
+                  :document-id="minutesDocument.id"
+                  @saved="onMinutesOnlyOfficeSaved"
+                  @reload="onMinutesOnlyOfficeReload"
+                />
+              </div>
+
+              <div
+                v-else
+                class="minutes-a4-shell"
+              >
+                <div class="minutes-a4-sheet">
+                  <TiptapEditor
+                    v-model="minutesBody"
+                    placeholder="L’entête institutionnelle et le corps du CR sont modifiables ici…"
+                    class="minutes-editor"
+                  />
+                </div>
+                <p class="text-caption text-medium-emphasis mt-3 mb-0">
+                  L’entête (MEF / DGTCP / République du Mali) fait partie du document et peut être modifiée.
+                  OnlyOffice désactivé : édition HTML A4 — activez <code>ONLYOFFICE_ENABLED</code> pour Word.
+                </p>
+              </div>
+            </template>
           </VCardText>
         </VCard>
       </VWindowItem>
@@ -1402,10 +1552,47 @@ const statusLabel = computed(() => meetingStatusLabels[meeting.value?.status] ||
 </template>
 
 <style scoped lang="scss">
+.minutes-workspace {
+  background: rgba(var(--v-theme-on-surface), 0.02);
+}
+
+.minutes-office-shell {
+  min-block-size: 44rem;
+  overflow: hidden;
+  border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
+  border-radius: 12px;
+  background: #fff;
+}
+
+.minutes-a4-shell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.minutes-a4-sheet {
+  inline-size: min(100%, 52rem);
+  padding: 1.75rem 1.5rem 2rem;
+  border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
+  border-radius: 4px;
+  background: #fff;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 8%);
+}
+
 .minutes-editor {
   :deep(.ProseMirror) {
-    min-block-size: 28rem;
-    padding: 1rem;
+    min-block-size: 32rem;
+    padding: 0.25rem 0;
+    font-family: "Times New Roman", Times, serif;
+    font-size: 0.95rem;
+    line-height: 1.45;
+  }
+
+  :deep(.minutes-letterhead),
+  :deep(table.minutes-letterhead) {
+    width: 100%;
+    margin-block-end: 1.25rem;
+    border-collapse: collapse;
   }
 }
 </style>

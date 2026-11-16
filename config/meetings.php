@@ -23,4 +23,22 @@ return [
         'meeting_hours_before' => [1],
         'decision_days_before' => [7, 3, 1],
     ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Entête institutionnelle (modifiable dans le CR / DOCX / PDF)
+    |--------------------------------------------------------------------------
+    |
+    | Ces valeurs sont injectées à la génération. Une fois dans le document,
+    | le rédacteur peut les modifier librement (Tiptap ou OnlyOffice).
+    |
+    */
+    'letterhead' => [
+        'ministry_line_1' => env('MEETINGS_LETTERHEAD_MINISTRY_1', "MINISTÈRE DE L'ÉCONOMIE"),
+        'ministry_line_2' => env('MEETINGS_LETTERHEAD_MINISTRY_2', 'ET DES FINANCES'),
+        'direction_line_1' => env('MEETINGS_LETTERHEAD_DIRECTION_1', 'DIRECTION GÉNÉRALE DU TRÉSOR'),
+        'direction_line_2' => env('MEETINGS_LETTERHEAD_DIRECTION_2', 'ET DE LA COMPTABILITÉ PUBLIQUE'),
+        'republic' => env('MEETINGS_LETTERHEAD_REPUBLIC', 'RÉPUBLIQUE DU MALI'),
+        'motto' => env('MEETINGS_LETTERHEAD_MOTTO', 'Un Peuple - Un But - Une Foi'),
+    ],
 ];

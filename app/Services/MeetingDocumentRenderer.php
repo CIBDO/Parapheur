@@ -264,16 +264,37 @@ HTML;
 </table>
 HTML;
 
-        $institutional = $this->renderInstitutional([
-            'title' => $title,
-            'subtitle' => $meeting->displayTitle(),
-            'metaRows' => $this->commonMeta($meeting),
-            'body' => $body,
-            'reference' => (string) ($meeting->reference ?: ''),
-            'date' => optional($meeting->meeting_date)->format('d/m/Y') ?: '',
-        ]);
+        // Fragment éditable (entête incluse) — modifiable dans Tiptap / puis figé dans le DOCX OnlyOffice
+        $editorBody = $this->letterheadEditableHtml()
+            .'<h1 style="text-align:center;text-transform:uppercase;">'.$this->e($title).'</h1>'
+            .'<p style="text-align:center;">'.$this->e($meeting->displayTitle()).'</p>'
+            .$body;
 
-        return $this->renderKind($kind, $this->placeholders($meeting), $institutional);
+        return $this->renderKind($kind, $this->placeholders($meeting), $editorBody);
+    }
+
+    /**
+     * Entête institutionnelle sous forme de HTML éditable (Tiptap / aperçu).
+     */
+    public function letterheadEditableHtml(): string
+    {
+        $lh = config('meetings.letterhead', []);
+        $ministry1 = e((string) ($lh['ministry_line_1'] ?? "MINISTÈRE DE L'ÉCONOMIE"));
+        $ministry2 = e((string) ($lh['ministry_line_2'] ?? 'ET DES FINANCES'));
+        $direction1 = e((string) ($lh['direction_line_1'] ?? 'DIRECTION GÉNÉRALE DU TRÉSOR'));
+        $direction2 = e((string) ($lh['direction_line_2'] ?? 'ET DE LA COMPTABILITÉ PUBLIQUE'));
+        $republic = e((string) ($lh['republic'] ?? 'RÉPUBLIQUE DU MALI'));
+        $motto = e((string) ($lh['motto'] ?? 'Un Peuple - Un But - Une Foi'));
+
+        // Paragraphes (pas de <table>/<div>) pour rester éditable dans Tiptap StarterKit
+        return <<<HTML
+<p class="minutes-letterhead-block" style="text-align:center;text-transform:uppercase;"><strong>{$ministry1}</strong><br><strong>{$ministry2}</strong></p>
+<p style="text-align:center;">______________</p>
+<p style="text-align:center;text-transform:uppercase;"><strong>{$direction1}</strong><br><strong>{$direction2}</strong></p>
+<p style="text-align:center;">______________</p>
+<p style="text-align:right;text-transform:uppercase;"><strong>{$republic}</strong><br><em style="text-transform:none;font-style:normal;">{$motto}</em></p>
+<p style="text-align:right;">______________</p>
+HTML;
     }
 
     /**
