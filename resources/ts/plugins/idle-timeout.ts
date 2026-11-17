@@ -31,7 +31,7 @@ async function forceLogoutForIdle(): Promise<void> {
   localStorage.removeItem(STORAGE_KEY)
 
   if (typeof window !== 'undefined' && !window.location.pathname.includes('/login'))
-    window.location.assign('/login?reason=idle')
+    window.location.assign('/login')
 }
 
 /**

@@ -12,7 +12,26 @@ const selectable = computed(() => (options.value as Record<string, any>[])
   .map(option => ({ ...option, title: optionTitle(option) })))
 const showSelect = computed(() => selectable.value.length > 1)
 
+const isMobile = useMediaQuery('(max-width: 960px)')
+
 const currentLabel = computed(() => {
+  const code = current.value?.structure?.code
+  const name = current.value?.structure?.name || code
+  const unit = current.value?.unit?.name
+  if (!name)
+    return ''
+
+  // Mobile : privilégier le code court pour éviter le débordement dans la navbar
+  if (isMobile.value && code)
+    return code
+
+  if (unit && unit !== name)
+    return `${name} — ${unit}`
+
+  return name
+})
+
+const currentFullLabel = computed(() => {
   const structure = current.value?.structure?.name || current.value?.structure?.code
   const unit = current.value?.unit?.name
   if (!structure)
@@ -69,7 +88,7 @@ onMounted(loadContext)
 
 <template>
   <div
-    v-if="showSelect || currentLabel"
+    v-if="!isMobile && (showSelect || currentLabel)"
     class="mail-context d-flex align-center me-2"
   >
     <VSelect
@@ -85,6 +104,7 @@ onMounted(loadContext)
       :disabled="switching"
       label="Périmètre"
       class="mail-context-select"
+      :title="currentFullLabel"
       @update:model-value="onSwitch"
     >
       <template #selection="{ item }">
@@ -98,7 +118,7 @@ onMounted(loadContext)
       variant="tonal"
       color="primary"
       prepend-icon="tabler-building"
-      :title="currentLabel"
+      :title="currentFullLabel"
     >
       <span class="mail-context-label">{{ currentLabel }}</span>
     </VChip>
@@ -108,33 +128,48 @@ onMounted(loadContext)
 <style scoped>
 .mail-context {
   flex: 0 1 auto;
-  max-width: calc(100% - 220px);
+  max-width: min(28rem, calc(100vw - 13.5rem));
   min-width: 0;
 }
 
 .mail-context-label {
-  white-space: normal;
-  line-height: 1.25;
+  display: block;
+  overflow: hidden;
+  max-width: 100%;
   text-align: start;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  line-height: 1.25;
 }
 
 .mail-context-chip {
-  height: auto;
   max-width: 100%;
-  padding-block: 4px;
+  min-width: 0;
 }
 
 .mail-context-chip :deep(.v-chip__content) {
-  white-space: normal;
-  overflow: visible;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .mail-context-select {
-  min-width: 280px;
+  min-width: 0;
   max-width: 100%;
+  width: min(18rem, 100%);
 }
 
 .mail-context-select :deep(.v-field__input) {
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  overflow: hidden;
+}
+
+@media (max-width: 960px) {
+  .mail-context {
+    max-width: calc(100vw - 11.5rem);
+  }
+
+  .mail-context-select {
+    width: min(9.5rem, 100%);
+  }
 }
 </style>
