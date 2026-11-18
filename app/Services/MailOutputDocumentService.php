@@ -307,8 +307,8 @@ class MailOutputDocumentService
             $city = $locality !== '' ? $locality : $city;
         }
         $code = trim((string) ($presentation['structure_code'] ?? ''));
-        if ($code === '' || preg_match('/^DGTCP(\s*-\s*DG)?$/i', $code)) {
-            $code = $abbreviation !== '' ? $abbreviation : $code;
+        if ($code === '') {
+            $code = $abbreviation;
         }
 
         $person = $this->identity->personForSignatory($identity);

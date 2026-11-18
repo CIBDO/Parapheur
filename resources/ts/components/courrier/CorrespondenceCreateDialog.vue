@@ -118,12 +118,25 @@ function removeLine(index: number) {
   form.value.lines.splice(index, 1)
 }
 
-function syncSenderDefaults() {
+function structureSuffix(structure: any): string {
+  const code = String(structure?.code || '').trim()
+  if (!code)
+    return ''
+  const type = String(structure?.type?.code || structure?.type_code || '').toUpperCase()
+  if (type === 'DG' || code.toUpperCase() === 'DGTCP')
+    return 'DGTCP - DG'
+
+  return code
+}
+
+function syncSenderDefaults(options: { forceCode?: boolean } = {}) {
   const structure = structures.value.find(s => s.id === form.value.sender_structure_id)
   if (!structure)
     return
   form.value.presentation.sender_title = structure.name || form.value.presentation.sender_title
-  form.value.presentation.structure_code = structure.code || form.value.presentation.structure_code
+  const suffix = structureSuffix(structure)
+  if (options.forceCode || !form.value.presentation.structure_code.trim())
+    form.value.presentation.structure_code = suffix
 }
 
 function syncRecipientDefaults() {
@@ -307,12 +320,12 @@ watch(() => props.modelValue, (open) => {
     form.value.sender_structure_id = userData.value?.structure?.id ?? userData.value?.structure_id ?? null
     form.value.presentation.signatory_name = userData.value?.name || ''
     scanFile.value = null
-    syncSenderDefaults()
+    syncSenderDefaults({ forceCode: true })
     searchCorrespondents('')
   }
 })
 
-watch(() => form.value.sender_structure_id, syncSenderDefaults)
+watch(() => form.value.sender_structure_id, () => syncSenderDefaults({ forceCode: true }))
 watch(() => form.value.correspondent_id, syncRecipientDefaults)
 watch(() => form.value.lines.map(line => line.designation).join('|'), () => {
   if (!isArrival.value) {
@@ -680,17 +693,24 @@ onMounted(async () => {
             </VWindowItem>
 
             <VWindowItem value="signature">
-              <VAlert
-                type="info"
-                variant="tonal"
-                density="compact"
-                class="mb-4"
-              >
-                Lieu, structure et destinataire du bordereau sont repris automatiquement
-                depuis le service émetteur et le destinataire.
-              </VAlert>
-
               <div class="text-subtitle-2 mb-2">
+                Suffixe du bordereau
+              </div>
+              <VRow class="mb-2">
+                <VCol
+                  cols="12"
+                  md="6"
+                >
+                  <AppTextField
+                    v-model="form.presentation.structure_code"
+                    label="Code après N° (ex. DGTCP - DG)"
+                    hint="Prérempli selon le service émetteur, modifiable."
+                    persistent-hint
+                  />
+                </VCol>
+              </VRow>
+
+              <div class="text-subtitle-2 mb-2 mt-4">
                 Signataire du bordereau
               </div>
               <VRow>
