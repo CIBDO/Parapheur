@@ -136,7 +136,6 @@ declare module 'vue-router/auto-routes' {
     'taches-calendrier': RouteRecordInfo<'taches-calendrier', '/taches/calendrier', Record<never, never>, Record<never, never>>,
     'taches-instructions': RouteRecordInfo<'taches-instructions', '/taches/instructions', Record<never, never>, Record<never, never>>,
     'taches-instructions-id': RouteRecordInfo<'taches-instructions-id', '/taches/instructions/:id', { id: ParamValue<true> }, { id: ParamValue<false> }>,
-    'taches-kanban': RouteRecordInfo<'taches-kanban', '/taches/kanban', Record<never, never>, Record<never, never>>,
     'taches-nouvelle': RouteRecordInfo<'taches-nouvelle', '/taches/nouvelle', Record<never, never>, Record<never, never>>,
     'taches-rapports': RouteRecordInfo<'taches-rapports', '/taches/rapports', Record<never, never>, Record<never, never>>,
     'ticketing': RouteRecordInfo<'ticketing', '/ticketing', Record<never, never>, Record<never, never>>,

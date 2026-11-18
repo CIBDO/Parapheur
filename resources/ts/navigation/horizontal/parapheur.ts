@@ -25,12 +25,6 @@ export default [
         subject: 'Task',
       },
       {
-        title: 'Kanban',
-        to: 'taches-kanban',
-        action: 'read',
-        subject: 'Task',
-      },
-      {
         title: 'Instructions',
         to: 'taches-instructions',
         action: 'read',

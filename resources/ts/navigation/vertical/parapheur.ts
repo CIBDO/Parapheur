@@ -56,13 +56,6 @@ export default [
         subject: 'Task',
       },
       {
-        title: 'Kanban',
-        icon: { icon: 'tabler-layout-kanban' },
-        to: 'taches-kanban',
-        action: 'read',
-        subject: 'Task',
-      },
-      {
         title: 'Instructions',
         icon: { icon: 'tabler-list-check' },
         to: 'taches-instructions',

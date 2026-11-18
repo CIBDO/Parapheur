@@ -71,7 +71,6 @@ const cards = computed(() => [
 const quickActions = [
   { title: 'Nouvelle tâche', icon: 'tabler-checkbox', color: 'primary', action: 'create-task' as const },
   { title: 'Instructions', icon: 'tabler-list-check', color: 'success', route: 'taches-instructions' },
-  { title: 'Kanban', icon: 'tabler-layout-kanban', color: 'info', route: 'taches-kanban' },
   { title: 'Tickets', icon: 'tabler-ticket', color: 'warning', route: 'ticketing' },
   { title: 'Courrier', icon: 'tabler-mail', color: 'secondary', route: 'courrier' },
   { title: 'Parapheur', icon: 'tabler-file', color: 'primary', route: 'parapheur' },

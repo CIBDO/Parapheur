@@ -116,13 +116,6 @@ onMounted(reload)
     >
       <template #actions>
         <VBtn
-          variant="tonal"
-          prepend-icon="tabler-layout-kanban"
-          @click="router.push('/taches/kanban')"
-        >
-          Kanban
-        </VBtn>
-        <VBtn
           color="primary"
           prepend-icon="tabler-plus"
           @click="showCreateDialog = true"
