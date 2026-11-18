@@ -36,7 +36,7 @@
     table.grid th { text-align: center; font-weight: bold; height: 26px; }
     td.qty, th.qty { text-align: center; width: 16%; }
     th.obs { width: 30%; }
-    td.obs { width: 30%; text-align: left; vertical-align: top; white-space: pre-wrap; }
+    td.obs { width: 30%; text-align: center; vertical-align: middle; white-space: pre-wrap; }
     td.designation { text-align: left; height: 28px; }
     tr.total td { font-weight: bold; text-align: center; height: 30px; }
     table.sign { border-collapse: collapse; margin-top: 22px; margin-left: auto; }
@@ -180,7 +180,7 @@
       </tr>
       @if(trim((string) ($signatoryName ?? '')) !== '' || trim((string) ($signatoryGrade ?? '')) !== '')
         <tr>
-          <td align="center" style="height:28px;">&nbsp;</td>
+          <td align="center" style="height:72px;">&nbsp;</td>
         </tr>
       @endif
     @endif

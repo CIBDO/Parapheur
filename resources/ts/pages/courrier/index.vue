@@ -24,9 +24,11 @@ const loading = ref(true)
 const recentLoading = ref(true)
 const searchLoading = ref(false)
 const dashboardType = ref<'order-office' | 'dg' | 'direction'>('order-office')
+const listScope = ref<'entrant' | 'sortant'>('entrant')
 const showAdvanced = ref(false)
 const hasSearched = ref(false)
 const recentIncoming = ref<any[]>([])
+const recentOutgoing = ref<any[]>([])
 const searchResults = ref<any[]>([])
 const showCreate = ref(false)
 const createDirection = ref<'entrant' | 'sortant'>('entrant')
@@ -72,33 +74,91 @@ const activeFilterCount = computed(() => {
   return n
 })
 
-const cards = computed(() => [
-  { title: 'Reçus aujourd\'hui', value: stats.value.received_today || 0, icon: 'tabler-inbox', color: 'info', route: 'courrier-entrants', hint: 'Arrivées du jour' },
-  { title: 'À affecter', value: stats.value.to_assign || 0, icon: 'tabler-user-plus', color: 'warning', route: 'courrier-a-affecter', hint: 'Sans destinataire' },
-  { title: 'En traitement', value: stats.value.in_processing || 0, icon: 'tabler-clock', color: 'primary', route: 'courrier-a-traiter', hint: 'En cours' },
-  { title: 'En retard', value: stats.value.overdue || 0, icon: 'tabler-alert-triangle', color: 'error', route: 'courrier-en-retard', hint: 'Échéance dépassée' },
-])
+const cards = computed(() => {
+  if (dashboardType.value === 'dg') {
+    return [
+      { title: 'Pour moi', value: stats.value.for_me || 0, icon: 'tabler-user', color: 'primary', route: 'courrier-a-traiter', hint: 'Affectés à vous' },
+      { title: 'Urgents', value: stats.value.urgent || 0, icon: 'tabler-flame', color: 'error', route: 'courrier-recherche', hint: 'Priorité haute' },
+      { title: 'À valider / viser', value: stats.value.to_validate || 0, icon: 'tabler-stamp', color: 'warning', route: 'courrier-a-traiter', hint: 'Décision requise' },
+      { title: 'À signer', value: stats.value.to_sign || 0, icon: 'tabler-writing-sign', color: 'info', route: 'courrier-sortants', hint: 'Signature' },
+      { title: 'En retard', value: stats.value.overdue || 0, icon: 'tabler-alert-triangle', color: 'error', route: 'courrier-en-retard', hint: 'Échéance dépassée' },
+      { title: 'Expédiés (7 j)', value: stats.value.recent_dispatched || 0, icon: 'tabler-send', color: 'success', route: 'courrier-sortants', hint: 'Départs récents' },
+    ]
+  }
 
-const tableItems = computed(() =>
-  hasSearched.value ? searchResults.value : recentIncoming.value,
+  if (dashboardType.value === 'direction') {
+    return [
+      { title: 'Arrivés', value: stats.value.received || 0, icon: 'tabler-inbox', color: 'info', route: 'courrier-entrants', hint: 'Courriers entrants' },
+      { title: 'Départs', value: stats.value.outgoing || 0, icon: 'tabler-send', color: 'success', route: 'courrier-sortants', hint: 'Courriers sortants' },
+      { title: 'Internes', value: stats.value.internal || 0, icon: 'tabler-mail-forward', color: 'primary', route: 'courrier-internes', hint: 'Notes / internes' },
+      { title: 'Non pris', value: stats.value.not_taken || 0, icon: 'tabler-user-question', color: 'warning', route: 'courrier-a-affecter', hint: 'À prendre en charge' },
+      { title: 'En traitement', value: stats.value.in_processing || 0, icon: 'tabler-clock', color: 'primary', route: 'courrier-a-traiter', hint: 'En cours' },
+      { title: 'En retard', value: stats.value.overdue || 0, icon: 'tabler-alert-triangle', color: 'error', route: 'courrier-en-retard', hint: 'Échéance dépassée' },
+    ]
+  }
+
+  return [
+    { title: 'Reçus aujourd\'hui', value: stats.value.received_today || 0, icon: 'tabler-inbox', color: 'info', route: 'courrier-entrants', hint: 'Arrivées du jour' },
+    { title: 'À affecter', value: stats.value.to_assign || 0, icon: 'tabler-user-plus', color: 'warning', route: 'courrier-a-affecter', hint: 'Sans destinataire' },
+    { title: 'En traitement', value: stats.value.in_processing || 0, icon: 'tabler-clock', color: 'primary', route: 'courrier-a-traiter', hint: 'En cours' },
+    { title: 'À expédier', value: stats.value.to_dispatch || 0, icon: 'tabler-package', color: 'secondary', route: 'courrier-sortants', hint: 'Départs prêts' },
+    { title: 'Expédiés aujourd\'hui', value: stats.value.dispatched_today || 0, icon: 'tabler-send', color: 'success', route: 'courrier-sortants', hint: 'Départs du jour' },
+    { title: 'En retard', value: stats.value.overdue || 0, icon: 'tabler-alert-triangle', color: 'error', route: 'courrier-en-retard', hint: 'Échéance dépassée' },
+  ]
+})
+
+const tableItems = computed(() => {
+  if (hasSearched.value)
+    return searchResults.value
+
+  return listScope.value === 'sortant' ? recentOutgoing.value : recentIncoming.value
+})
+
+const tableTitle = computed(() => {
+  if (hasSearched.value)
+    return `Résultats de recherche (${searchResults.value.length})`
+
+  return listScope.value === 'sortant'
+    ? 'Derniers courriers de départ'
+    : 'Derniers courriers arrivés'
+})
+
+const tableSubtitle = computed(() => {
+  if (hasSearched.value)
+    return 'Correspondances trouvées selon vos critères'
+
+  return listScope.value === 'sortant'
+    ? 'Les 10 derniers enregistrements de départ'
+    : 'Les 10 derniers enregistrements d\'arrivée'
+})
+
+const partyColumnTitle = computed(() =>
+  listScope.value === 'sortant' ? 'Destinataire' : 'Expéditeur',
 )
 
-const tableTitle = computed(() =>
-  hasSearched.value
-    ? `Résultats de recherche (${searchResults.value.length})`
-    : 'Derniers courriers arrivés',
+const dateColumnTitle = computed(() =>
+  listScope.value === 'sortant' ? 'Date' : 'Reçu le',
 )
 
-const recentHeaders = [
-  { title: 'N°', key: 'number', width: '140px' },
-  { title: 'Objet', key: 'subject' },
-  { title: 'Expéditeur', key: 'sender', width: '180px' },
-  { title: 'Priorité', key: 'priority', width: '120px' },
-  { title: 'Statut', key: 'status', width: '140px' },
-  { title: 'Affectation', key: 'assignment', width: '140px' },
-  { title: 'Reçu le', key: 'received_at', width: '150px' },
-  { title: '', key: 'actions', width: '110px', sortable: false },
-]
+const recentHeaders = computed(() => {
+  const headers = [
+    { title: 'N°', key: 'number', width: '140px' },
+    { title: 'Objet', key: 'subject' },
+    { title: partyColumnTitle.value, key: 'sender', width: '180px' },
+    { title: 'Priorité', key: 'priority', width: '120px' },
+    { title: 'Statut', key: 'status', width: '140px' },
+  ]
+
+  if (listScope.value !== 'sortant' || hasSearched.value)
+    headers.push({ title: 'Affectation', key: 'assignment', width: '140px' })
+
+  headers.push(
+    { title: dateColumnTitle.value, key: 'received_at', width: '150px' },
+    { title: '', key: 'actions', width: '110px', sortable: false },
+  )
+
+  return headers
+})
 
 function openCreate(direction: 'entrant' | 'sortant') {
   createDirection.value = direction
@@ -107,14 +167,14 @@ function openCreate(direction: 'entrant' | 'sortant') {
 
 async function onCreated() {
   showCreate.value = false
-  await Promise.all([loadDashboard(), loadRecentIncoming()])
+  await Promise.all([loadDashboard(), loadRecentLists()])
 }
 
 onMounted(async () => {
   $api('/mail/meta/priorities')
     .then(items => applyMailPriorities(Array.isArray(items) ? items : []))
     .catch(() => undefined)
-  await Promise.all([loadDashboard(), loadRecentIncoming()])
+  await Promise.all([loadDashboard(), loadRecentLists()])
 })
 
 watch(simpleQuery, (value) => {
@@ -144,7 +204,6 @@ async function switchDashboard(type: 'order-office' | 'dg' | 'direction') {
 }
 
 async function loadRecentIncoming() {
-  recentLoading.value = true
   try {
     const response = await $api('/mail/correspondences', {
       query: {
@@ -157,9 +216,39 @@ async function loadRecentIncoming() {
   catch {
     recentIncoming.value = []
   }
+}
+
+async function loadRecentOutgoing() {
+  try {
+    const response = await $api('/mail/correspondences', {
+      query: {
+        direction: 'sortant',
+        per_page: 10,
+      },
+    })
+    recentOutgoing.value = listItems(response)
+  }
+  catch {
+    recentOutgoing.value = []
+  }
+}
+
+async function loadRecentLists() {
+  recentLoading.value = true
+  try {
+    await Promise.all([loadRecentIncoming(), loadRecentOutgoing()])
+  }
   finally {
     recentLoading.value = false
   }
+}
+
+function setListScope(scope: unknown) {
+  if (scope !== 'entrant' && scope !== 'sortant')
+    return
+  listScope.value = scope
+  if (hasSearched.value)
+    resetSearch()
 }
 
 async function performSearch() {
@@ -207,9 +296,10 @@ function resetSearch() {
 }
 
 function senderLabel(item: any) {
-  const from = partiesByRole(item.parties, 'from')[0]
-  if (from)
-    return partyDisplayName(from) || from.organization || '—'
+  const role = item.direction === 'sortant' || listScope.value === 'sortant' ? 'to' : 'from'
+  const party = partiesByRole(item.parties, role)[0]
+  if (party)
+    return partyDisplayName(party) || party.organization || '—'
 
   return item.structure?.name || item.external_reference || '—'
 }
@@ -220,6 +310,8 @@ function openItem(item: any) {
 
 function rowProps({ item }: { item: any }) {
   const row = item?.raw ?? item
+  if ((row?.direction === 'sortant' || listScope.value === 'sortant') && !hasSearched.value)
+    return {}
 
   return {
     class: isCorrespondenceAssigned(row) ? 'courrier-row--assigned' : 'courrier-row--unassigned',
@@ -230,7 +322,7 @@ async function refreshTable() {
   if (hasSearched.value)
     await performSearch()
   else
-    await loadRecentIncoming()
+    await loadRecentLists()
 }
 </script>
 
@@ -246,7 +338,7 @@ async function refreshTable() {
           color="primary"
           prepend-icon="tabler-refresh"
           :loading="loading || recentLoading"
-          @click="() => Promise.all([loadDashboard(), loadRecentIncoming()])"
+          @click="() => Promise.all([loadDashboard(), loadRecentLists()])"
         >
           Actualiser
         </VBtn>
@@ -255,7 +347,14 @@ async function refreshTable() {
           prepend-icon="tabler-plus"
           @click="openCreate('entrant')"
         >
-          Enregistrer un courrier arrivé
+          Courrier arrivé
+        </VBtn>
+        <VBtn
+          color="success"
+          prepend-icon="tabler-send"
+          @click="openCreate('sortant')"
+        >
+          Courrier de départ
         </VBtn>
       </template>
     </ParapheurPageHeader>
@@ -450,19 +549,35 @@ async function refreshTable() {
               size="small"
               color="primary"
               variant="tonal"
-              prepend-icon="tabler-mail-plus"
-              @click="openCreate('entrant')"
+              prepend-icon="tabler-mail-opened"
+              :to="{ name: 'courrier-entrants' }"
             >
-              Courrier arrivé
+              Tous les arrivés
             </VBtn>
             <VBtn
               size="small"
               color="success"
               variant="tonal"
               prepend-icon="tabler-send"
-              @click="openCreate('sortant')"
+              :to="{ name: 'courrier-sortants' }"
             >
-              Courrier de départ
+              Tous les départs
+            </VBtn>
+            <VBtn
+              size="small"
+              variant="tonal"
+              prepend-icon="tabler-mail-forward"
+              :to="{ name: 'courrier-internes' }"
+            >
+              Internes
+            </VBtn>
+            <VBtn
+              size="small"
+              variant="tonal"
+              prepend-icon="tabler-clipboard-list"
+              :to="{ name: 'courrier-bordereaux' }"
+            >
+              Bordereaux
             </VBtn>
           </VCardText>
         </VCard>
@@ -486,7 +601,8 @@ async function refreshTable() {
         :key="card.title"
         cols="12"
         sm="6"
-        md="3"
+        md="4"
+        lg="2"
       >
         <VCard
           class="kpi-card cursor-pointer h-100"
@@ -525,13 +641,13 @@ async function refreshTable() {
       <VCardItem>
         <template #prepend>
           <VAvatar
-            color="info"
+            :color="hasSearched ? 'primary' : (listScope === 'sortant' ? 'success' : 'info')"
             variant="tonal"
             rounded
             size="36"
           >
             <VIcon
-              :icon="hasSearched ? 'tabler-list-search' : 'tabler-mail-opened'"
+              :icon="hasSearched ? 'tabler-list-search' : (listScope === 'sortant' ? 'tabler-send' : 'tabler-mail-opened')"
               size="20"
             />
           </VAvatar>
@@ -540,30 +656,48 @@ async function refreshTable() {
           {{ tableTitle }}
         </VCardTitle>
         <VCardSubtitle>
-          {{ hasSearched
-            ? 'Correspondances trouvées selon vos critères'
-            : 'Les 10 derniers enregistrements d\'arrivée' }}
+          {{ tableSubtitle }}
         </VCardSubtitle>
-        <template #append>
+        <template
+          v-if="hasSearched"
+          #append
+        >
           <VBtn
-            v-if="!hasSearched"
-            size="small"
-            variant="tonal"
-            color="primary"
-            :to="{ name: 'courrier-entrants' }"
-          >
-            Voir tous les courriers arrivés
-          </VBtn>
-          <VBtn
-            v-else
             size="small"
             variant="text"
+            prepend-icon="tabler-arrow-left"
             @click="resetSearch"
           >
             Revenir aux derniers
           </VBtn>
         </template>
       </VCardItem>
+
+      <template v-if="!hasSearched">
+        <VDivider />
+        <div class="list-scope-bar px-4">
+          <VTabs
+            :model-value="listScope"
+            color="primary"
+            density="comfortable"
+            class="list-scope-tabs"
+            @update:model-value="setListScope"
+          >
+            <VTab
+              value="entrant"
+              prepend-icon="tabler-mail-opened"
+            >
+              Arrivés
+            </VTab>
+            <VTab
+              value="sortant"
+              prepend-icon="tabler-send"
+            >
+              Départs
+            </VTab>
+          </VTabs>
+        </div>
+      </template>
 
       <VDivider />
 
@@ -657,7 +791,9 @@ async function refreshTable() {
             <div>
               {{ hasSearched
                 ? 'Aucun courrier ne correspond à votre recherche.'
-                : 'Aucun courrier entrant récent.' }}
+                : (listScope === 'sortant'
+                  ? 'Aucun courrier de départ récent.'
+                  : 'Aucun courrier entrant récent.') }}
             </div>
           </div>
         </template>
@@ -693,6 +829,20 @@ async function refreshTable() {
 .subject-cell {
   max-inline-size: 420px;
   white-space: normal;
+}
+
+.list-scope-bar {
+  background: rgba(var(--v-theme-on-surface), 0.02);
+}
+
+.list-scope-tabs {
+  min-block-size: 48px;
+}
+
+.list-scope-tabs :deep(.v-btn) {
+  letter-spacing: normal;
+  text-transform: none;
+  font-weight: 600;
 }
 
 .courrier-list :deep(tr.courrier-row--assigned) {

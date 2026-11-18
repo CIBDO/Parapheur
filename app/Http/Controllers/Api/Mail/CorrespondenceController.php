@@ -108,6 +108,20 @@ class CorrespondenceController extends Controller
             'recipient_structure_id' => 'nullable|exists:structures,id',
             'recipient_structure_ids' => 'nullable|array',
             'recipient_structure_ids.*' => 'integer|exists:structures,id',
+            'presentation' => 'nullable|array',
+            'presentation.place' => 'nullable|string|max:120',
+            'presentation.sender_title' => 'nullable|string|max:255',
+            'presentation.recipient_title' => 'nullable|string|max:255',
+            'presentation.recipient_city' => 'nullable|string|max:120',
+            'presentation.structure_code' => 'nullable|string|max:50',
+            'presentation.signatory_post' => 'nullable|string|max:255',
+            'presentation.signatory_name' => 'nullable|string|max:255',
+            'presentation.signatory_grade' => 'nullable|string|max:255',
+            'lines' => 'nullable|array',
+            'lines.*.designation' => 'nullable|string|max:500',
+            'lines.*.quantity' => 'nullable|integer|min:0',
+            'lines.*.observation' => 'nullable|string|max:500',
+            'slip_observations' => 'nullable|string',
         ]);
 
         $direction = $validated['direction'];
@@ -322,6 +336,22 @@ class CorrespondenceController extends Controller
 
         return response()->download($path, $name, [
             'Content-Type' => 'application/pdf',
+        ])->deleteFileAfterSend(true);
+    }
+
+    public function dispatchSlipPdfForCorrespondence(Correspondence $correspondence)
+    {
+        $this->authorize('view', $correspondence);
+        abort_unless($correspondence->direction?->value === 'sortant', 422, 'Le bordereau d\'envoi concerne les courriers de départ.');
+
+        $path = $this->outputDocumentService->renderCorrespondenceDispatchPdf($correspondence);
+        $name = MailSheetPdfService::safeFilename(
+            'bordereau-envoi-'.($correspondence->departure_number ?: $correspondence->id).'.pdf'
+        );
+
+        return response()->file($path, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'inline; filename="'.$name.'"',
         ])->deleteFileAfterSend(true);
     }
 

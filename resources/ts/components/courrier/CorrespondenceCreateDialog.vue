@@ -21,6 +21,7 @@ const { createCorrespondence, fetchMeta, loading } = useCorrespondence()
 const userData = useCookie<Record<string, any> | null>('userData')
 
 const errorMsg = ref('')
+const activeTab = ref('infos')
 const structures = ref<any[]>([])
 const categories = ref<any[]>([])
 const priorities = ref<any[]>([])
@@ -50,6 +51,18 @@ function emptyForm() {
     correspondent_id: null as number | null,
     recipient_structure_ids: [] as number[],
     sender_structure_id: null as number | null,
+    slip_observations: '',
+    presentation: {
+      place: 'Bamako',
+      sender_title: '',
+      recipient_title: '',
+      recipient_city: '',
+      structure_code: '',
+      signatory_post: '',
+      signatory_name: '',
+      signatory_grade: '',
+    },
+    lines: [{ designation: '', quantity: 1, observation: '' }],
   }
 }
 
@@ -60,6 +73,7 @@ const structureItems = computed(() =>
   structures.value.map(s => ({
     value: s.id,
     title: s.code ? `${s.code} — ${s.name}` : s.name,
+    raw: s,
   })),
 )
 
@@ -83,8 +97,53 @@ const correspondentItems = computed(() =>
   })),
 )
 
+const linesTotal = computed(() =>
+  form.value.lines.reduce((sum, line) => sum + (Number(line.quantity) || 0), 0),
+)
+
 function close() {
   emit('update:modelValue', false)
+}
+
+function addLine() {
+  form.value.lines.push({ designation: '', quantity: 1, observation: '' })
+}
+
+function removeLine(index: number) {
+  if (form.value.lines.length === 1) {
+    form.value.lines[0] = { designation: '', quantity: 1, observation: '' }
+
+    return
+  }
+  form.value.lines.splice(index, 1)
+}
+
+function syncSenderDefaults() {
+  const structure = structures.value.find(s => s.id === form.value.sender_structure_id)
+  if (!structure)
+    return
+  if (!form.value.presentation.sender_title)
+    form.value.presentation.sender_title = structure.name || ''
+  if (!form.value.presentation.structure_code)
+    form.value.presentation.structure_code = structure.code || ''
+}
+
+function syncRecipientDefaults() {
+  const correspondent = correspondents.value.find(c => c.id === form.value.correspondent_id)
+  if (!correspondent)
+    return
+  form.value.presentation.recipient_title = correspondent.name || correspondent.sigle || ''
+  if (!form.value.presentation.recipient_city)
+    form.value.presentation.recipient_city = correspondent.city || correspondent.organization || form.value.presentation.place
+}
+
+function syncDesignationDefaults() {
+  if (!form.value.lines.length)
+    form.value.lines = [{ designation: form.value.subject || '', quantity: form.value.piece_count || 1, observation: '' }]
+  else if (!form.value.lines[0].designation.trim() && form.value.subject.trim())
+    form.value.lines[0].designation = form.value.subject
+  if (form.value.lines.length === 1)
+    form.value.lines[0].quantity = form.value.piece_count || form.value.lines[0].quantity || 1
 }
 
 async function searchCorrespondents(query: string) {
@@ -117,6 +176,7 @@ async function createOrigin() {
     form.value.correspondent_id = created.id
     showOriginDialog.value = false
     originForm.value = { sigle: '', name: '' }
+    syncRecipientDefaults()
   }
   catch (error: any) {
     errorMsg.value = error?.data?.message || 'Impossible d’enregistrer cette origine.'
@@ -130,6 +190,7 @@ async function submit() {
   errorMsg.value = ''
   if (!form.value.subject.trim()) {
     errorMsg.value = isArrival.value ? 'Renseignez l’objet.' : 'Renseignez la désignation.'
+    activeTab.value = 'infos'
 
     return
   }
@@ -185,15 +246,25 @@ async function submit() {
     else {
       if (!form.value.correspondent_id) {
         errorMsg.value = 'Indiquez le destinataire.'
+        activeTab.value = 'infos'
 
         return
       }
+      syncDesignationDefaults()
+      const lines = form.value.lines
+        .map(line => ({
+          designation: line.designation.trim(),
+          quantity: Number(line.quantity) || 0,
+          observation: line.observation?.trim() || '',
+        }))
+        .filter(line => line.designation !== '')
+
       created = await createCorrespondence({
         direction: 'sortant',
         medium: 'hybride',
         subject: form.value.subject,
         summary: form.value.summary || undefined,
-        piece_count: form.value.piece_count || 1,
+        piece_count: form.value.piece_count || linesTotal.value || 1,
         priority: form.value.priority,
         confidentiality: form.value.confidentiality,
         correspondence_date: form.value.correspondence_date || undefined,
@@ -201,6 +272,9 @@ async function submit() {
         sender_structure_id: form.value.sender_structure_id,
         structure_id: form.value.sender_structure_id || userData.value?.structure?.id || userData.value?.structure_id,
         parties: party ? [party] : [],
+        presentation: form.value.presentation,
+        lines: lines.length ? lines : [{ designation: form.value.subject, quantity: form.value.piece_count || 1, observation: '' }],
+        slip_observations: form.value.slip_observations || undefined,
       })
     }
 
@@ -218,11 +292,25 @@ async function submit() {
 watch(() => props.modelValue, (open) => {
   if (open) {
     errorMsg.value = ''
+    activeTab.value = 'infos'
     form.value = emptyForm()
     form.value.sender_structure_id = userData.value?.structure?.id ?? userData.value?.structure_id ?? null
+    form.value.presentation.signatory_name = userData.value?.name || ''
     scanFile.value = null
+    syncSenderDefaults()
     searchCorrespondents('')
   }
+})
+
+watch(() => form.value.sender_structure_id, syncSenderDefaults)
+watch(() => form.value.correspondent_id, syncRecipientDefaults)
+watch(() => form.value.subject, () => {
+  if (!isArrival.value)
+    syncDesignationDefaults()
+})
+watch(() => form.value.piece_count, () => {
+  if (!isArrival.value && form.value.lines.length === 1)
+    form.value.lines[0].quantity = form.value.piece_count || 1
 })
 
 onMounted(async () => {
@@ -245,7 +333,7 @@ onMounted(async () => {
 <template>
   <VDialog
     :model-value="modelValue"
-    max-width="860"
+    max-width="920"
     scrollable
     @update:model-value="emit('update:modelValue', $event)"
   >
@@ -258,6 +346,25 @@ onMounted(async () => {
           @click="close"
         />
       </VCardTitle>
+
+      <VTabs
+        v-if="!isArrival"
+        v-model="activeTab"
+        color="primary"
+        class="px-4"
+      >
+        <VTab value="infos">
+          Infos courrier
+        </VTab>
+        <VTab value="pieces">
+          Pièces / désignations
+        </VTab>
+        <VTab value="signature">
+          Formule & signature
+        </VTab>
+      </VTabs>
+      <VDivider v-if="!isArrival" />
+
       <VCardText>
         <VAlert
           v-if="errorMsg"
@@ -269,9 +376,9 @@ onMounted(async () => {
         </VAlert>
 
         <VForm @submit.prevent="submit">
-          <VRow>
+          <!-- Entrant : formulaire unique -->
+          <VRow v-if="isArrival">
             <VCol
-              v-if="isArrival"
               cols="12"
               md="6"
             >
@@ -283,7 +390,7 @@ onMounted(async () => {
             </VCol>
             <VCol
               cols="12"
-              :md="isArrival ? 6 : 4"
+              md="6"
             >
               <AppTextField
                 v-model="form.correspondence_date"
@@ -292,7 +399,6 @@ onMounted(async () => {
               />
             </VCol>
             <VCol
-              v-if="isArrival"
               cols="12"
               md="6"
             >
@@ -302,7 +408,6 @@ onMounted(async () => {
               />
             </VCol>
             <VCol
-              v-if="isArrival"
               cols="12"
               md="6"
             >
@@ -317,8 +422,8 @@ onMounted(async () => {
                   v-model="form.correspondent_id"
                   class="flex-grow-1"
                   :items="correspondentItems"
-                  :label="isArrival ? 'Origine du courrier' : 'Destinataire'"
-                  :placeholder="isArrival ? 'Sigle ou nom…' : 'Sigle ou nom du destinataire…'"
+                  label="Origine du courrier"
+                  placeholder="Sigle ou nom…"
                   :loading="searching"
                   item-title="title"
                   item-value="value"
@@ -330,15 +435,12 @@ onMounted(async () => {
                   icon="tabler-plus"
                   color="primary"
                   variant="tonal"
-                  :title="isArrival ? 'Nouvelle origine' : 'Nouveau destinataire'"
+                  title="Nouvelle origine"
                   @click="showOriginDialog = true"
                 />
               </div>
             </VCol>
-            <VCol
-              v-if="isArrival"
-              cols="12"
-            >
+            <VCol cols="12">
               <AppAutocomplete
                 v-model="form.recipient_structure_ids"
                 :items="structureItems"
@@ -349,20 +451,6 @@ onMounted(async () => {
                 multiple
                 chips
                 closable-chips
-                clearable
-              />
-            </VCol>
-            <VCol
-              v-else
-              cols="12"
-              md="6"
-            >
-              <AppAutocomplete
-                v-model="form.sender_structure_id"
-                :items="structureItems"
-                label="Service émetteur"
-                item-title="title"
-                item-value="value"
                 clearable
               />
             </VCol>
@@ -411,7 +499,7 @@ onMounted(async () => {
             <VCol cols="12">
               <AppTextarea
                 v-model="form.subject"
-                :label="isArrival ? 'Objet *' : 'Désignation *'"
+                label="Objet *"
                 rows="3"
               />
             </VCol>
@@ -422,10 +510,7 @@ onMounted(async () => {
                 rows="3"
               />
             </VCol>
-            <VCol
-              v-if="isArrival"
-              cols="12"
-            >
+            <VCol cols="12">
               <VFileInput
                 v-model="scanFile"
                 label="Scan / document principal"
@@ -434,15 +519,287 @@ onMounted(async () => {
               />
             </VCol>
           </VRow>
+
+          <!-- Sortant : onglets -->
+          <VWindow
+            v-else
+            v-model="activeTab"
+          >
+            <VWindowItem value="infos">
+              <VRow>
+                <VCol
+                  cols="12"
+                  md="4"
+                >
+                  <AppTextField
+                    v-model="form.correspondence_date"
+                    label="Date du courrier"
+                    type="date"
+                  />
+                </VCol>
+                <VCol cols="12">
+                  <div class="d-flex align-start gap-2">
+                    <AppAutocomplete
+                      v-model="form.correspondent_id"
+                      class="flex-grow-1"
+                      :items="correspondentItems"
+                      label="Destinataire"
+                      placeholder="Sigle ou nom du destinataire…"
+                      :loading="searching"
+                      item-title="title"
+                      item-value="value"
+                      clearable
+                      @update:search="searchCorrespondents"
+                    />
+                    <VBtn
+                      class="mt-1"
+                      icon="tabler-plus"
+                      color="primary"
+                      variant="tonal"
+                      title="Nouveau destinataire"
+                      @click="showOriginDialog = true"
+                    />
+                  </div>
+                </VCol>
+                <VCol
+                  cols="12"
+                  md="6"
+                >
+                  <AppAutocomplete
+                    v-model="form.sender_structure_id"
+                    :items="structureItems"
+                    label="Service émetteur"
+                    item-title="title"
+                    item-value="value"
+                    clearable
+                  />
+                </VCol>
+                <VCol
+                  cols="12"
+                  md="6"
+                >
+                  <AppSelect
+                    v-model="form.category_id"
+                    :items="categoryItems"
+                    label="Type"
+                    clearable
+                  />
+                </VCol>
+                <VCol
+                  cols="12"
+                  md="4"
+                >
+                  <AppTextField
+                    v-model.number="form.piece_count"
+                    label="Nombre de pièces"
+                    type="number"
+                    min="1"
+                  />
+                </VCol>
+                <VCol
+                  cols="12"
+                  md="4"
+                >
+                  <AppSelect
+                    v-model="form.priority"
+                    :items="priorityItems"
+                    label="Priorité"
+                  />
+                </VCol>
+                <VCol
+                  cols="12"
+                  md="4"
+                >
+                  <AppSelect
+                    v-model="form.confidentiality"
+                    :items="Object.entries(correspondenceConfidentialityLabels).map(([value, title]) => ({ value, title }))"
+                    label="Confidentialité"
+                  />
+                </VCol>
+                <VCol cols="12">
+                  <AppTextarea
+                    v-model="form.subject"
+                    label="Objet / désignation principale *"
+                    rows="3"
+                  />
+                </VCol>
+                <VCol cols="12">
+                  <AppTextarea
+                    v-model="form.summary"
+                    label="Résumé"
+                    rows="3"
+                  />
+                </VCol>
+              </VRow>
+            </VWindowItem>
+
+            <VWindowItem value="pieces">
+              <div class="d-flex align-center justify-space-between mb-3">
+                <div>
+                  <div class="text-subtitle-2">
+                    Pièces du bordereau d’envoi
+                  </div>
+                  <div class="text-caption text-medium-emphasis">
+                    Total : {{ linesTotal }}
+                  </div>
+                </div>
+                <VBtn
+                  size="small"
+                  variant="tonal"
+                  color="primary"
+                  prepend-icon="tabler-plus"
+                  @click="addLine"
+                >
+                  Ajouter une pièce
+                </VBtn>
+              </div>
+
+              <div
+                v-for="(line, index) in form.lines"
+                :key="index"
+                class="d-flex flex-wrap ga-2 mb-3 align-end"
+              >
+                <AppTextField
+                  v-model="line.designation"
+                  label="Désignation"
+                  class="flex-grow-1"
+                  style="min-inline-size: 220px;"
+                />
+                <AppTextField
+                  v-model.number="line.quantity"
+                  label="Nombre"
+                  type="number"
+                  min="0"
+                  style="max-inline-size: 110px;"
+                />
+                <AppTextField
+                  v-model="line.observation"
+                  label="Observation"
+                  style="min-inline-size: 160px;"
+                />
+                <VBtn
+                  icon
+                  size="small"
+                  variant="text"
+                  color="error"
+                  @click="removeLine(index)"
+                >
+                  <VIcon icon="tabler-trash" />
+                </VBtn>
+              </div>
+
+              <AppTextarea
+                v-model="form.slip_observations"
+                label="Observations générales du bordereau"
+                rows="2"
+                class="mt-2"
+              />
+            </VWindowItem>
+
+            <VWindowItem value="signature">
+              <div class="text-subtitle-2 mb-2">
+                Formule du bordereau
+              </div>
+              <VRow>
+                <VCol
+                  cols="12"
+                  sm="6"
+                >
+                  <AppTextField
+                    v-model="form.presentation.place"
+                    label="Lieu"
+                  />
+                </VCol>
+                <VCol
+                  cols="12"
+                  sm="6"
+                >
+                  <AppTextField
+                    v-model="form.presentation.structure_code"
+                    label="Code de structure"
+                  />
+                </VCol>
+                <VCol cols="12">
+                  <AppTextField
+                    v-model="form.presentation.sender_title"
+                    label="Structure qui envoie"
+                  />
+                </VCol>
+                <VCol
+                  cols="12"
+                  sm="8"
+                >
+                  <AppTextField
+                    v-model="form.presentation.recipient_title"
+                    label="Destinataire (formule)"
+                  />
+                </VCol>
+                <VCol
+                  cols="12"
+                  sm="4"
+                >
+                  <AppTextField
+                    v-model="form.presentation.recipient_city"
+                    label="Ville"
+                  />
+                </VCol>
+              </VRow>
+
+              <div class="text-subtitle-2 mt-4 mb-2">
+                Signataire
+              </div>
+              <VRow>
+                <VCol cols="12">
+                  <AppTextField
+                    v-model="form.presentation.signatory_post"
+                    label="Poste du signataire"
+                  />
+                </VCol>
+                <VCol
+                  cols="12"
+                  sm="6"
+                >
+                  <AppTextField
+                    v-model="form.presentation.signatory_name"
+                    label="Prénoms et Noms"
+                  />
+                </VCol>
+                <VCol
+                  cols="12"
+                  sm="6"
+                >
+                  <AppTextField
+                    v-model="form.presentation.signatory_grade"
+                    label="Grade ou titre honorifique"
+                  />
+                </VCol>
+              </VRow>
+            </VWindowItem>
+          </VWindow>
         </VForm>
       </VCardText>
       <VCardActions>
+        <VBtn
+          v-if="!isArrival && activeTab !== 'infos'"
+          variant="text"
+          @click="activeTab = activeTab === 'signature' ? 'pieces' : 'infos'"
+        >
+          Précédent
+        </VBtn>
         <VSpacer />
         <VBtn
           variant="tonal"
           @click="close"
         >
           Annuler
+        </VBtn>
+        <VBtn
+          v-if="!isArrival && activeTab !== 'signature'"
+          color="primary"
+          variant="tonal"
+          @click="activeTab = activeTab === 'infos' ? 'pieces' : 'signature'"
+        >
+          Suivant
         </VBtn>
         <VBtn
           color="primary"

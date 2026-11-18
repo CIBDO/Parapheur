@@ -81,6 +81,13 @@ class CorrespondenceService
     public function createOutgoing(User $user, array $data): Correspondence
     {
         return DB::transaction(function () use ($user, $data) {
+            $slipData = [
+                'presentation' => is_array($data['presentation'] ?? null) ? $data['presentation'] : null,
+                'lines' => is_array($data['lines'] ?? null) ? $data['lines'] : null,
+                'observations' => $data['slip_observations'] ?? $data['observations'] ?? null,
+            ];
+            unset($data['presentation'], $data['lines'], $data['slip_observations']);
+
             [$data, $parties] = $this->extractPartiesInput($data);
             $data = $this->bindOwnerStructure($user, $data);
 
@@ -94,6 +101,14 @@ class CorrespondenceService
 
             $this->seedParties($correspondence, $user, $parties);
 
+            if ($slipData['presentation'] !== null || $slipData['lines'] !== null) {
+                app(CorrespondenceDispatchService::class)->saveDraftSlip($correspondence->fresh(), $user, array_filter([
+                    'presentation' => $slipData['presentation'] ?? [],
+                    'lines' => $slipData['lines'] ?? [],
+                    'observations' => $slipData['observations'],
+                ], fn ($value) => $value !== null));
+            }
+
             $this->eventService->logEvent(
                 $correspondence,
                 'correspondence_created',
@@ -105,7 +120,7 @@ class CorrespondenceService
                 'actor_id' => $user->id,
             ]);
 
-            return $correspondence->fresh(['structure', 'registeredBy', 'parties']);
+            return $correspondence->fresh(['structure', 'registeredBy', 'parties', 'dispatches']);
         });
     }
 

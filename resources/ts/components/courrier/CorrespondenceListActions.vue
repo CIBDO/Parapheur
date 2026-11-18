@@ -35,6 +35,7 @@ const structureItems = computed(() =>
 )
 
 const isSortant = computed(() => props.item?.direction === 'sortant')
+const printingDispatch = ref(false)
 
 async function printCirculationSheet() {
   printing.value = true
@@ -50,6 +51,23 @@ async function printCirculationSheet() {
   }
   finally {
     printing.value = false
+  }
+}
+
+async function printDispatchSlip() {
+  printingDispatch.value = true
+  try {
+    const blob = await $api(`/mail/correspondences/${props.item.id}/dispatch-slip/pdf`, {
+      responseType: 'blob',
+    }) as Blob
+    const file = blob instanceof Blob ? blob : new Blob([blob], { type: 'application/pdf' })
+    window.open(URL.createObjectURL(file), '_blank')
+  }
+  catch (error: any) {
+    alert(error?.data?.message || 'Impression du bordereau d\'envoi impossible')
+  }
+  finally {
+    printingDispatch.value = false
   }
 }
 
@@ -110,41 +128,60 @@ async function confirmAssign() {
 
 <template>
   <div
-    v-if="!isSortant"
     class="d-flex justify-end gap-1"
     @click.stop
   >
-    <VBtn
-      icon
-      size="small"
-      variant="tonal"
-      color="primary"
-      :loading="printing"
-      @click="printCirculationSheet"
-    >
-      <VIcon icon="tabler-printer" />
-      <VTooltip
-        activator="parent"
-        location="top"
+    <template v-if="isSortant">
+      <VBtn
+        icon
+        size="small"
+        variant="tonal"
+        color="success"
+        :loading="printingDispatch"
+        @click="printDispatchSlip"
       >
-        Imprimer la fiche de circulation
-      </VTooltip>
-    </VBtn>
-    <VBtn
-      icon
-      size="small"
-      variant="tonal"
-      color="secondary"
-      @click="openAssign"
-    >
-      <VIcon icon="tabler-user-plus" />
-      <VTooltip
-        activator="parent"
-        location="top"
+        <VIcon icon="tabler-printer" />
+        <VTooltip
+          activator="parent"
+          location="top"
+        >
+          Imprimer bordereau d'envoi
+        </VTooltip>
+      </VBtn>
+    </template>
+    <template v-else>
+      <VBtn
+        icon
+        size="small"
+        variant="tonal"
+        color="primary"
+        :loading="printing"
+        @click="printCirculationSheet"
       >
-        Imputer
-      </VTooltip>
-    </VBtn>
+        <VIcon icon="tabler-printer" />
+        <VTooltip
+          activator="parent"
+          location="top"
+        >
+          Imprimer la fiche de circulation
+        </VTooltip>
+      </VBtn>
+      <VBtn
+        icon
+        size="small"
+        variant="tonal"
+        color="secondary"
+        @click="openAssign"
+      >
+        <VIcon icon="tabler-user-plus" />
+        <VTooltip
+          activator="parent"
+          location="top"
+        >
+          Imputer
+        </VTooltip>
+      </VBtn>
+    </template>
   </div>
 
   <VDialog

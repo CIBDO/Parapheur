@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import CorrespondenceCreateDialog from '@/components/courrier/CorrespondenceCreateDialog.vue'
+import CorrespondenceListActions from '@/components/courrier/CorrespondenceListActions.vue'
 import { useCorrespondence } from '@/composables/useCorrespondence'
 import { listItems } from '@/utils/listItems'
 import { correspondenceStatusColors, formatCorrespondenceNumber, formatCourrierDate, statusLabel } from '@/utils/courrierUi'
@@ -34,7 +35,9 @@ onMounted(() => {
     showCreate.value = true
 })
 
-const items = computed(() => listItems(correspondences.value))
+const items = computed(() =>
+  listItems(correspondences.value).map((item: any) => ({ ...item, direction: item.direction || 'sortant' })),
+)
 </script>
 
 <template>
@@ -79,6 +82,7 @@ const items = computed(() => listItems(correspondences.value))
           { title: 'Objet', key: 'subject' },
           { title: 'Statut', key: 'status' },
           { title: 'Date', key: 'correspondence_date' },
+          { title: '', key: 'actions', sortable: false, width: '80px' },
         ]"
         :items="items"
         :loading="loading"
@@ -99,6 +103,9 @@ const items = computed(() => listItems(correspondences.value))
         </template>
         <template #item.correspondence_date="{ item }">
           {{ formatCourrierDate(item.correspondence_date) }}
+        </template>
+        <template #item.actions="{ item }">
+          <CorrespondenceListActions :item="item" />
         </template>
       </VDataTable>
     </VCard>

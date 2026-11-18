@@ -199,6 +199,61 @@ class MailOutputDocumentService
     }
 
     /**
+     * PDF bordereau d'envoi pour un courrier : dernière expédition / brouillon enregistré, sinon suggestions.
+     */
+    public function renderCorrespondenceDispatchPdf(Correspondence $correspondence): string
+    {
+        $correspondence->loadMissing([
+            'parties.correspondent',
+            'registeredBy',
+            'structure',
+            'dispatches.dispatchedBy',
+        ]);
+
+        $dispatch = $correspondence->dispatches
+            ->sortByDesc(fn (CorrespondenceDispatch $item) => sprintf(
+                '%d-%010d',
+                $item->dispatched_at ? 1 : 0,
+                (int) $item->id
+            ))
+            ->first();
+
+        if ($dispatch) {
+            if (! $dispatch->number && $dispatch->method === 'projet') {
+                $dispatch->number = $correspondence->departure_number
+                    ? 'BE/'.$correspondence->departure_number
+                    : 'PROJET';
+            }
+
+            // Brouillon non persisté comme expédition : rendu sans consommer un n° BE officiel.
+            if ($dispatch->method === 'projet' && ! $dispatch->dispatched_at) {
+                $dispatch->loadMissing('dispatchedBy');
+                $dispatch = $this->ensureSlipContent($dispatch, $correspondence);
+
+                return $this->sheets->writeDispatchSlip($this->pdfPayload($dispatch, $correspondence));
+            }
+
+            return $this->renderDispatchPdf($dispatch);
+        }
+
+        $suggested = $this->suggestSlip($correspondence);
+        $draft = new CorrespondenceDispatch([
+            'correspondence_id' => $correspondence->id,
+            'number' => $correspondence->departure_number
+                ? 'BE/'.$correspondence->departure_number
+                : 'PROJET',
+            'dispatched_at' => now(),
+            'method' => 'courrier',
+            'lines' => $suggested['lines'],
+            'presentation' => $suggested['presentation'],
+        ]);
+        $draft->setRelation('correspondence', $correspondence);
+        $draft->setRelation('dispatchedBy', null);
+
+        return $this->sheets->writeDispatchSlip($this->pdfPayload($draft, $correspondence));
+    }
+
+    /**
      * @param  mixed  $lines
      * @return list<array{designation: string, quantity: int, observation: string}>
      */

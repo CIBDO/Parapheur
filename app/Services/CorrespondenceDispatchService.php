@@ -22,6 +22,48 @@ class CorrespondenceDispatchService
         private readonly AuditLogger $audit,
     ) {}
 
+    /**
+     * Enregistre un brouillon de bordereau d'envoi (pièces + formule) sans expédier.
+     *
+     * @param  array{presentation?: array<string, mixed>, lines?: list<array<string, mixed>>, observations?: string|null}  $data
+     */
+    public function saveDraftSlip(Correspondence $correspondence, User $user, array $data): CorrespondenceDispatch
+    {
+        return DB::transaction(function () use ($correspondence, $user, $data) {
+            $slip = app(MailOutputDocumentService::class)->resolveSlipContent($correspondence, $data);
+
+            $draft = CorrespondenceDispatch::query()
+                ->where('correspondence_id', $correspondence->id)
+                ->where('method', 'projet')
+                ->whereNull('dispatched_at')
+                ->latest('id')
+                ->first();
+
+            if ($draft) {
+                $draft->update([
+                    'observations' => $data['observations'] ?? $draft->observations,
+                    'lines' => $slip['lines'],
+                    'presentation' => $slip['presentation'],
+                    'dispatched_by' => $user->id,
+                ]);
+
+                return $draft->fresh();
+            }
+
+            return CorrespondenceDispatch::query()->create([
+                'correspondence_id' => $correspondence->id,
+                'number' => null,
+                'dispatched_at' => null,
+                'method' => 'projet',
+                'tracking_number' => null,
+                'dispatched_by' => $user->id,
+                'observations' => $data['observations'] ?? null,
+                'lines' => $slip['lines'],
+                'presentation' => $slip['presentation'],
+            ]);
+        });
+    }
+
     public function recordDispatch(Correspondence $correspondence, User $user, array $data): CorrespondenceDispatch
     {
         return DB::transaction(function () use ($correspondence, $user, $data) {

@@ -637,6 +637,7 @@ Route::middleware(['auth:sanctum', 'auth.idle', 'password.changed'])->group(func
         Route::post('/correspondences/{correspondence}/dispatch', [CorrespondenceController::class, 'dispatch'])
             ->middleware('permission:mail.dispatch|admin.access');
         Route::get('/correspondences/{correspondence}/dispatch-slip/preview', [CorrespondenceController::class, 'dispatchSlipPreview']);
+        Route::get('/correspondences/{correspondence}/dispatch-slip/pdf', [CorrespondenceController::class, 'dispatchSlipPdfForCorrespondence']);
         Route::get('/correspondences/{correspondence}/dispatches/{dispatch}/pdf', [CorrespondenceController::class, 'dispatchSlipPdf']);
         Route::post('/correspondences/{correspondence}/dispatches/{dispatch}/generate', [CorrespondenceController::class, 'generateDispatchSlip'])
             ->middleware('permission:mail.dispatch|admin.access');
