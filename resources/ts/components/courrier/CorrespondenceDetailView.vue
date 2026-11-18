@@ -792,11 +792,13 @@ async function handleDispatch() {
     return
   }
   const lines = dispatchForm.value.lines.filter(line => line.designation.trim() !== '')
-  if (!lines.length) {
-    alert('Indiquez au moins une pièce')
-
-    return
-  }
+  const slipLines = lines.length
+    ? lines
+    : [{
+        designation: props.correspondence.subject || 'Courrier',
+        quantity: Number(props.correspondence.piece_count) || 1,
+        observation: '',
+      }]
   dispatching.value = true
   try {
     const result = await dispatch(props.correspondence.id, {
@@ -814,7 +816,7 @@ async function handleDispatch() {
         signatory_name: dispatchForm.value.signatory_name,
         signatory_grade: dispatchForm.value.signatory_grade,
       },
-      lines,
+      lines: slipLines,
       generate: true,
     })
     showDispatchDialog.value = false
@@ -2581,8 +2583,7 @@ async function archiveCorrespondence() {
     <!-- Dialog Expédition -->
     <VDialog
       v-model="showDispatchDialog"
-      max-width="760"
-      scrollable
+      max-width="520"
     >
       <VCard>
         <VCardTitle>
@@ -2631,107 +2632,8 @@ async function archiveCorrespondence() {
             v-model="dispatchForm.observations"
             label="Observations générales"
             rows="2"
-            class="mb-4"
+            class="mb-2"
           />
-          <div class="text-subtitle-2 mb-2">
-            Formule du bordereau
-          </div>
-          <VRow>
-            <VCol cols="12" sm="6">
-              <AppTextField
-                v-model="dispatchForm.place"
-                label="Lieu"
-              />
-            </VCol>
-            <VCol cols="12" sm="6">
-              <AppTextField
-                v-model="dispatchForm.structure_code"
-                label="Code de structure"
-              />
-            </VCol>
-            <VCol cols="12">
-              <AppTextField
-                v-model="dispatchForm.sender_title"
-                label="Structure qui envoie"
-              />
-            </VCol>
-            <VCol cols="12" sm="8">
-              <AppTextField
-                v-model="dispatchForm.recipient_title"
-                label="Destinataire"
-              />
-            </VCol>
-            <VCol cols="12" sm="4">
-              <AppTextField
-                v-model="dispatchForm.recipient_city"
-                label="Ville"
-              />
-            </VCol>
-          </VRow>
-          <div class="text-subtitle-2 mt-4 mb-2">
-            Signataire
-          </div>
-          <VRow>
-            <VCol cols="12">
-              <AppTextField
-                v-model="dispatchForm.signatory_post"
-                label="Poste du signataire"
-              />
-            </VCol>
-            <VCol cols="12" sm="6">
-              <AppTextField
-                v-model="dispatchForm.signatory_name"
-                label="Prénoms et Noms"
-              />
-            </VCol>
-            <VCol cols="12" sm="6">
-              <AppTextField
-                v-model="dispatchForm.signatory_grade"
-                label="Grade ou titre honorifique"
-              />
-            </VCol>
-          </VRow>
-          <div class="d-flex align-center justify-space-between mt-4 mb-2">
-            <div class="text-subtitle-2">
-              Pièces — total {{ dispatchTotal }}
-            </div>
-            <VBtn
-              size="small"
-              variant="tonal"
-              prepend-icon="tabler-plus"
-              @click="addDispatchLine"
-            >
-              Ajouter une pièce
-            </VBtn>
-          </div>
-          <div
-            v-for="(line, index) in dispatchForm.lines"
-            :key="index"
-            class="d-flex flex-wrap ga-2 mb-2 align-end"
-          >
-            <AppTextField
-              v-model="line.designation"
-              label="Désignation"
-              class="flex-grow-1"
-              style="min-inline-size: 220px;"
-            />
-            <AppTextField
-              v-model.number="line.quantity"
-              label="Nombre"
-              type="number"
-              min="0"
-              style="max-inline-size: 110px;"
-            />
-            <VBtn
-              icon
-              size="small"
-              variant="text"
-              color="error"
-              @click="removeDispatchLine(index)"
-            >
-              <VIcon icon="tabler-trash" />
-            </VBtn>
-          </div>
         </VCardText>
         <VCardActions>
           <VSpacer />
