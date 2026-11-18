@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import GedBackButton from '@/components/ged/GedBackButton.vue'
 import ParapheurPageHeader from '@/components/parapheur/ParapheurPageHeader.vue'
 import {
   publicationStatusColor,
@@ -23,9 +24,15 @@ const folders = ref<any[]>([])
 const selectedFolder = ref<any | null>(null)
 const breadcrumb = ref<Array<{ id: number; name: string }>>([])
 const documents = ref<any[]>([])
+const facets = ref<Record<string, Array<{ value: string | number; label: string; total: number }>>>({})
 const total = ref(0)
+const page = ref(1)
+const perPage = ref(25)
+const lastPage = ref(1)
 const viewMode = ref<'list' | 'grid'>('list')
 const q = ref('')
+const facetOrigin = ref<string | null>(null)
+const facetConfidentiality = ref<string | null>(null)
 
 const flattenForTree = (nodes: any[]): any[] =>
   (nodes || []).map(n => ({
@@ -41,28 +48,51 @@ const loadTree = async () => {
   folders.value = res.data || []
 }
 
-const loadFolder = async (folderId: number | null) => {
+const loadFolder = async (folderId: number | null, resetPage = true) => {
+  if (resetPage)
+    page.value = 1
+
   loading.value = true
   try {
     if (!folderId) {
       selectedFolder.value = null
       breadcrumb.value = []
-      const res = await $api('/ged/documents', {
-        query: { per_page: 40, sort: 'updated_at', dir: 'desc', q: q.value || undefined },
+      const res = await $api('/ged/catalog', {
+        query: {
+          page: page.value,
+          per_page: perPage.value,
+          sort: 'updated_at',
+          dir: 'desc',
+          catalog: 'institutional',
+          q: q.value || undefined,
+          origin: facetOrigin.value || undefined,
+          confidentiality: facetConfidentiality.value || undefined,
+        },
       })
       documents.value = res.data || []
       total.value = res.total || documents.value.length
+      lastPage.value = res.last_page || 1
+      facets.value = res.facets || {}
 
       return
     }
 
     const res = await $api(`/ged/folders/${folderId}`, {
-      query: { per_page: 40 },
+      query: {
+        page: page.value,
+        per_page: perPage.value,
+        catalog: 'institutional',
+        q: q.value || undefined,
+        sort: 'updated_at',
+        dir: 'desc',
+      },
     })
     selectedFolder.value = res.folder
     breadcrumb.value = res.breadcrumb || []
     documents.value = res.documents?.data || []
     total.value = res.documents?.total || documents.value.length
+    lastPage.value = res.documents?.last_page || 1
+    facets.value = {}
   }
   finally {
     loading.value = false
@@ -74,7 +104,17 @@ const onSelectFolder = (item: any) => {
     loadFolder(item.id)
 }
 
+const applyFacet = (key: 'origin' | 'confidentiality', value: string | number | null) => {
+  if (key === 'origin')
+    facetOrigin.value = value ? String(value) : null
+  else
+    facetConfidentiality.value = value ? String(value) : null
+  loadFolder(selectedFolder.value?.id ?? null)
+}
+
 const openDoc = (id: number) => router.push({ name: 'ged-id', params: { id } })
+
+watch(page, () => loadFolder(selectedFolder.value?.id ?? null, false))
 
 const shortcuts = [
   { title: 'Mes dépôts', icon: 'tabler-folder-user', to: 'ged-mes-documents' },
@@ -94,9 +134,12 @@ onMounted(async () => {
   <div>
     <ParapheurPageHeader
       title="Explorer"
-      subtitle="Parcourez les dossiers institutionnels, puis ouvrez un document"
+      subtitle="Bibliothèque institutionnelle — documents versés uniquement (hors brouillons)"
       icon="tabler-folder-open"
     >
+      <template #back>
+        <GedBackButton to="ged" />
+      </template>
       <VBtn
         variant="tonal"
         prepend-icon="tabler-search"
@@ -201,8 +244,41 @@ onMounted(async () => {
               prepend-inner-icon="tabler-search"
               clearable
               hide-details
+              class="mb-3"
               @keyup.enter="loadFolder(selectedFolder?.id ?? null)"
             />
+            <div
+              v-if="!selectedFolder && (facets.origin?.length || facets.confidentiality?.length)"
+              class="d-flex flex-wrap gap-2"
+            >
+              <VChip
+                size="small"
+                :variant="facetOrigin ? 'flat' : 'tonal'"
+                :color="facetOrigin ? 'primary' : undefined"
+                @click="applyFacet('origin', null)"
+              >
+                Toutes origines
+              </VChip>
+              <VChip
+                v-for="f in facets.origin || []"
+                :key="`o-${f.value}`"
+                size="small"
+                :variant="facetOrigin === String(f.value) ? 'flat' : 'tonal'"
+                :color="facetOrigin === String(f.value) ? 'primary' : undefined"
+                @click="applyFacet('origin', f.value)"
+              >
+                {{ f.label }} ({{ f.total }})
+              </VChip>
+              <VChip
+                v-for="f in facets.confidentiality || []"
+                :key="`c-${f.value}`"
+                size="small"
+                :variant="facetConfidentiality === String(f.value) ? 'flat' : 'outlined'"
+                @click="applyFacet('confidentiality', facetConfidentiality === String(f.value) ? null : f.value)"
+              >
+                {{ labelOf(confidentialityLabels, String(f.value)) }} ({{ f.total }})
+              </VChip>
+            </div>
           </VCardText>
         </VCard>
 
@@ -290,13 +366,22 @@ onMounted(async () => {
                     colspan="5"
                     class="text-center text-medium-emphasis py-6"
                   >
-                    Aucun document.
+                    Aucun document versé dans ce périmètre.
                   </td>
                 </tr>
               </tbody>
             </VTable>
-            <div class="text-caption text-medium-emphasis mt-2">
-              {{ total }} document(s)
+            <div class="d-flex flex-wrap align-center justify-space-between mt-3 gap-2">
+              <div class="text-caption text-medium-emphasis">
+                {{ total }} document(s)
+              </div>
+              <VPagination
+                v-if="lastPage > 1"
+                v-model="page"
+                :length="lastPage"
+                density="compact"
+                total-visible="5"
+              />
             </div>
           </VCardText>
         </VCard>

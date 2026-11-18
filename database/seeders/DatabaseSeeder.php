@@ -206,6 +206,7 @@ class DatabaseSeeder extends Seeder
         $this->call(ProductionObligationSeeder::class);
         $this->call(AnnouncementCatalogSeeder::class);
         $this->call(PortalAppSeeder::class);
+        $this->call(ArchivesSeeder::class);
     }
 
     private function seedDemoDocuments(): void

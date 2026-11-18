@@ -1,9 +1,27 @@
 <?php
 
+use App\Http\Controllers\Api\Archives\ArchiveBoxController;
+use App\Http\Controllers\Api\Archives\ArchiveClassificationController;
+use App\Http\Controllers\Api\Archives\ArchiveCommunicationController;
+use App\Http\Controllers\Api\Archives\ArchiveDashboardController;
+use App\Http\Controllers\Api\Archives\ArchiveDispositionController;
+use App\Http\Controllers\Api\Archives\ArchiveHoldController;
+use App\Http\Controllers\Api\Archives\ArchiveImportController;
+use App\Http\Controllers\Api\Archives\ArchiveInventoryController;
+use App\Http\Controllers\Api\Archives\ArchiveLoanController;
+use App\Http\Controllers\Api\Archives\ArchiveLocationController;
+use App\Http\Controllers\Api\Archives\ArchivePreservationController;
+use App\Http\Controllers\Api\Archives\ArchivePreventiveController;
+use App\Http\Controllers\Api\Archives\ArchiveProposeController;
+use App\Http\Controllers\Api\Archives\ArchiveRecordController;
+use App\Http\Controllers\Api\Archives\ArchiveReportController;
+use App\Http\Controllers\Api\Archives\ArchiveRetentionController;
+use App\Http\Controllers\Api\Archives\ArchiveTransferController;
 use App\Http\Controllers\Api\Ged\GedAuditController;
 use App\Http\Controllers\Api\Ged\GedCategoryController;
 use App\Http\Controllers\Api\Ged\GedClassificationController;
 use App\Http\Controllers\Api\Ged\GedDashboardController;
+use App\Http\Controllers\Api\Ged\GedCatalogController;
 use App\Http\Controllers\Api\Ged\GedDocumentController;
 use App\Http\Controllers\Api\Ged\GedDomainController;
 use App\Http\Controllers\Api\Ged\GedEngagementController;
@@ -218,6 +236,108 @@ Route::middleware(['auth:sanctum', 'auth.idle', 'password.changed'])->group(func
         ->middleware('throttle:uploads');
     Route::get('/parapheur/documents', [DocumentController::class, 'index']);
     Route::get('/parapheur/documents/{document}', [DocumentController::class, 'show']);
+
+    // ——— Archives institutionnelles (SAE) ———
+    Route::get('/archives/dashboard', ArchiveDashboardController::class);
+    Route::post('/archives/propose', ArchiveProposeController::class);
+    Route::get('/archives/transfers', [ArchiveTransferController::class, 'index']);
+    Route::post('/archives/transfers', [ArchiveTransferController::class, 'store']);
+    Route::get('/archives/transfers/{transfer}', [ArchiveTransferController::class, 'show']);
+    Route::post('/archives/transfers/{transfer}/submit', [ArchiveTransferController::class, 'submit']);
+    Route::post('/archives/transfers/{transfer}/control', [ArchiveTransferController::class, 'control']);
+    Route::post('/archives/transfers/{transfer}/accept', [ArchiveTransferController::class, 'accept']);
+    Route::post('/archives/transfers/{transfer}/reject', [ArchiveTransferController::class, 'reject']);
+    Route::post('/archives/transfers/{transfer}/take-over', [ArchiveTransferController::class, 'takeOver']);
+    Route::get('/archives/records', [ArchiveRecordController::class, 'index']);
+    Route::get('/archives/records/{record}', [ArchiveRecordController::class, 'show']);
+    Route::post('/archives/records/{record}/classify', [ArchiveRecordController::class, 'classify']);
+    Route::post('/archives/records/{record}/hybrid', [ArchiveRecordController::class, 'updateHybrid']);
+    Route::get('/archives/fonds', [ArchiveClassificationController::class, 'fondsIndex']);
+    Route::post('/archives/fonds', [ArchiveClassificationController::class, 'fondsStore']);
+    Route::get('/archives/series', [ArchiveClassificationController::class, 'seriesIndex']);
+    Route::post('/archives/series', [ArchiveClassificationController::class, 'seriesStore']);
+    Route::get('/archives/classification-nodes', [ArchiveClassificationController::class, 'nodesIndex']);
+    Route::post('/archives/classification-nodes', [ArchiveClassificationController::class, 'nodesStore']);
+    Route::put('/archives/classification-nodes/{classificationNode}', [ArchiveClassificationController::class, 'nodesUpdate']);
+    Route::delete('/archives/classification-nodes/{classificationNode}', [ArchiveClassificationController::class, 'nodesDestroy']);
+
+    // Archives physiques (Phase 2)
+    Route::get('/archives/locations', [ArchiveLocationController::class, 'index']);
+    Route::post('/archives/locations', [ArchiveLocationController::class, 'store']);
+    Route::get('/archives/locations/occupation', [ArchiveLocationController::class, 'occupation']);
+    Route::get('/archives/locations/{location}', [ArchiveLocationController::class, 'show']);
+    Route::put('/archives/locations/{location}', [ArchiveLocationController::class, 'update']);
+    Route::get('/archives/boxes', [ArchiveBoxController::class, 'index']);
+    Route::post('/archives/boxes', [ArchiveBoxController::class, 'store']);
+    Route::get('/archives/boxes/scan/{token}', [ArchiveBoxController::class, 'scan']);
+    Route::get('/archives/boxes/{box}', [ArchiveBoxController::class, 'show']);
+    Route::post('/archives/boxes/{box}/assign', [ArchiveBoxController::class, 'assign']);
+    Route::post('/archives/boxes/{box}/contents', [ArchiveBoxController::class, 'addContent']);
+    Route::get('/archives/boxes/{box}/label', [ArchiveBoxController::class, 'label']);
+    Route::get('/archives/movements', [ArchiveInventoryController::class, 'movements']);
+    Route::get('/archives/loans', [ArchiveLoanController::class, 'index']);
+    Route::post('/archives/loans', [ArchiveLoanController::class, 'store']);
+    Route::get('/archives/loans/{loan}', [ArchiveLoanController::class, 'show']);
+    Route::post('/archives/loans/{loan}/validate', [ArchiveLoanController::class, 'validateLoan']);
+    Route::post('/archives/loans/{loan}/prepare', [ArchiveLoanController::class, 'prepare']);
+    Route::post('/archives/loans/{loan}/checkout', [ArchiveLoanController::class, 'checkout']);
+    Route::post('/archives/loans/{loan}/return', [ArchiveLoanController::class, 'returnLoan']);
+    Route::post('/archives/loans/{loan}/refuse', [ArchiveLoanController::class, 'refuse']);
+    Route::get('/archives/inventories', [ArchiveInventoryController::class, 'index']);
+    Route::post('/archives/inventories', [ArchiveInventoryController::class, 'store']);
+    Route::get('/archives/inventories/{inventory}', [ArchiveInventoryController::class, 'show']);
+    Route::post('/archives/inventories/{inventory}/start', [ArchiveInventoryController::class, 'start']);
+    Route::post('/archives/inventories/{inventory}/scan', [ArchiveInventoryController::class, 'scan']);
+    Route::post('/archives/inventories/{inventory}/close', [ArchiveInventoryController::class, 'close']);
+
+    // Gouvernance (Phase 3)
+    Route::get('/archives/reports/responsible', [ArchiveReportController::class, 'responsible']);
+    Route::get('/archives/reports/dg', [ArchiveReportController::class, 'dg']);
+    Route::get('/archives/reports/export-metadata', [ArchiveReportController::class, 'exportMetadata']);
+    Route::get('/archives/retention-rules', [ArchiveRetentionController::class, 'index']);
+    Route::post('/archives/retention-rules', [ArchiveRetentionController::class, 'store']);
+    Route::post('/archives/retention-rules/{rule}/validate', [ArchiveRetentionController::class, 'validateRule']);
+    Route::get('/archives/retention/due', [ArchiveRetentionController::class, 'due']);
+    Route::post('/archives/records/{record}/retention', [ArchiveRetentionController::class, 'apply']);
+    Route::post('/archives/records/{record}/holds', [ArchiveHoldController::class, 'place']);
+    Route::post('/archives/holds/{hold}/lift', [ArchiveHoldController::class, 'lift']);
+    Route::get('/archives/communications', [ArchiveCommunicationController::class, 'index']);
+    Route::post('/archives/communications', [ArchiveCommunicationController::class, 'store']);
+    Route::post('/archives/communications/{communication}/authorize', [ArchiveCommunicationController::class, 'authorizeRequest']);
+    Route::post('/archives/communications/{communication}/refuse', [ArchiveCommunicationController::class, 'refuse']);
+    Route::post('/archives/communications/{communication}/revoke', [ArchiveCommunicationController::class, 'revoke']);
+    Route::get('/archives/dispositions', [ArchiveDispositionController::class, 'index']);
+    Route::post('/archives/dispositions', [ArchiveDispositionController::class, 'store']);
+    Route::get('/archives/dispositions/{disposition}', [ArchiveDispositionController::class, 'show']);
+    Route::post('/archives/dispositions/{disposition}/authorize', [ArchiveDispositionController::class, 'authorizeDisposition']);
+    Route::post('/archives/dispositions/{disposition}/refuse', [ArchiveDispositionController::class, 'refuse']);
+    Route::post('/archives/dispositions/{disposition}/execute', [ArchiveDispositionController::class, 'execute']);
+
+    // Préservation (Phase 4)
+    Route::get('/archives/preservation/supervision', [ArchivePreservationController::class, 'supervision']);
+    Route::get('/archives/packages', [ArchivePreservationController::class, 'packagesIndex']);
+    Route::get('/archives/packages/{package}', [ArchivePreservationController::class, 'packageShow']);
+    Route::get('/archives/packages/{package}/download', [ArchivePreservationController::class, 'downloadPackage']);
+    Route::post('/archives/packages/{package}/replicate', [ArchivePreservationController::class, 'replicate']);
+    Route::post('/archives/packages/{package}/verify', [ArchivePreservationController::class, 'verifyPackage']);
+    Route::post('/archives/transfers/{transfer}/sip', [ArchivePreservationController::class, 'buildSip']);
+    Route::post('/archives/records/{record}/aip', [ArchivePreservationController::class, 'buildAip']);
+    Route::post('/archives/records/{record}/dip', [ArchivePreservationController::class, 'buildDip']);
+    Route::post('/archives/records/{record}/verify-integrity', [ArchivePreservationController::class, 'verifyRecord']);
+    Route::post('/archives/records/{record}/format-migration', [ArchivePreservationController::class, 'planMigration']);
+    Route::post('/archives/records/{record}/restore', [ArchivePreservationController::class, 'restoreRecord']);
+    Route::post('/archives/packages/{package}/restore', [ArchivePreservationController::class, 'restorePackage']);
+    Route::post('/archives/integrity/batch', [ArchivePreservationController::class, 'verifyBatch']);
+
+    Route::post('/archives/imports/preview', [ArchiveImportController::class, 'preview']);
+    Route::post('/archives/imports/{import}/commit', [ArchiveImportController::class, 'commit']);
+    Route::get('/archives/imports/{import}', [ArchiveImportController::class, 'show']);
+
+    Route::get('/archives/preventive/events', [ArchivePreventiveController::class, 'events']);
+    Route::post('/archives/preventive/events', [ArchivePreventiveController::class, 'storeEvent']);
+    Route::get('/archives/preventive/climate', [ArchivePreventiveController::class, 'climate']);
+    Route::post('/archives/preventive/climate', [ArchivePreventiveController::class, 'storeClimate']);
+
     // ——— GED (référentiel documentaire transversal) ———
     Route::get('/ged/dashboard', GedDashboardController::class);
     Route::get('/ged/audit-logs', GedAuditController::class);
@@ -237,6 +357,7 @@ Route::middleware(['auth:sanctum', 'auth.idle', 'password.changed'])->group(func
             ], (int) $request->query('per_page', 8))
         );
     });
+    Route::get('/ged/catalog', GedCatalogController::class);
     Route::get('/ged/documents', [GedDocumentController::class, 'index']);
     Route::post('/ged/documents', [GedDocumentController::class, 'store']);
     Route::get('/ged/documents/{document}', [GedDocumentController::class, 'show']);

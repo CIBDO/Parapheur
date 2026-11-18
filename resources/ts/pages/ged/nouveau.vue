@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import GedBackButton from '@/components/ged/GedBackButton.vue'
 import ParapheurPageHeader from '@/components/parapheur/ParapheurPageHeader.vue'
 import {
   confidentialityOptions,
@@ -183,7 +184,14 @@ const submit = async () => {
       title="Déposer un document"
       subtitle="Documentation institutionnelle — le dépôt ne publie pas automatiquement"
       icon="tabler-upload"
-    />
+    >
+      <template #back>
+        <GedBackButton
+          to="ged-explorer"
+          prefer-history
+        />
+      </template>
+    </ParapheurPageHeader>
 
     <VAlert
       v-if="errorMessage"

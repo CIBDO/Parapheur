@@ -1,0 +1,1113 @@
+# PROMPT MAÎTRE — E-TRÉSOR
+## Système d'Archivage Électronique et Physique Institutionnel (SAE)
+### Direction Générale du Trésor et de la Comptabilité Publique — Mali
+
+**Projet :** E-Trésor  
+**Module :** Archives institutionnelles  
+**Technologies :** Laravel API, Vue.js, ONLYOFFICE  
+**Approche :** Audit de l'existant, mutualisation, architecture modulaire, sécurité multi-structures  
+**Statut :** Cahier d'instructions pour agent de développement Cursor / Codex / Claude Code
+
+---
+
+# 1. RÔLE ET MISSION
+
+Tu interviens en qualité d'architecte logiciel senior, expert en :
+
+- Systèmes d'Archivage Électronique (SAE) ;
+- Records Management et archivistique institutionnelle ;
+- Gestion des archives physiques et hybrides ;
+- Gestion Électronique des Documents (GED) ;
+- Gouvernance documentaire ;
+- Sécurité des systèmes d'information ;
+- Architecture Laravel API et Vue.js ;
+- Gestion des organisations multi-structures ;
+- Préservation numérique à long terme.
+
+Ta mission consiste à analyser l'application **E-Trésor** existante, puis à proposer l'architecture et le plan d'implémentation d'un module complet intitulé **« Archives institutionnelles »**.
+
+Ce module doit permettre à la DGTCP de gérer l'ensemble du cycle de vie de ses archives administratives, comptables, financières, techniques et institutionnelles.
+
+Il doit prendre en charge les archives numériques, physiques et hybrides.
+
+**Règle impérative : ne commence aucune modification du code avant d'avoir audité l'existant, présenté les écarts et obtenu ma validation.**
+
+# 2. CONTEXTE INSTITUTIONNEL
+
+La DGTCP est composée de plusieurs structures centrales et déconcentrées :
+
+- Direction Générale et Cabinet ;
+- Directions centrales ;
+- Trésoreries Régionales ;
+- Postes comptables ;
+- Services rattachés ;
+- Divisions ;
+- Sections ;
+- Bureaux ;
+- Autres unités organisationnelles.
+
+Chaque structure possède sa propre organisation interne.
+
+Exemples :
+
+- Direction → Division → Section ;
+- Trésorerie → Service → Bureau ;
+- Structure → Service ;
+- Autres hiérarchies configurables.
+
+Le module doit être mutualisé tout en respectant l'autonomie documentaire, les responsabilités et les habilitations de chaque structure.
+
+Deux structures de même type doivent conserver des périmètres documentaires distincts.
+
+# 3. PRINCIPES DIRECTEURS
+
+Le module doit respecter les principes suivants :
+
+1. Application unique, gestion multi-structures.
+2. Réutilisation maximale des composants existants.
+3. Séparation entre GED et archivage.
+4. Classement institutionnel normalisé et configurable.
+5. Gestion du cycle de vie complet des archives.
+6. Conservation et traçabilité.
+7. Sécurité contextualisée par structure et unité.
+8. Conservation des preuves et de l'historique.
+9. Gestion des archives numériques et physiques.
+10. Pérennité et réversibilité.
+11. Interopérabilité avec les autres modules.
+12. Paramétrage métier sans modification du code.
+13. Architecture évolutive.
+14. Ergonomie adaptée aux agents et archivistes.
+15. Respect des obligations réglementaires applicables.
+
+# 4. RÉFÉRENTIELS ET BONNES PRATIQUES
+
+S'inspirer des référentiels suivants :
+
+- ISO 15489 : gestion des documents d'activité ;
+- ISO 14721 / OAIS : modèle de référence pour la préservation numérique ;
+- ISO 23081 : métadonnées des documents d'activité ;
+- ISO 16175 : exigences fonctionnelles relatives aux documents d'activité dans les environnements numériques ;
+- ISO 27001 : bonnes pratiques de management de la sécurité de l'information ;
+- ISO 19005 : famille PDF/A pour l'archivage de documents électroniques.
+
+Étudier également les bonnes pratiques de gestion des archives publiques, de classement, de versement, de communication et de conservation.
+
+Ces références ne doivent pas être présentées comme une certification automatique du système.
+
+Les délais de conservation, modalités de transfert, règles de communicabilité et conditions d'élimination doivent être validés à partir des textes applicables au Mali.
+
+# 5. AUDIT OBLIGATOIRE DE L'EXISTANT
+
+Avant toute implémentation, analyser :
+
+- Le module GED ;
+- Le module Courrier ;
+- Le Parapheur électronique ;
+- La Documentation institutionnelle ;
+- Le module Tâches et Directives ;
+- Les Productions périodiques ;
+- Les Réunions ;
+- L'Annuaire institutionnel ;
+- Les rôles et permissions ;
+- Les workflows ;
+- Les notifications ;
+- L'intégration ONLYOFFICE ;
+- Les fichiers et stockages ;
+- Les mécanismes de journalisation ;
+- Les fonctionnalités d'archivage déjà présentes.
+
+Identifier :
+
+1. Les fonctionnalités réutilisables ;
+2. Les fonctionnalités à étendre ;
+3. Les fonctionnalités manquantes ;
+4. Les redondances potentielles ;
+5. Les risques techniques ;
+6. Les risques de sécurité ;
+7. Les migrations nécessaires.
+
+Ne jamais recréer un référentiel déjà disponible sans justification architecturale.
+
+# 6. PÉRIMÈTRE DU MODULE
+
+Le module doit couvrir :
+
+## 6.1 Archives électroniques
+
+- Versements ;
+- Classement ;
+- Métadonnées ;
+- Conservation ;
+- Recherche ;
+- Consultation ;
+- Communication ;
+- Intégrité ;
+- Préservation ;
+- Restitution ;
+- Sort final.
+
+## 6.2 Archives physiques
+
+- Magasins d'archives ;
+- Sites et bâtiments ;
+- Salles de conservation ;
+- Armoires ;
+- Rayonnages ;
+- Travées ;
+- Faces ;
+- Tablettes ;
+- Emplacements ;
+- Boîtes ;
+- Chemises ;
+- Dossiers ;
+- Registres ;
+- Mouvements ;
+- Prêts ;
+- Récolements ;
+- Inventaires.
+
+## 6.3 Archives hybrides
+
+Permettre de relier les pièces numériques et les originaux papier.
+
+# 7. PLAN DE CLASSEMENT INSTITUTIONNEL
+
+Créer un plan de classement hiérarchique, configurable et versionné.
+
+Le classement doit privilégier les fonctions et activités de l'institution.
+
+Domaines indicatifs :
+
+- Gouvernance ;
+- Administration générale ;
+- Ressources humaines ;
+- Comptabilité publique ;
+- Trésorerie ;
+- Recettes ;
+- Dépenses ;
+- Opérations bancaires ;
+- Contrôle et inspection ;
+- Affaires juridiques ;
+- Marchés et contrats ;
+- Systèmes d'information ;
+- Patrimoine ;
+- Documentation réglementaire ;
+- Correspondances ;
+- Autres domaines configurables.
+
+Permettre :
+
+- Fonds ;
+- Sous-fonds ;
+- Séries ;
+- Sous-séries ;
+- Dossiers ;
+- Pièces.
+
+Le classement intellectuel doit être distinct de la localisation physique.
+
+Un dossier peut changer d'emplacement sans changer de référence archivistique permanente.
+
+# 8. GESTION DES MAGASINS ET EMPLACEMENTS PHYSIQUES
+
+Créer un sous-module **« Magasins et emplacements »**.
+
+## 8.1 Hiérarchie physique
+
+Prévoir une hiérarchie configurable :
+
+```text
+Structure
+  └── Site de conservation
+       └── Bâtiment
+            └── Salle / Magasin
+                 └── Zone
+                      └── Rayonnage
+                           └── Travée
+                                └── Face
+                                     └── Tablette / Niveau
+                                          └── Emplacement
+                                               └── Boîte
+                                                    └── Dossier
+```
+
+Tous les niveaux ne sont pas obligatoires.
+
+Une petite structure peut conserver ses archives dans une armoire.
+
+Une structure importante peut disposer de plusieurs bâtiments et magasins.
+
+Prévoir une modélisation flexible, sans imposer une profondeur identique à toutes les structures.
+
+## 8.2 Référentiel des emplacements
+
+Chaque emplacement doit pouvoir comporter :
+
+- Identifiant unique ;
+- Code ;
+- Libellé ;
+- Type ;
+- Parent ;
+- Structure responsable ;
+- Site ;
+- Salle ;
+- Rayonnage ;
+- Travée ;
+- Face ;
+- Tablette ;
+- Dimensions ;
+- Capacité ;
+- Taux d'occupation ;
+- Statut ;
+- Observations.
+
+## 8.3 Codification
+
+Prévoir une codification automatique configurable.
+
+Exemple :
+
+`BKO/SAL01/R03/T02/N04/B012/D008`
+
+Cette cote représente une localisation physique et non l'identifiant permanent de l'archive.
+
+La codification doit être unique dans le périmètre défini.
+
+## 8.4 Capacités de stockage
+
+Permettre le suivi :
+
+- Des mètres linéaires disponibles ;
+- Des mètres linéaires occupés ;
+- Des volumes ;
+- Du nombre de boîtes ;
+- Du nombre d'emplacements libres ;
+- Des capacités maximales ;
+- Des rayonnages saturés.
+
+Empêcher les affectations dépassant les capacités disponibles, sauf dérogation contrôlée.
+
+## 8.5 Plan d'occupation
+
+Prévoir une interface permettant de visualiser :
+
+- Les salles ;
+- Les rayonnages ;
+- Les tablettes ;
+- Les emplacements libres ;
+- Les emplacements occupés ;
+- Les emplacements indisponibles ;
+- Les boîtes présentes.
+
+Une représentation 2D interactive est suffisante dans un premier temps.
+
+Ne pas imposer une modélisation 3D.
+
+# 9. GESTION DES BOÎTES ET DOSSIERS PHYSIQUES
+
+Chaque boîte d'archives doit disposer d'une fiche comprenant :
+
+- Code unique ;
+- Structure productrice ;
+- Service producteur ;
+- Fonds ;
+- Série ;
+- Typologie ;
+- Intitulé ;
+- Dates extrêmes ;
+- Nombre de dossiers ;
+- Dimensions ;
+- État physique ;
+- Localisation ;
+- Date de dépôt ;
+- Responsable ;
+- Durée de conservation ;
+- Sort final ;
+- Observations.
+
+Une boîte peut contenir plusieurs dossiers.
+
+Un dossier peut comporter plusieurs pièces.
+
+Prévoir les contrôles de cohérence entre la capacité, le contenu et les règles de classement.
+
+# 10. ÉTIQUETTES ET IDENTIFICATION
+
+Prévoir la génération d'étiquettes imprimables pour :
+
+- Rayonnages ;
+- Tablettes ;
+- Boîtes ;
+- Dossiers ;
+- Registres ;
+- Unités physiques.
+
+Les étiquettes peuvent comporter :
+
+- Logo ou identité institutionnelle ;
+- Référence ;
+- Intitulé ;
+- Dates extrêmes ;
+- Code-barres ;
+- QR code ;
+- Localisation ;
+- Numéro de boîte.
+
+Le QR code doit contenir un identifiant opaque ou une référence sécurisée, sans exposer de données confidentielles.
+
+Le scan doit déclencher une vérification des permissions avant toute consultation.
+
+# 11. MOUVEMENTS DES ARCHIVES
+
+Gérer les opérations suivantes :
+
+- Entrée en magasin ;
+- Affectation d'emplacement ;
+- Déplacement interne ;
+- Transfert entre salles ;
+- Transfert entre structures ;
+- Sortie temporaire ;
+- Prêt ;
+- Retour ;
+- Mise en quarantaine ;
+- Réintégration ;
+- Transfert définitif ;
+- Élimination autorisée.
+
+Chaque mouvement doit enregistrer :
+
+- Archive concernée ;
+- Emplacement d'origine ;
+- Emplacement de destination ;
+- Type de mouvement ;
+- Motif ;
+- Date ;
+- Agent ;
+- Autorité de validation ;
+- Observations ;
+- Pièces justificatives.
+
+Conserver l'historique intégral des mouvements.
+
+# 12. PRÊTS ET COMMUNICATION DES ARCHIVES PHYSIQUES
+
+Créer un workflow :
+
+1. Demande de consultation ou de prêt ;
+2. Vérification des habilitations ;
+3. Validation ;
+4. Préparation du dossier ;
+5. Sortie ;
+6. Remise ;
+7. Suivi de l'échéance ;
+8. Retour ;
+9. Vérification de l'état ;
+10. Réintégration.
+
+Prévoir :
+
+- Délais de prêt configurables ;
+- Relances ;
+- Retards ;
+- Prolongations ;
+- Historique des emprunteurs ;
+- Accusés de remise et de retour ;
+- Gestion des archives indisponibles.
+
+# 13. RÉCOLEMENT ET INVENTAIRES
+
+Permettre de réaliser des opérations de récolement physique.
+
+Fonctionnalités :
+
+- Création d'une campagne ;
+- Sélection des sites et magasins ;
+- Inventaire des emplacements ;
+- Scan des boîtes ;
+- Vérification de présence ;
+- Identification des écarts ;
+- Signalement des boîtes manquantes ;
+- Identification des déplacements non enregistrés ;
+- Validation ;
+- Rapport final.
+
+Prévoir des imports Excel et CSV pour reprendre les inventaires historiques.
+
+Les données importées doivent être contrôlées avant validation.
+
+# 14. CONSERVATION PRÉVENTIVE
+
+Prévoir le suivi :
+
+- Des incidents ;
+- Des infiltrations ;
+- Des dégradations ;
+- Des infestations ;
+- Des anomalies de température ;
+- Des anomalies d'humidité ;
+- Des risques d'incendie ;
+- Des contrôles de sécurité ;
+- Des opérations de nettoyage ;
+- Des interventions de conservation.
+
+Les mesures environnementales peuvent être saisies manuellement ou intégrées à des capteurs lorsque l'infrastructure le permet.
+
+# 15. VERSEMENT AUX ARCHIVES
+
+Prévoir les versements :
+
+- Manuels ;
+- Automatiques ;
+- Unitaires ;
+- Par lots ;
+- Depuis les modules métiers ;
+- Depuis des inventaires existants.
+
+Chaque versement doit comporter :
+
+- Référence ;
+- Structure versante ;
+- Responsable ;
+- Date ;
+- Typologie ;
+- Documents ;
+- Métadonnées ;
+- Règles de conservation ;
+- Bordereau ;
+- Statut ;
+- Historique.
+
+Workflow :
+
+```text
+Brouillon
+   ↓
+Soumis
+   ↓
+En contrôle
+   ├── Rejeté → Correction → Nouvelle soumission
+   ↓
+Accepté
+   ↓
+Pris en charge
+   ↓
+Conservé
+```
+
+# 16. MÉTADONNÉES ARCHIVISTIQUES
+
+Prévoir notamment :
+
+- Identifiant permanent ;
+- Référence ;
+- Titre ;
+- Description ;
+- Producteur ;
+- Structure ;
+- Unité ;
+- Dates ;
+- Typologie ;
+- Fonds ;
+- Série ;
+- Mots-clés ;
+- Niveau de confidentialité ;
+- Statut ;
+- Format ;
+- Taille ;
+- Empreinte cryptographique ;
+- Règle de conservation ;
+- Événement déclencheur ;
+- Date prévisionnelle du sort final ;
+- Responsable ;
+- Provenance ;
+- Historique ;
+- Localisation physique éventuelle.
+
+Les métadonnées doivent être structurées, exportables et historisées.
+
+# 17. TABLEAUX DE GESTION ET DURÉES DE CONSERVATION
+
+Créer un référentiel des règles de conservation.
+
+Chaque règle doit définir :
+
+- Typologie ou série ;
+- Structure ou activité ;
+- Événement déclencheur ;
+- Durée de conservation courante ;
+- Durée de conservation intermédiaire ;
+- Sort final ;
+- Fondement réglementaire ;
+- Autorité compétente ;
+- Date de validité ;
+- Version.
+
+Ne jamais inventer les délais légaux applicables au Mali.
+
+Prévoir un processus de validation institutionnelle des tableaux de gestion.
+
+# 18. GEL DE CONSERVATION
+
+Prévoir un mécanisme permettant de suspendre toute élimination lorsqu'une archive est concernée par :
+
+- Un contrôle ;
+- Un audit ;
+- Un contentieux ;
+- Une enquête ;
+- Une instruction administrative ;
+- Une obligation réglementaire.
+
+Chaque gel doit être motivé, daté, autorisé et historisé.
+
+La levée du gel doit également être contrôlée.
+
+# 19. SORT FINAL
+
+Prévoir :
+
+- Conservation définitive ;
+- Transfert ;
+- Réévaluation ;
+- Élimination autorisée.
+
+L'élimination doit suivre un workflow formel :
+
+1. Identification des archives arrivées à échéance ;
+2. Vérification des règles ;
+3. Vérification des gels ;
+4. Proposition ;
+5. Validation par les autorités habilitées ;
+6. Établissement du procès-verbal ;
+7. Exécution ;
+8. Conservation des preuves.
+
+Interdire toute destruction définitive par une simple action non contrôlée.
+
+# 20. INTÉGRITÉ ET PRÉSERVATION NUMÉRIQUE
+
+Mettre en place :
+
+- Empreintes SHA-256 ou équivalent ;
+- Contrôle initial d'intégrité ;
+- Vérifications périodiques ;
+- Détection des altérations ;
+- Journalisation ;
+- Restauration contrôlée ;
+- Copies de conservation ;
+- Gestion des formats ;
+- Migration de formats ;
+- Conservation des originaux ;
+- Traçabilité des transformations.
+
+Étudier l'utilisation des concepts OAIS :
+
+- SIP : paquet de versement ;
+- AIP : paquet d'archivage ;
+- DIP : paquet de diffusion.
+
+Prévoir des mécanismes de restitution indépendants de l'application.
+
+# 21. STOCKAGE ET INFRASTRUCTURE
+
+Séparer logiquement :
+
+- Métadonnées ;
+- Fichiers de référence ;
+- Copies de conservation ;
+- Sauvegardes ;
+- Journaux d'audit ;
+- Preuves d'intégrité.
+
+Prévoir :
+
+- Chiffrement ;
+- Contrôle d'accès ;
+- Stockage privé ;
+- Sauvegardes ;
+- Réplication ;
+- Vérification des restaurations ;
+- Supervision ;
+- Gestion des capacités ;
+- Plan de reprise ;
+- Réversibilité.
+
+Étudier la faisabilité d'un stockage objet compatible S3, du verrouillage d'objets ou de mécanismes d'immutabilité équivalents.
+
+Ne pas supposer que l'hébergement actuel offre toutes les garanties nécessaires.
+
+# 22. SÉCURITÉ MULTI-STRUCTURES
+
+Réutiliser les permissions contextualisées de E-Trésor.
+
+Périmètres :
+
+- Personnel ;
+- Unité ;
+- Hiérarchique ;
+- Structure ;
+- Spécifique ;
+- Transversal explicitement autorisé.
+
+Un agent de la TR Sikasso ne doit pas accéder automatiquement aux archives de la TR Ségou.
+
+Un agent ne doit pas accéder aux archives d'un autre service simplement parce que celui-ci appartient au même type de structure.
+
+Les habilitations doivent être liées aux identifiants réels des structures et unités.
+
+La confidentialité peut restreindre davantage les accès.
+
+Les contrôles doivent être appliqués côté Laravel à toutes les opérations, y compris les fichiers, exports, recherches et API.
+
+# 23. RÔLES ET PERMISSIONS
+
+Prévoir les profils :
+
+- Agent versant ;
+- Gestionnaire documentaire ;
+- Archiviste de structure ;
+- Archiviste central ;
+- Responsable des archives ;
+- Responsable de structure ;
+- Autorité de validation ;
+- Auditeur habilité ;
+- Administrateur fonctionnel ;
+- Administrateur technique.
+
+Permissions indicatives :
+
+- `archives.consulter`
+- `archives.rechercher`
+- `archives.verser`
+- `archives.valider_versement`
+- `archives.rejeter_versement`
+- `archives.classer`
+- `archives.telecharger`
+- `archives.communiquer`
+- `archives.gerer_conservation`
+- `archives.proposer_elimination`
+- `archives.autoriser_elimination`
+- `archives.executer_elimination`
+- `archives.gerer_magasins`
+- `archives.gerer_emplacements`
+- `archives.gerer_boites`
+- `archives.gerer_prets`
+- `archives.gerer_recolement`
+- `archives.exporter`
+- `archives.auditer`
+- `archives.administrer`
+
+Adapter les noms aux conventions existantes.
+
+Séparer les responsabilités incompatibles, notamment proposition, autorisation et exécution de l'élimination.
+
+# 24. RECHERCHE ET CONSULTATION
+
+Prévoir :
+
+- Recherche simple ;
+- Recherche avancée ;
+- Recherche plein texte ;
+- Recherche par référence ;
+- Recherche par structure ;
+- Recherche par service ;
+- Recherche par fonds ;
+- Recherche par série ;
+- Recherche par période ;
+- Recherche par typologie ;
+- Recherche par localisation ;
+- Recherche par boîte ;
+- Recherche par mots-clés ;
+- Filtres combinables.
+
+Les résultats doivent respecter les habilitations.
+
+Un utilisateur non autorisé ne doit pas découvrir des archives confidentielles à travers les résultats ou suggestions de recherche.
+
+# 25. INTÉGRATION AUX MODULES EXISTANTS
+
+## Courrier
+
+Archiver les courriers finalisés avec leurs références, pièces, signataires et informations de transmission.
+
+## Parapheur
+
+Archiver les documents validés ou signés, accompagnés de leur contexte et des preuves disponibles.
+
+## GED
+
+Réutiliser les fichiers, métadonnées, services de stockage et mécanismes documentaires existants.
+
+## Documentation institutionnelle
+
+Permettre la publication contrôlée des documents communicables sans ouvrir l'accès aux archives confidentielles.
+
+## Tâches et Directives
+
+Archiver les décisions, instructions, pièces et livrables.
+
+## Productions périodiques
+
+Archiver les situations transmises, leurs périodes, validations et justificatifs.
+
+## Réunions
+
+Archiver les convocations, procès-verbaux, comptes rendus et documents associés.
+
+## Annuaire institutionnel
+
+Réutiliser les structures, unités, responsables, fonctions et affectations.
+
+## ONLYOFFICE
+
+Permettre la consultation des documents bureautiques lorsque nécessaire.
+
+Ne pas permettre de modifier la version archivistique de référence.
+
+# 26. ARCHITECTURE TECHNIQUE
+
+Auditer l'architecture Laravel/Vue.js existante.
+
+Proposer des services réutilisables tels que :
+
+- `ArchiveService`
+- `ArchiveIngestService`
+- `ArchiveClassificationService`
+- `ArchiveRetentionService`
+- `ArchiveAccessService`
+- `ArchiveIntegrityService`
+- `ArchivePreservationService`
+- `ArchiveDispositionService`
+- `ArchiveCommunicationService`
+- `PhysicalArchiveService`
+- `ArchiveLocationService`
+- `ArchiveMovementService`
+- `ArchiveLoanService`
+- `ArchiveInventoryService`
+- `ArchiveAuditService`
+
+Les noms sont indicatifs.
+
+Prévoir :
+
+- Services métier ;
+- Policies ;
+- Form Requests ;
+- API Resources ;
+- Jobs asynchrones ;
+- Événements métier ;
+- Transactions et mécanismes de reprise ;
+- Journalisation ;
+- Tests automatisés.
+
+Ne pas disperser les règles d'accès dans les contrôleurs.
+
+# 27. MODÈLE DE DONNÉES CONCEPTUEL
+
+Étudier les entités suivantes :
+
+```text
+archive_fonds
+archive_series
+archive_classification_nodes
+archive_records
+archive_files
+archive_packages
+archive_transfers
+archive_transfer_items
+archive_retention_rules
+archive_retention_events
+archive_holds
+archive_integrity_checks
+archive_preservation_events
+archive_access_grants
+archive_communication_requests
+archive_disposition_requests
+archive_disposition_items
+archive_disposition_approvals
+archive_audit_events
+
+archive_sites
+archive_buildings
+archive_rooms
+archive_storage_units
+archive_storage_locations
+archive_physical_units
+archive_boxes
+archive_box_contents
+archive_movements
+archive_loans
+archive_inventories
+archive_inventory_items
+archive_condition_reports
+```
+
+Cette liste est conceptuelle.
+
+Ne pas créer systématiquement toutes ces tables.
+
+Étudier une modélisation hiérarchique générique pour les emplacements, lorsque cela simplifie la maintenance et évite les redondances.
+
+Documenter les relations, index, contraintes, règles d'unicité et politiques de suppression.
+
+# 28. INTERFACES UTILISATEUR
+
+Créer un menu **« Archives institutionnelles »**.
+
+Sous-menus proposés :
+
+1. Tableau de bord ;
+2. Explorer les archives ;
+3. Recherche avancée ;
+4. Mes versements ;
+5. Versements à contrôler ;
+6. Fonds et séries ;
+7. Plan de classement ;
+8. Archives physiques ;
+9. Magasins et salles ;
+10. Rayonnages et emplacements ;
+11. Boîtes et dossiers ;
+12. Plan d'occupation ;
+13. Étiquettes ;
+14. Mouvements ;
+15. Prêts et communications ;
+16. Récolement ;
+17. Conservation et échéances ;
+18. Sort final ;
+19. Contrôles d'intégrité ;
+20. Rapports ;
+21. Administration.
+
+Afficher uniquement les fonctionnalités autorisées.
+
+Prévoir une interface responsive, sobre et professionnelle, cohérente avec la charte graphique de E-Trésor.
+
+# 29. TABLEAUX DE BORD
+
+## Responsable des archives
+
+Afficher notamment :
+
+- Nombre total de dossiers ;
+- Nombre de boîtes ;
+- Volume numérique ;
+- Volume physique ;
+- Versements en attente ;
+- Versements acceptés ;
+- Archives par structure ;
+- Archives par typologie ;
+- Capacité des magasins ;
+- Taux d'occupation ;
+- Rayonnages saturés ;
+- Prêts en cours ;
+- Prêts en retard ;
+- Récolements ;
+- Archives manquantes ;
+- Échéances de conservation ;
+- Contrôles d'intégrité ;
+- Incidents.
+
+## Direction Générale
+
+Prévoir une vision consolidée et sécurisée :
+
+- Couverture archivistique des structures ;
+- État des versements ;
+- Volumes par domaine ;
+- Occupation des magasins ;
+- Retards ;
+- Risques de conservation ;
+- Échéances ;
+- Indicateurs de conformité ;
+- État des opérations de récolement.
+
+Les tableaux de bord consolidés ne doivent pas donner automatiquement accès aux contenus confidentiels.
+
+# 30. IMPORTATION ET REPRISE DES ARCHIVES EXISTANTES
+
+Prévoir :
+
+- Import Excel ;
+- Import CSV ;
+- Import par lots ;
+- Import des inventaires physiques ;
+- Import des dossiers numériques ;
+- Correspondance des colonnes ;
+- Détection des doublons ;
+- Contrôles de cohérence ;
+- Prévisualisation ;
+- Validation ;
+- Rapport d'import ;
+- Reprise sur erreur.
+
+Les archives historiques sans rattachement clair doivent faire l'objet d'une validation métier.
+
+Ne jamais leur attribuer arbitrairement une structure.
+
+# 31. JOURNALISATION ET AUDIT
+
+Journaliser les opérations sensibles :
+
+- Versement ;
+- Validation ;
+- Rejet ;
+- Classement ;
+- Consultation sensible ;
+- Téléchargement ;
+- Communication ;
+- Déplacement ;
+- Prêt ;
+- Retour ;
+- Récolement ;
+- Modification de localisation ;
+- Changement de droits ;
+- Vérification d'intégrité ;
+- Gel ;
+- Proposition d'élimination ;
+- Autorisation ;
+- Destruction ;
+- Transfert ;
+- Restauration.
+
+Les journaux doivent être protégés contre les modifications non autorisées.
+
+# 32. TESTS ET RECETTE
+
+Prévoir des tests couvrant :
+
+1. Versement d'un courrier ;
+2. Versement d'un dossier ;
+3. Versement en masse ;
+4. Rejet et correction ;
+5. Classement ;
+6. Conservation ;
+7. Contrôle d'intégrité ;
+8. Recherche sécurisée ;
+9. Isolation entre structures ;
+10. Consultation d'archives confidentielles ;
+11. Création d'un magasin ;
+12. Création d'une salle ;
+13. Création d'un rayonnage ;
+14. Création d'une tablette ;
+15. Affectation d'une boîte ;
+16. Contrôle de capacité ;
+17. Génération d'une étiquette ;
+18. Scan d'un QR code ;
+19. Déplacement d'une boîte ;
+20. Prêt ;
+21. Retour ;
+22. Prêt en retard ;
+23. Récolement ;
+24. Détection d'une boîte manquante ;
+25. Import d'inventaire ;
+26. Gel de conservation ;
+27. Proposition d'élimination ;
+28. Refus d'élimination non autorisée ;
+29. Export d'archives ;
+30. Restauration après incident ;
+31. Changement d'affectation d'un agent ;
+32. Conservation des références historiques.
+
+# 33. PLAN DE RÉALISATION
+
+## Phase 1 — Audit et socle
+
+- Audit de l'existant ;
+- Architecture ;
+- Modèle de données ;
+- Plan de classement ;
+- Métadonnées ;
+- Permissions ;
+- Versements ;
+- Consultation ;
+- Intégration Courrier/GED.
+
+## Phase 2 — Archives physiques
+
+- Sites ;
+- Magasins ;
+- Salles ;
+- Rayonnages ;
+- Emplacements ;
+- Boîtes ;
+- Étiquettes ;
+- Mouvements ;
+- Prêts ;
+- Récolements.
+
+## Phase 3 — Gouvernance archivistique
+
+- Tableaux de gestion ;
+- Durées de conservation ;
+- Gels ;
+- Communication ;
+- Sort final ;
+- Rapports ;
+- Tableaux de bord.
+
+## Phase 4 — Préservation avancée
+
+- Paquets archivistiques ;
+- Contrôles périodiques ;
+- Stockage immuable ;
+- Réplication ;
+- Migration de formats ;
+- Réversibilité ;
+- Supervision avancée.
+
+# 34. LIVRABLES AVANT IMPLÉMENTATION
+
+Produire dans cet ordre :
+
+1. Rapport d'audit de E-Trésor ;
+2. Cartographie des composants existants ;
+3. Analyse des écarts ;
+4. Architecture fonctionnelle ;
+5. Architecture technique ;
+6. Modèle conceptuel de données ;
+7. Modèle relationnel ;
+8. Plan de classement initial ;
+9. Modèle des magasins et emplacements ;
+10. Matrice des permissions ;
+11. Workflows de versement ;
+12. Workflows des mouvements physiques ;
+13. Workflows de conservation ;
+14. Maquettes des écrans ;
+15. Stratégie de stockage ;
+16. Stratégie de migration ;
+17. Plan de développement ;
+18. Plan de tests ;
+19. Critères de recette ;
+20. Analyse des risques.
+
+# 35. CONSIGNES FINALES À L'AGENT
+
+Tu interviens sur un projet existant.
+
+Tu dois :
+
+- Inspecter le code avant toute proposition ;
+- Respecter l'architecture actuelle ;
+- Réutiliser les services et référentiels existants ;
+- Éviter les doublons fonctionnels ;
+- Respecter les conventions du projet ;
+- Ne pas casser les modules existants ;
+- Préserver les données historiques ;
+- Garantir le cloisonnement multi-structures ;
+- Centraliser les contrôles de sécurité ;
+- Prévoir des tests automatisés ;
+- Documenter les choix techniques ;
+- Proposer une réalisation progressive.
+
+**Ne commence pas à coder immédiatement.**
+
+Présente d'abord l'audit, l'architecture cible, les modèles de données, les écrans, les workflows et le plan d'implémentation.
+
+**Attends expressément ma validation avant toute modification.**
+
+## OBJECTIF FINAL
+
+Doter la Direction Générale du Trésor et de la Comptabilité Publique d'un système institutionnel d'archivage électronique, physique et hybride, mutualisé, sécurisé, évolutif et pérenne.
+
+Le système doit permettre à chaque structure de gérer ses propres archives tout en offrant aux responsables habilités une vision consolidée du patrimoine documentaire de la DGTCP.
+
+Il doit garantir la traçabilité, la conservation, la localisation, la disponibilité, la confidentialité et la restitution des archives, conformément aux règles institutionnelles et réglementaires applicables.

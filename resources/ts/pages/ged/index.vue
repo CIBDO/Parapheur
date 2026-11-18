@@ -163,7 +163,9 @@ async function performSearch() {
       if (v !== null && v !== undefined && v !== '')
         params[k] = v as string | number
     })
-    const res = await $api('/ged/documents', { query: params })
+    const res = await $api('/ged/documents', {
+      query: { ...params, catalog: params.catalog || 'institutional' },
+    })
     searchResults.value = res.data || []
   }
   catch {

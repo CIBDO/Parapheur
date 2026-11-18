@@ -376,6 +376,7 @@ declare module 'vue' {
     DropZone: typeof import('./resources/ts/@core/components/DropZone.vue')['default']
     EnableOneTimePasswordDialog: typeof import('./resources/ts/components/dialogs/EnableOneTimePasswordDialog.vue')['default']
     ErrorHeader: typeof import('./resources/ts/components/ErrorHeader.vue')['default']
+    GedBackButton: typeof import('./resources/ts/components/ged/GedBackButton.vue')['default']
     I18n: typeof import('./resources/ts/@core/components/I18n.vue')['default']
     MailReferentialPanel: typeof import('./resources/ts/components/courrier/MailReferentialPanel.vue')['default']
     MailWorkContextSwitcher: typeof import('./resources/ts/components/courrier/MailWorkContextSwitcher.vue')['default']

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import GedBackButton from '@/components/ged/GedBackButton.vue'
 import ParapheurPageHeader from '@/components/parapheur/ParapheurPageHeader.vue'
 import { useGedDocumentList } from '@/composables/useGedDocumentList'
 
@@ -22,7 +23,11 @@ onMounted(load)
       title="À traiter"
       subtitle="Documents qui m’ont été assignés"
       icon="tabler-inbox"
-    />
+    >
+      <template #back>
+        <GedBackButton to="ged" />
+      </template>
+    </ParapheurPageHeader>
     <VCard class="parapheur-section-card">
       <VDataTableServer
         v-model:page="page"

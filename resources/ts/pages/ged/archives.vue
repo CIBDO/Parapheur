@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import GedBackButton from '@/components/ged/GedBackButton.vue'
 import ParapheurPageHeader from '@/components/parapheur/ParapheurPageHeader.vue'
 import { useGedDocumentList } from '@/composables/useGedDocumentList'
 
@@ -21,7 +22,11 @@ onMounted(load)
       title="Archives GED"
       subtitle="Documents archivés (non supprimés)"
       icon="tabler-archive"
-    />
+    >
+      <template #back>
+        <GedBackButton to="ged" />
+      </template>
+    </ParapheurPageHeader>
     <VCard class="parapheur-section-card">
       <VDataTableServer
         v-model:page="page"

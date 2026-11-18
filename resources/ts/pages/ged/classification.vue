@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import GedBackButton from '@/components/ged/GedBackButton.vue'
 import ParapheurPageHeader from '@/components/parapheur/ParapheurPageHeader.vue'
 import { useAbility } from '@/plugins/casl/composables/useAbility'
 
@@ -122,6 +123,9 @@ const remove = async (id: number) => {
       subtitle="Arborescence logique dynamique (indépendante du stockage physique)"
       icon="tabler-sitemap"
     >
+      <template #back>
+        <GedBackButton to="ged" />
+      </template>
       <template #actions>
         <VBtn
           v-if="canManage"

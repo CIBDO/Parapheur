@@ -109,6 +109,29 @@ class PermissionCatalog
             'ged.manage_retention' => 'Gérer la rétention GED',
         ]);
 
+        $add('archives', [
+            'archives.consulter' => 'Consulter les archives institutionnelles',
+            'archives.rechercher' => 'Rechercher dans les archives',
+            'archives.verser' => 'Verser aux archives',
+            'archives.valider_versement' => 'Valider un versement',
+            'archives.rejeter_versement' => 'Rejeter un versement',
+            'archives.classer' => 'Classer une archive',
+            'archives.telecharger' => 'Télécharger une archive',
+            'archives.communiquer' => 'Communiquer une archive',
+            'archives.gerer_conservation' => 'Gérer la conservation',
+            'archives.proposer_elimination' => 'Proposer une élimination',
+            'archives.autoriser_elimination' => 'Autoriser une élimination',
+            'archives.executer_elimination' => 'Exécuter une élimination',
+            'archives.gerer_magasins' => 'Gérer les magasins',
+            'archives.gerer_emplacements' => 'Gérer les emplacements',
+            'archives.gerer_boites' => 'Gérer les boîtes',
+            'archives.gerer_prets' => 'Gérer les prêts',
+            'archives.gerer_recolement' => 'Gérer le récolement',
+            'archives.exporter' => 'Exporter des archives',
+            'archives.auditer' => 'Auditer les archives',
+            'archives.administrer' => 'Administrer les archives',
+        ]);
+
         $add('workspace', [
             'workspace.access' => 'Accéder à Mon espace',
             'workspace.create_shared' => 'Créer un espace partagé',
@@ -297,6 +320,18 @@ class PermissionCatalog
             'ged.manage_workflows', 'ged.view_audit', 'ged.manage_retention',
         ]);
 
+        $archivesBasic = [
+            'archives.consulter', 'archives.rechercher', 'archives.verser', 'archives.telecharger',
+        ];
+        $archivesManage = array_merge($archivesBasic, [
+            'archives.valider_versement', 'archives.rejeter_versement', 'archives.classer',
+            'archives.communiquer', 'archives.gerer_conservation', 'archives.exporter',
+            'archives.auditer', 'archives.administrer',
+            'archives.gerer_magasins', 'archives.gerer_emplacements', 'archives.gerer_boites',
+            'archives.gerer_prets', 'archives.gerer_recolement',
+            'archives.proposer_elimination', 'archives.autoriser_elimination', 'archives.executer_elimination',
+        ]);
+
         $workspaceBasic = [
             'workspace.access', 'workspace.manage_own', 'library.access', 'library.manage_own',
         ];
@@ -399,6 +434,7 @@ class PermissionCatalog
                 'permissions' => $merge(
                     ['documents.create', 'documents.act', 'documents.vise', 'documents.validate', 'dashboard.dg', 'instructions.manage', 'meetings.manage', 'reporting.view', 'delegations.manage'],
                     $gedManage,
+                    $archivesManage,
                     $workspaceManage,
                     $appointmentManage,
                     $mailAdmin,
@@ -416,6 +452,7 @@ class PermissionCatalog
                 'permissions' => $merge(
                     ['documents.create', 'documents.act', 'documents.vise', 'documents.validate', 'dashboard.dg', 'instructions.manage', 'meetings.manage', 'reporting.view'],
                     $gedManage,
+                    $archivesManage,
                     $workspaceManage,
                     ['appointments.view', 'appointments.create', 'appointments.view_calendar', 'appointments.validate', 'appointments.manage_notes'],
                     $mailManage,
@@ -433,6 +470,7 @@ class PermissionCatalog
                 'permissions' => $merge(
                     ['documents.create', 'documents.act', 'reporting.view', 'meetings.view', 'appointments.view', 'appointments.create', 'appointments.view_calendar'],
                     $gedBasic,
+                    $archivesBasic,
                     $workspaceBasic,
                     $mailBasic,
                     $ticketBasic,
@@ -449,6 +487,7 @@ class PermissionCatalog
                 'permissions' => $merge(
                     ['documents.create', 'documents.act', 'meetings.manage', 'meetings.view', 'meetings.create', 'meetings.take_official_notes', 'meetings.generate_minutes', 'reporting.view'],
                     $gedManage,
+                    $archivesManage,
                     $workspaceManage,
                     $appointmentManage,
                     $mailAdmin,
@@ -466,6 +505,7 @@ class PermissionCatalog
                 'permissions' => $merge(
                     ['documents.create', 'documents.act', 'documents.vise', 'documents.validate', 'dashboard.direction', 'reporting.view', 'meetings.manage', 'meetings.view', 'appointments.view', 'appointments.create', 'appointments.view_calendar'],
                     $gedManage,
+                    $archivesManage,
                     $workspaceBasic,
                     $mailManage,
                     $ticketLead,
@@ -482,6 +522,7 @@ class PermissionCatalog
                 'permissions' => $merge(
                     ['documents.create', 'documents.act', 'meetings.view', 'appointments.view', 'appointments.create'],
                     $gedBasic,
+                    $archivesBasic,
                     $workspaceBasic,
                     $mailBasic,
                     $ticketAgent,
@@ -498,6 +539,7 @@ class PermissionCatalog
                 'permissions' => $merge(
                     ['documents.create', 'documents.act', 'meetings.view', 'appointments.view', 'appointments.create'],
                     $gedBasic,
+                    $archivesBasic,
                     $workspaceBasic,
                     $mailBasic,
                     $ticketAgent,
@@ -514,6 +556,7 @@ class PermissionCatalog
                 'permissions' => $merge(
                     ['documents.create', 'documents.act', 'meetings.view', 'appointments.view', 'appointments.create'],
                     $gedBasic,
+                    $archivesBasic,
                     $workspaceBasic,
                     $mailBasic,
                     $ticketAgent,
@@ -530,6 +573,7 @@ class PermissionCatalog
                 'permissions' => $merge(
                     ['meetings.view', 'appointments.view', 'appointments.view_calendar'],
                     ['ged.view', 'ged.search', 'ged.download'],
+                    ['archives.consulter', 'archives.rechercher'],
                     ['workspace.access', 'library.access'],
                     ['mail.view'],
                     ['ticket.view', 'knowledge.view'],
@@ -594,6 +638,7 @@ class PermissionCatalog
             'task' => 'Tâches',
             'instruction' => 'Instructions',
             'ged' => 'GED',
+            'archives' => 'Archives institutionnelles',
             'workspace' => 'Mon espace',
             'meetings' => 'Réunions',
             'appointments' => 'Rendez-vous',

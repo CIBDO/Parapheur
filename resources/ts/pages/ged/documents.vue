@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import GedBackButton from '@/components/ged/GedBackButton.vue'
 import ParapheurPageHeader from '@/components/parapheur/ParapheurPageHeader.vue'
 import { useGedDocumentList } from '@/composables/useGedDocumentList'
 import { originOptions } from '@/utils/gedUi'
@@ -41,9 +42,12 @@ const applyFilters = () => {
   <div>
     <ParapheurPageHeader
       title="Tous les documents"
-      subtitle="Catalogue de la documentation institutionnelle"
+      subtitle="Catalogue institutionnel — documents versés (hors brouillons de travail)"
       icon="tabler-files"
     >
+      <template #back>
+        <GedBackButton to="ged" />
+      </template>
       <VBtn
         color="primary"
         prepend-icon="tabler-file-plus"

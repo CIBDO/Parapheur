@@ -3,13 +3,14 @@
 namespace App\Services;
 
 use App\Enums\DocumentConfidentiality;
+use App\Enums\DocumentOrigin;
+use App\Enums\DocumentPublicationStatus;
 use App\Enums\ExpectedAction;
 use App\Enums\MeetingDecisionStatus;
 use App\Enums\MeetingDocumentKind;
 use App\Enums\MeetingStatus;
 use App\Models\Document;
 use App\Models\DocumentType;
-use App\Models\DocumentVersion;
 use App\Models\Instruction;
 use App\Models\Meeting;
 use App\Models\MeetingAgendaItem;
@@ -35,6 +36,7 @@ class MeetingService
         private readonly MeetingMinutesDocxService $minutesDocx,
         private readonly PrivateDocumentStorage $storage,
         private readonly DocumentWorkflowService $documents,
+        private readonly DocumentIngestionService $ingestion,
         private readonly DocumentAccessService $documentAccess,
     ) {}
 
@@ -391,13 +393,15 @@ class MeetingService
         $type = DocumentType::query()->where('code', $meta['document_type_code'] ?? 'DOSSIER_REUNION')->first()
             ?? DocumentType::query()->firstOrFail();
 
-        $document = $this->documents->createDraft($actor, [
+        $document = $this->ingestion->ingestWorkingDraft($actor, [
             'object' => $meta['object'] ?? ($meeting->displayTitle().' — '.$file->getClientOriginalName()),
             'document_type_id' => $type->id,
             'structure_id' => $meeting->structure_id ?? $actor->structure_id,
             'confidentiality' => $meeting->confidentiality?->value ?? 'normal',
             'priority' => $meeting->priority?->value ?? 'normale',
             'keywords' => ['reunion', $meeting->reference],
+            'origin' => DocumentOrigin::Meeting->value,
+            'publication_status' => DocumentPublicationStatus::Brouillon->value,
         ], $file);
 
         return $this->attachExistingDocument($actor, $meeting, $document->id, $meta);
@@ -1231,32 +1235,23 @@ class MeetingService
         string $filename,
         MeetingDocumentKind $kind
     ): Document {
-        $document = $this->documents->createDraft($actor, [
-            'object' => $object,
-            'document_type_id' => $type->id,
-            'structure_id' => $meeting->structure_id ?? $actor->structure_id,
-            'confidentiality' => $meeting->confidentiality?->value ?? 'normal',
-            'priority' => $meeting->priority?->value ?? 'normale',
-            'keywords' => ['reunion', $kind->value, $meeting->reference],
-        ]);
-
-        $stored = $this->storage->storeContent($html, $filename, 'text/html', 'documents/'.$document->uuid);
-        $document->versions()->where('is_main', true)->update(['is_main' => false]);
-        DocumentVersion::query()->create([
-            'document_id' => $document->id,
-            'version_number' => 1,
-            'disk' => $stored['disk'],
-            'path' => $stored['path'],
-            'original_name' => $stored['original_name'],
-            'mime_type' => $stored['mime_type'],
-            'size' => $stored['size'],
-            'checksum' => $stored['checksum'],
-            'is_main' => true,
-            'uploaded_by' => $actor->id,
-            'change_note' => 'Génération automatique depuis le module Réunions',
-        ]);
-        $document->current_version = 1;
-        $document->save();
+        $document = $this->ingestion->ingestGeneratedContent(
+            $actor,
+            [
+                'object' => $object,
+                'document_type_id' => $type->id,
+                'structure_id' => $meeting->structure_id ?? $actor->structure_id,
+                'confidentiality' => $meeting->confidentiality?->value ?? 'normal',
+                'priority' => $meeting->priority?->value ?? 'normale',
+                'keywords' => ['reunion', $kind->value, $meeting->reference],
+                'origin' => DocumentOrigin::Meeting->value,
+                'publication_status' => DocumentPublicationStatus::Brouillon->value,
+            ],
+            $html,
+            $filename,
+            'text/html',
+            'Génération automatique depuis le module Réunions',
+        );
 
         MeetingDocument::query()->updateOrCreate(
             ['meeting_id' => $meeting->id, 'document_id' => $document->id],
@@ -1275,37 +1270,23 @@ class MeetingService
         string $filename,
         MeetingDocumentKind $kind
     ): Document {
-        $document = $this->documents->createDraft($actor, [
-            'object' => $object,
-            'document_type_id' => $type->id,
-            'structure_id' => $meeting->structure_id ?? $actor->structure_id,
-            'confidentiality' => $meeting->confidentiality?->value ?? 'normal',
-            'priority' => $meeting->priority?->value ?? 'normale',
-            'keywords' => ['reunion', $kind->value, $meeting->reference, 'docx'],
-        ]);
-
-        $stored = $this->storage->storeContent(
+        $document = $this->ingestion->ingestGeneratedContent(
+            $actor,
+            [
+                'object' => $object,
+                'document_type_id' => $type->id,
+                'structure_id' => $meeting->structure_id ?? $actor->structure_id,
+                'confidentiality' => $meeting->confidentiality?->value ?? 'normal',
+                'priority' => $meeting->priority?->value ?? 'normale',
+                'keywords' => ['reunion', $kind->value, $meeting->reference, 'docx'],
+                'origin' => DocumentOrigin::Meeting->value,
+                'publication_status' => DocumentPublicationStatus::Brouillon->value,
+            ],
             $binary,
             $filename,
             'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-            'documents/'.$document->uuid
+            'Génération DOCX institutionnelle — module Réunions',
         );
-        $document->versions()->where('is_main', true)->update(['is_main' => false]);
-        DocumentVersion::query()->create([
-            'document_id' => $document->id,
-            'version_number' => 1,
-            'disk' => $stored['disk'],
-            'path' => $stored['path'],
-            'original_name' => $stored['original_name'],
-            'mime_type' => $stored['mime_type'],
-            'size' => $stored['size'],
-            'checksum' => $stored['checksum'],
-            'is_main' => true,
-            'uploaded_by' => $actor->id,
-            'change_note' => 'Génération DOCX institutionnelle — module Réunions',
-        ]);
-        $document->current_version = 1;
-        $document->save();
 
         MeetingDocument::query()->updateOrCreate(
             ['meeting_id' => $meeting->id, 'document_id' => $document->id],

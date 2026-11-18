@@ -61,6 +61,8 @@ class AbilityMapper
             ['action' => 'manage', 'subject' => 'AppointmentType'],
             ['action' => 'manage', 'subject' => 'Ged'],
             ['action' => 'manage', 'subject' => 'GedAdmin'],
+            ['action' => 'manage', 'subject' => 'Archives'],
+            ['action' => 'manage', 'subject' => 'ArchivesAdmin'],
             ['action' => 'manage', 'subject' => 'Workspace'],
             ['action' => 'manage', 'subject' => 'WorkspaceAdmin'],
             ['action' => 'manage', 'subject' => 'Library'],
@@ -230,6 +232,24 @@ class AbilityMapper
                 ['action' => 'validate', 'subject' => 'Ged'],
                 ['action' => 'update', 'subject' => 'Ged'],
             ],
+            'archives.verser' => [
+                ['action' => 'create', 'subject' => 'Archives'],
+            ],
+            'archives.valider_versement' => [
+                ['action' => 'validate', 'subject' => 'Archives'],
+                ['action' => 'update', 'subject' => 'Archives'],
+            ],
+            'archives.rejeter_versement' => [
+                ['action' => 'validate', 'subject' => 'Archives'],
+                ['action' => 'update', 'subject' => 'Archives'],
+            ],
+            'archives.classer' => [
+                ['action' => 'update', 'subject' => 'Archives'],
+            ],
+            'archives.administrer' => [
+                ['action' => 'manage', 'subject' => 'Archives'],
+                ['action' => 'manage', 'subject' => 'ArchivesAdmin'],
+            ],
             'workspace.create_shared' => [
                 ['action' => 'create', 'subject' => 'Workspace'],
                 ['action' => 'manage', 'subject' => 'Workspace'],
@@ -376,6 +396,12 @@ class AbilityMapper
                 'rules' => [
                     ['action' => 'read', 'subject' => 'Ged'],
                     ['action' => 'read', 'subject' => 'Document'],
+                ],
+            ],
+            [
+                'permissions' => ['archives.consulter', 'archives.rechercher'],
+                'rules' => [
+                    ['action' => 'read', 'subject' => 'Archives'],
                 ],
             ],
             [

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import GedBackButton from '@/components/ged/GedBackButton.vue'
 import ParapheurPageHeader from '@/components/parapheur/ParapheurPageHeader.vue'
 import { formatDateFr } from '@/utils/parapheurUi'
 
@@ -47,7 +48,11 @@ onMounted(load)
       title="Journal d’audit documentaire"
       subtitle="Dépôts, validations, publications, partages et permissions"
       icon="tabler-shield-search"
-    />
+    >
+      <template #back>
+        <GedBackButton to="ged" />
+      </template>
+    </ParapheurPageHeader>
 
     <VCard class="mb-4 parapheur-section-card">
       <VCardText class="d-flex gap-3 flex-wrap">

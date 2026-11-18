@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import GedBackButton from '@/components/ged/GedBackButton.vue'
 import ParapheurPageHeader from '@/components/parapheur/ParapheurPageHeader.vue'
 import UserAutocomplete from '@/components/common/UserAutocomplete.vue'
 import { publicationWorkflowOptions } from '@/utils/gedUi'
@@ -173,6 +174,9 @@ onMounted(load)
       subtitle="Arborescence, circuits et permissions (héritage contrôlé)"
       icon="tabler-folders"
     >
+      <template #back>
+        <GedBackButton to="ged" />
+      </template>
       <VBtn
         color="primary"
         prepend-icon="tabler-folder-plus"

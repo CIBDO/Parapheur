@@ -5,12 +5,17 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Structure;
 use App\Models\StructureType;
+use App\Services\DocumentFolderService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
 class StructureController extends Controller
 {
+    public function __construct(
+        private readonly DocumentFolderService $folders,
+    ) {}
+
     public function index(): JsonResponse
     {
         $structures = Structure::query()
@@ -28,6 +33,7 @@ class StructureController extends Controller
         $data = $this->validated($request);
 
         $structure = Structure::query()->create($data);
+        $this->folders->ensureStructureFolder($structure, $request->user());
         $structure->load(['type', 'parent:id,code,name']);
 
         return response()->json($structure, 201);
@@ -44,12 +50,20 @@ class StructureController extends Controller
         }
 
         $structure->update($data);
+        $structure->refresh();
+
+        if ($structure->is_active) {
+            $this->folders->ensureStructureFolder($structure, $request->user());
+        } else {
+            $this->folders->retireStructureFolder($structure, $request->user());
+        }
+
         $structure->load(['type', 'parent:id,code,name']);
 
         return response()->json($structure);
     }
 
-    public function destroy(Structure $structure): JsonResponse
+    public function destroy(Request $request, Structure $structure): JsonResponse
     {
         if ($structure->children()->exists()) {
             return response()->json([
@@ -69,6 +83,7 @@ class StructureController extends Controller
             ], 422);
         }
 
+        $this->folders->retireStructureFolder($structure, $request->user());
         $structure->delete();
 
         return response()->json(['message' => 'Structure supprimée']);

@@ -129,10 +129,10 @@ class DocumentFolderService
     /**
      * @return Collection<int, DocumentFolder>
      */
-    public function tree(?bool $includeArchived = false): Collection
+    public function tree(?bool $includeArchived = false, bool $onlyActiveStructures = true): Collection
     {
         $query = DocumentFolder::query()
-            ->with(['structure:id,code,name', 'responsible:id,name'])
+            ->with(['structure:id,code,name,is_active', 'responsible:id,name'])
             ->orderBy('sort_order')
             ->orderBy('name');
 
@@ -140,7 +140,131 @@ class DocumentFolderService
             $query->where('is_archived', false);
         }
 
+        // Masquer les dossiers liés à une structure absente ou inactive (fantômes organigramme)
+        if ($onlyActiveStructures) {
+            $query->where(function ($q) {
+                $q->whereNull('structure_id')
+                    ->orWhereHas('structure', fn ($s) => $s->where('is_active', true));
+            });
+        }
+
         return $this->buildTree($query->get());
+    }
+
+    /**
+     * Crée ou réactive le dossier institutionnel miroir d'une structure.
+     */
+    public function ensureStructureFolder(Structure $structure, User $actor): DocumentFolder
+    {
+        $root = DocumentFolder::query()->firstOrCreate(
+            ['code' => 'ROOT_DOC', 'parent_id' => null],
+            [
+                'name' => 'Documentation officielle',
+                'description' => 'Bibliothèque documentaire institutionnelle DGTCP',
+                'kind' => DocumentFolderKind::Institutional->value,
+                'path' => '/tmp/',
+                'depth' => 0,
+                'default_publication_workflow' => PublicationWorkflow::Controlled->value,
+                'sort_order' => 0,
+            ]
+        );
+        if ($root->path === '/tmp/' || ! $root->path) {
+            $root->rebuildPath();
+        }
+
+        $folder = DocumentFolder::withTrashed()
+            ->where(function ($q) use ($structure) {
+                $q->where('structure_id', $structure->id)
+                    ->orWhere('code', 'STR_'.$structure->code);
+            })
+            ->first();
+
+        if ($folder) {
+            if ($folder->trashed()) {
+                $folder->restore();
+            }
+            $folder->fill([
+                'name' => $structure->name,
+                'structure_id' => $structure->id,
+                'code' => 'STR_'.$structure->code,
+                'parent_id' => $root->id,
+                'kind' => DocumentFolderKind::Structure->value,
+                'is_archived' => ! $structure->is_active,
+                'sort_order' => (int) $structure->sort_order,
+            ]);
+            $folder->save();
+            if ($folder->path === '/tmp/' || ! $folder->path) {
+                $folder->rebuildPath();
+            }
+        } else {
+            $folder = DocumentFolder::query()->create([
+                'code' => 'STR_'.$structure->code,
+                'parent_id' => $root->id,
+                'name' => $structure->name,
+                'structure_id' => $structure->id,
+                'kind' => DocumentFolderKind::Structure->value,
+                'path' => '/tmp/',
+                'depth' => 0,
+                'is_archived' => ! $structure->is_active,
+                'default_publication_workflow' => PublicationWorkflow::Hierarchical->value,
+                'sort_order' => (int) $structure->sort_order,
+            ]);
+            $folder->rebuildPath();
+        }
+
+        if ($structure->is_active
+            && ! $folder->accessRules()->where('structure_id', $structure->id)->where('ability', 'view')->exists()) {
+            $this->grantAccess($folder, $actor, DocumentAccessAbility::View, structureId: $structure->id);
+            $this->grantAccess($folder, $actor, DocumentAccessAbility::Upload, structureId: $structure->id);
+        }
+
+        $this->audit->log('document_folder.structure_synced', $folder, [
+            'actor_id' => $actor->id,
+            'structure_id' => $structure->id,
+            'is_active' => $structure->is_active,
+        ]);
+
+        return $folder->fresh(['structure', 'parent']);
+    }
+
+    /**
+     * Retire le dossier GED d'une structure (soft-delete si vide, sinon archive).
+     *
+     * @return array{action: string, folder_id: int|null}
+     */
+    public function retireStructureFolder(Structure $structure, User $actor): array
+    {
+        $folder = DocumentFolder::query()
+            ->where(function ($q) use ($structure) {
+                $q->where('structure_id', $structure->id)
+                    ->orWhere('code', 'STR_'.$structure->code);
+            })
+            ->first();
+
+        if (! $folder) {
+            return ['action' => 'noop', 'folder_id' => null];
+        }
+
+        if ($folder->documents()->exists() || $folder->children()->exists()) {
+            $folder->is_archived = true;
+            $folder->save();
+            $this->audit->log('document_folder.structure_archived', $folder, [
+                'actor_id' => $actor->id,
+                'structure_id' => $structure->id,
+                'reason' => 'structure_retired_with_content',
+            ]);
+
+            return ['action' => 'archived', 'folder_id' => $folder->id];
+        }
+
+        $folderId = $folder->id;
+        $folder->delete();
+        $this->audit->log('document_folder.structure_retired', $folder, [
+            'actor_id' => $actor->id,
+            'structure_id' => $structure->id,
+        ]);
+
+        return ['action' => 'deleted', 'folder_id' => $folderId];
     }
 
     /**
@@ -238,6 +362,20 @@ class DocumentFolderService
             return false;
         }
 
+        $hasPositiveRules = DocumentFolderAccessRule::query()
+            ->whereIn('document_folder_id', $folderIds)
+            ->where('ability', $ability->value)
+            ->where('is_exception', false)
+            ->where(function ($q) {
+                $q->whereNull('expires_at')->orWhere('expires_at', '>', now());
+            })
+            ->exists();
+
+        // Dossier ouvert : lecture autorisée sans règle ; écriture exige une grant explicite
+        if (! $hasPositiveRules) {
+            return $ability === DocumentAccessAbility::View;
+        }
+
         return DocumentFolderAccessRule::query()
             ->whereIn('document_folder_id', $folderIds)
             ->where('ability', $ability->value)
@@ -255,6 +393,97 @@ class DocumentFolderService
                 }
             })
             ->exists();
+    }
+
+    /**
+     * Visibilité dossiers pour un utilisateur (arbre + contrainte documents).
+     *
+     * @return array{
+     *     mode: 'all'|'filtered',
+     *     gated: list<int>,
+     *     allowed: list<int>,
+     *     denied: list<int>
+     * }
+     */
+    public function resolveFolderVisibility(User $user): array
+    {
+        if ($user->can('admin.access') || $user->can('ged.manage_folders')) {
+            return [
+                'mode' => 'all',
+                'gated' => [],
+                'allowed' => [],
+                'denied' => [],
+            ];
+        }
+
+        $folders = DocumentFolder::query()
+            ->where('is_archived', false)
+            ->get();
+
+        $gated = DocumentFolderAccessRule::query()
+            ->where('ability', DocumentAccessAbility::View->value)
+            ->where('is_exception', false)
+            ->where(function ($q) {
+                $q->whereNull('expires_at')->orWhere('expires_at', '>', now());
+            })
+            ->distinct()
+            ->pluck('document_folder_id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+
+        $allowed = [];
+        $denied = [];
+
+        foreach ($folders as $folder) {
+            $id = (int) $folder->id;
+            if ($this->userHasFolderAbility($user, $folder, DocumentAccessAbility::View)) {
+                $allowed[] = $id;
+            } elseif (in_array($id, $gated, true)) {
+                $denied[] = $id;
+            }
+        }
+
+        return [
+            'mode' => 'filtered',
+            'gated' => array_values($gated),
+            'allowed' => array_values(array_unique($allowed)),
+            'denied' => array_values(array_unique($denied)),
+        ];
+    }
+
+    /**
+     * Arbre filtré : structures actives + ACL utilisateur.
+     *
+     * @return Collection<int, DocumentFolder>
+     */
+    public function treeForUser(User $user, ?bool $includeArchived = false): Collection
+    {
+        $tree = $this->tree($includeArchived, onlyActiveStructures: true);
+        $visibility = $this->resolveFolderVisibility($user);
+
+        if ($visibility['mode'] === 'all') {
+            return $tree;
+        }
+
+        $allowed = array_flip($visibility['allowed']);
+
+        $filter = function (Collection $nodes) use (&$filter, $allowed): Collection {
+            return $nodes
+                ->map(function (DocumentFolder $folder) use (&$filter, $allowed) {
+                    $children = $folder->relationLoaded('children')
+                        ? $filter($folder->children)
+                        : collect();
+                    $folder->setRelation('children', $children);
+
+                    $visible = isset($allowed[$folder->id]) || $children->isNotEmpty();
+
+                    return $visible ? $folder : null;
+                })
+                ->filter()
+                ->values();
+        };
+
+        return $filter($tree);
     }
 
     /**
@@ -293,38 +522,36 @@ class DocumentFolderService
             $archives->rebuildPath();
         }
 
-        Structure::query()->where('is_active', true)->orderBy('sort_order')->each(function (Structure $structure) use ($root, $actor) {
-            $folder = DocumentFolder::query()->firstOrCreate(
-                ['code' => 'STR_'.$structure->code, 'parent_id' => $root->id],
-                [
-                    'name' => $structure->name,
-                    'structure_id' => $structure->id,
-                    'kind' => DocumentFolderKind::Structure->value,
-                    'path' => '/tmp/',
-                    'depth' => 0,
-                    'default_publication_workflow' => PublicationWorkflow::Hierarchical->value,
-                    'sort_order' => (int) $structure->sort_order,
-                ]
-            );
-            if ($folder->path === '/tmp/' || ! $folder->path) {
-                $folder->rebuildPath();
+        Structure::query()->where('is_active', true)->orderBy('sort_order')->each(
+            function (Structure $structure) use ($actor) {
+                $this->ensureStructureFolder($structure, $actor);
             }
+        );
 
-            if (! $folder->accessRules()->where('structure_id', $structure->id)->where('ability', 'view')->exists()) {
-                $this->grantAccess(
-                    $folder,
-                    $actor,
-                    DocumentAccessAbility::View,
-                    structureId: $structure->id,
-                );
-                $this->grantAccess(
-                    $folder,
-                    $actor,
-                    DocumentAccessAbility::Upload,
-                    structureId: $structure->id,
-                );
-            }
-        });
+        // Archiver / retirer les miroirs de structures inactives ou absentes
+        DocumentFolder::query()
+            ->where('kind', DocumentFolderKind::Structure->value)
+            ->whereNotNull('structure_id')
+            ->where(function ($q) {
+                $q->whereDoesntHave('structure')
+                    ->orWhereHas('structure', fn ($s) => $s->where('is_active', false));
+            })
+            ->each(function (DocumentFolder $folder) use ($actor) {
+                $structure = $folder->structure;
+                if ($structure) {
+                    $this->retireStructureFolder($structure, $actor);
+                } else {
+                    if ($folder->documents()->exists() || $folder->children()->exists()) {
+                        $folder->is_archived = true;
+                        $folder->save();
+                    } else {
+                        $folder->delete();
+                    }
+                    $this->audit->log('document_folder.orphan_structure_cleaned', $folder, [
+                        'actor_id' => $actor->id,
+                    ]);
+                }
+            });
     }
 
     /**

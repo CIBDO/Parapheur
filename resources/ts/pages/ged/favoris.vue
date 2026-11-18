@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import GedBackButton from '@/components/ged/GedBackButton.vue'
 import ParapheurPageHeader from '@/components/parapheur/ParapheurPageHeader.vue'
 import { formatDateFr, labelOf, statusColor, statusLabels } from '@/utils/parapheurUi'
 
@@ -34,7 +35,11 @@ onMounted(load)
       title="Mes favoris"
       subtitle="Documents épinglés — accessibles uniquement si vos droits le permettent encore"
       icon="tabler-star"
-    />
+    >
+      <template #back>
+        <GedBackButton to="ged" />
+      </template>
+    </ParapheurPageHeader>
     <VCard class="parapheur-section-card">
       <VDataTable
         :headers="[

@@ -30,13 +30,22 @@ export interface GedDocRow {
   tags?: Array<{ id: number; name: string }>
 }
 
-export function useGedDocumentList(defaultScope?: string) {
+export type GedCatalogMode = 'institutional' | 'work' | 'all'
+
+export function useGedDocumentList(
+  defaultScope?: string,
+  options?: { catalog?: GedCatalogMode },
+) {
   const router = useRouter()
   const loading = ref(false)
   const items = ref<GedDocRow[]>([])
   const total = ref(0)
   const page = ref(1)
   const perPage = ref(15)
+
+  // Bibliothèque institutionnelle par défaut ; files de travail via scope (to_process, etc.)
+  const defaultCatalog: GedCatalogMode = options?.catalog
+    ?? (defaultScope ? 'work' : 'institutional')
 
   const filters = ref({
     q: '',
@@ -49,6 +58,7 @@ export function useGedDocumentList(defaultScope?: string) {
     classification_node_id: null as number | null,
     archive_status: null as string | null,
     scope: defaultScope || null as string | null,
+    catalog: defaultCatalog as GedCatalogMode | null,
     document_date_from: '',
     document_date_to: '',
     tag: '',

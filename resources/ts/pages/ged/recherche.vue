@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import GedBackButton from '@/components/ged/GedBackButton.vue'
 import ParapheurPageHeader from '@/components/parapheur/ParapheurPageHeader.vue'
 import { useGedDocumentList } from '@/composables/useGedDocumentList'
 import { originOptions } from '@/utils/gedUi'
@@ -40,7 +41,11 @@ onMounted(async () => {
       title="Recherche documentaire"
       subtitle="Que recherchez-vous ?"
       icon="tabler-search"
-    />
+    >
+      <template #back>
+        <GedBackButton to="ged" />
+      </template>
+    </ParapheurPageHeader>
 
     <VCard class="mb-4 parapheur-section-card">
       <VCardText>

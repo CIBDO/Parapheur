@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Enums\DocumentArchiveStatus;
 use App\Enums\DocumentOrigin;
+use App\Enums\DocumentPublicationStatus;
 use App\Models\Document;
 use App\Models\User;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
@@ -14,6 +15,11 @@ use Illuminate\Database\Eloquent\Builder;
  */
 class DocumentSearchService
 {
+    /** @var list<string> */
+    private const WORK_SCOPES = [
+        'mine', 'shared', 'to_process', 'to_validate', 'my_deposits', 'all',
+    ];
+
     public function __construct(
         private readonly DocumentAccessService $access,
     ) {}
@@ -23,7 +29,8 @@ class DocumentSearchService
      */
     public function search(User $user, array $criteria, int $perPage = 15): LengthAwarePaginator
     {
-        $query = Document::query()
+        $criteria['_user_id'] = $user->id;
+        $query = $this->baseFilteredQuery($user, $criteria)
             ->with([
                 'type:id,code,name',
                 'category:id,code,name',
@@ -36,10 +43,45 @@ class DocumentSearchService
                 'tags:id,name,slug',
             ]);
 
-        $this->access->scopeVisibleTo($query, $user);
-        $criteria['_user_id'] = $user->id;
+        [$sort, $dir] = $this->resolveSort($criteria);
 
-        // Catalogue GED : exclure personal/workspace sauf demande explicite
+        return $query->orderBy($sort, $dir)->paginate($perPage);
+    }
+
+    /**
+     * Catalogue institutionnel paginé + facettes SQL (sans OpenSearch).
+     *
+     * @param  array<string, mixed>  $criteria
+     * @return array{data: mixed, total: int, per_page: int, current_page: int, last_page: int, facets: array<string, mixed>}
+     */
+    public function catalog(User $user, array $criteria, int $perPage = 15): array
+    {
+        if (! isset($criteria['catalog']) || $criteria['catalog'] === '' || $criteria['catalog'] === null) {
+            $criteria['catalog'] = 'institutional';
+        }
+
+        $paginator = $this->search($user, $criteria, $perPage);
+        $facetQuery = $this->baseFilteredQuery($user, array_merge($criteria, ['_user_id' => $user->id]));
+
+        return [
+            'data' => $paginator->items(),
+            'total' => $paginator->total(),
+            'per_page' => $paginator->perPage(),
+            'current_page' => $paginator->currentPage(),
+            'last_page' => $paginator->lastPage(),
+            'facets' => $this->buildFacets($facetQuery),
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $criteria
+     */
+    private function baseFilteredQuery(User $user, array $criteria): Builder
+    {
+        $query = Document::query();
+        $this->access->scopeVisibleTo($query, $user);
+        $criteria['_user_id'] = $criteria['_user_id'] ?? $user->id;
+
         if (! array_key_exists('origin', $criteria) || $criteria['origin'] === '' || $criteria['origin'] === null) {
             if (empty($criteria['include_workspace_origins'])) {
                 $query->whereNotIn('origin', [
@@ -49,8 +91,18 @@ class DocumentSearchService
             }
         }
 
+        $this->applyInstitutionalCatalogScope($query, $criteria);
         $this->applyFilters($query, $criteria);
 
+        return $query;
+    }
+
+    /**
+     * @param  array<string, mixed>  $criteria
+     * @return array{0: string, 1: string}
+     */
+    private function resolveSort(array $criteria): array
+    {
         $sort = $criteria['sort'] ?? 'created_at';
         $dir = strtolower((string) ($criteria['dir'] ?? 'desc')) === 'asc' ? 'asc' : 'desc';
         $allowedSort = [
@@ -62,7 +114,72 @@ class DocumentSearchService
             $sort = 'created_at';
         }
 
-        return $query->orderBy($sort, $dir)->paginate($perPage);
+        return [$sort, $dir];
+    }
+
+    /**
+     * @return array<string, list<array{value: mixed, label: string|null, total: int}>>
+     */
+    private function buildFacets(Builder $base): array
+    {
+        $mapFacet = function (Builder $query, string $column) {
+            return (clone $query)
+                ->whereNotNull($column)
+                ->selectRaw($column.' as value, count(*) as total')
+                ->groupBy($column)
+                ->orderByDesc('total')
+                ->limit(30)
+                ->get()
+                ->map(fn ($row) => [
+                    'value' => $row->value,
+                    'label' => (string) $row->value,
+                    'total' => (int) $row->total,
+                ])
+                ->values()
+                ->all();
+        };
+
+        $structures = (clone $base)
+            ->whereNotNull('structure_id')
+            ->selectRaw('structure_id as value, count(*) as total')
+            ->groupBy('structure_id')
+            ->orderByDesc('total')
+            ->limit(30)
+            ->get();
+
+        $structureNames = \App\Models\Structure::query()
+            ->whereIn('id', $structures->pluck('value')->all())
+            ->pluck('name', 'id');
+
+        $types = (clone $base)
+            ->whereNotNull('document_type_id')
+            ->selectRaw('document_type_id as value, count(*) as total')
+            ->groupBy('document_type_id')
+            ->orderByDesc('total')
+            ->limit(30)
+            ->get();
+
+        $typeNames = \App\Models\DocumentType::query()
+            ->whereIn('id', $types->pluck('value')->all())
+            ->pluck('name', 'id');
+
+        return [
+            'origin' => $mapFacet($base, 'origin'),
+            'publication_status' => $mapFacet($base, 'publication_status'),
+            'confidentiality' => $mapFacet($base, 'confidentiality'),
+            'status' => $mapFacet($base, 'status'),
+            'exercise_year' => $mapFacet($base, 'exercise_year'),
+            'structure' => $structures->map(fn ($row) => [
+                'value' => (int) $row->value,
+                'label' => $structureNames[(int) $row->value] ?? (string) $row->value,
+                'total' => (int) $row->total,
+            ])->values()->all(),
+            'document_type' => $types->map(fn ($row) => [
+                'value' => (int) $row->value,
+                'label' => $typeNames[(int) $row->value] ?? (string) $row->value,
+                'total' => (int) $row->total,
+            ])->values()->all(),
+        ];
     }
 
     /**
@@ -159,6 +276,41 @@ class DocumentSearchService
                 $q->whereNull('title')->orWhereNull('document_type_id')->orWhereNull('structure_id');
             })->count(),
         ];
+    }
+
+    /**
+     * Bibliothèque institutionnelle = documents versés (depose+), jamais les brouillons.
+     *
+     * @param  array<string, mixed>  $criteria
+     */
+    private function applyInstitutionalCatalogScope(Builder $query, array $criteria): void
+    {
+        $catalog = strtolower(trim((string) ($criteria['catalog'] ?? '')));
+        $scope = (string) ($criteria['scope'] ?? '');
+
+        if ($catalog === '' || $catalog === 'default') {
+            $catalog = in_array($scope, self::WORK_SCOPES, true) ? 'work' : 'institutional';
+        }
+
+        if ($catalog === 'all' || $catalog === 'work') {
+            return;
+        }
+
+        // Filtre publication explicite : l’appelant pilote le périmètre
+        if (isset($criteria['publication_status'])
+            && $criteria['publication_status'] !== ''
+            && $criteria['publication_status'] !== null) {
+            return;
+        }
+
+        if ($catalog !== 'institutional') {
+            return;
+        }
+
+        $query->whereIn(
+            'publication_status',
+            DocumentPublicationStatus::institutionalCatalogValues()
+        );
     }
 
     /**
@@ -263,6 +415,10 @@ class DocumentSearchService
                     ->whereNull('archived_at'),
                 'to_validate' => $query->whereIn('publication_status', ['en_verification', 'valide']),
                 'published' => $query->where('publication_status', 'publie'),
+                'institutional' => $query->whereIn(
+                    'publication_status',
+                    DocumentPublicationStatus::institutionalCatalogValues()
+                ),
                 'my_deposits' => $query->where('author_id', $criteria['_user_id'] ?? 0)
                     ->where('origin', DocumentOrigin::Ged->value),
                 'archives' => $query->where(function (Builder $a) {

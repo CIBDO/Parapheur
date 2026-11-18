@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import GedBackButton from '@/components/ged/GedBackButton.vue'
 import ParapheurPageHeader from '@/components/parapheur/ParapheurPageHeader.vue'
 import { useGedDocumentList } from '@/composables/useGedDocumentList'
 
@@ -22,7 +23,11 @@ onMounted(load)
       title="Mes dépôts"
       subtitle="Documents institutionnels que j’ai déposés"
       icon="tabler-folder-user"
-    />
+    >
+      <template #back>
+        <GedBackButton to="ged" />
+      </template>
+    </ParapheurPageHeader>
     <VCard class="parapheur-section-card">
       <VDataTableServer
         v-model:page="page"

@@ -77,3 +77,8 @@ Schedule::command('parapheur:remind-announcements')
     ->dailyAt('08:30')
     ->withoutOverlapping()
     ->appendOutputTo(storage_path('logs/announcement-reminders.log'));
+
+Schedule::command('archives:verify-integrity --limit=200')
+    ->dailyAt('02:30')
+    ->withoutOverlapping()
+    ->appendOutputTo(storage_path('logs/archives-integrity.log'));

@@ -276,6 +276,8 @@ declare global {
   const toRef: typeof import('vue')['toRef']
   const toRefs: typeof import('vue')['toRefs']
   const toValue: typeof import('vue')['toValue']
+  const transferStatusColor: typeof import('./resources/ts/composables/useArchives')['transferStatusColor']
+  const transferStatusLabels: typeof import('./resources/ts/composables/useArchives')['transferStatusLabels']
   const transmissionSlipNatureLabels: typeof import('./resources/ts/utils/courrierUi')['transmissionSlipNatureLabels']
   const transmissionSlipStatusColors: typeof import('./resources/ts/utils/courrierUi')['transmissionSlipStatusColors']
   const transmissionSlipStatusLabels: typeof import('./resources/ts/utils/courrierUi')['transmissionSlipStatusLabels']
@@ -294,6 +296,7 @@ declare global {
   const useActiveElement: typeof import('@vueuse/core')['useActiveElement']
   const useAnimate: typeof import('@vueuse/core')['useAnimate']
   const useApi: typeof import('./resources/ts/composables/useApi')['useApi']
+  const useArchives: typeof import('./resources/ts/composables/useArchives')['useArchives']
   const useArrayDifference: typeof import('@vueuse/core')['useArrayDifference']
   const useArrayEvery: typeof import('@vueuse/core')['useArrayEvery']
   const useArrayFilter: typeof import('@vueuse/core')['useArrayFilter']
@@ -767,6 +770,8 @@ declare module 'vue' {
     readonly toRef: UnwrapRef<typeof import('vue')['toRef']>
     readonly toRefs: UnwrapRef<typeof import('vue')['toRefs']>
     readonly toValue: UnwrapRef<typeof import('vue')['toValue']>
+    readonly transferStatusColor: UnwrapRef<typeof import('./resources/ts/composables/useArchives')['transferStatusColor']>
+    readonly transferStatusLabels: UnwrapRef<typeof import('./resources/ts/composables/useArchives')['transferStatusLabels']>
     readonly transmissionSlipNatureLabels: UnwrapRef<typeof import('./resources/ts/utils/courrierUi')['transmissionSlipNatureLabels']>
     readonly transmissionSlipStatusColors: UnwrapRef<typeof import('./resources/ts/utils/courrierUi')['transmissionSlipStatusColors']>
     readonly transmissionSlipStatusLabels: UnwrapRef<typeof import('./resources/ts/utils/courrierUi')['transmissionSlipStatusLabels']>
@@ -785,6 +790,7 @@ declare module 'vue' {
     readonly useActiveElement: UnwrapRef<typeof import('@vueuse/core')['useActiveElement']>
     readonly useAnimate: UnwrapRef<typeof import('@vueuse/core')['useAnimate']>
     readonly useApi: UnwrapRef<typeof import('./resources/ts/composables/useApi')['useApi']>
+    readonly useArchives: UnwrapRef<typeof import('./resources/ts/composables/useArchives')['useArchives']>
     readonly useArrayDifference: UnwrapRef<typeof import('@vueuse/core')['useArrayDifference']>
     readonly useArrayEvery: UnwrapRef<typeof import('@vueuse/core')['useArrayEvery']>
     readonly useArrayFilter: UnwrapRef<typeof import('@vueuse/core')['useArrayFilter']>

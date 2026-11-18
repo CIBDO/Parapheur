@@ -31,6 +31,8 @@ export type Subjects =
   | 'Delegation'
   | 'Ged'
   | 'GedAdmin'
+  | 'Archives'
+  | 'ArchivesAdmin'
   | 'Workspace'
   | 'WorkspaceAdmin'
   | 'Library'

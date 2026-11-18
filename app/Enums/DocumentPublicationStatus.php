@@ -32,6 +32,36 @@ enum DocumentPublicationStatus: string
         return $this === self::Publie;
     }
 
+    /**
+     * Documents visibles dans la bibliothèque institutionnelle (hors brouillon / rejet).
+     * La rétention administrative démarre au versement (`depose`).
+     */
+    public function isInstitutionallyCatalogued(): bool
+    {
+        return in_array($this, [
+            self::Depose,
+            self::EnVerification,
+            self::ACorriger,
+            self::Valide,
+            self::Publie,
+            self::Archive,
+        ], true);
+    }
+
+    /**
+     * @return list<string>
+     */
+    public static function institutionalCatalogValues(): array
+    {
+        return array_values(array_map(
+            static fn (self $status): string => $status->value,
+            array_filter(
+                self::cases(),
+                static fn (self $status): bool => $status->isInstitutionallyCatalogued(),
+            ),
+        ));
+    }
+
     public function isEditableDraft(): bool
     {
         return in_array($this, [self::Brouillon, self::Depose, self::ACorriger], true);

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import GedBackButton from '@/components/ged/GedBackButton.vue'
 import ParapheurPageHeader from '@/components/parapheur/ParapheurPageHeader.vue'
 
 definePage({
@@ -184,6 +185,9 @@ const saveClassificationRule = async () => {
       subtitle="Référentiels, conservation, classement et dossiers"
       icon="tabler-settings"
     >
+      <template #back>
+        <GedBackButton to="ged" />
+      </template>
       <VBtn
         variant="tonal"
         prepend-icon="tabler-folders"

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import GedBackButton from '@/components/ged/GedBackButton.vue'
 import ParapheurPageHeader from '@/components/parapheur/ParapheurPageHeader.vue'
 import {
   publicationStatusColor,
@@ -46,6 +47,9 @@ onMounted(load)
       subtitle="Documents en attente de validation ou de publication"
       icon="tabler-file-check"
     >
+      <template #back>
+        <GedBackButton to="ged" />
+      </template>
       <VBtn
         variant="tonal"
         prepend-icon="tabler-folder-open"

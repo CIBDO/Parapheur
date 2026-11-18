@@ -17,6 +17,7 @@ class DocumentAccessService
 {
     public function __construct(
         private readonly DelegationResolver $delegations,
+        private readonly DocumentFolderService $folders,
     ) {}
 
     public function canAccess(User $user, Document $document): bool
@@ -35,6 +36,10 @@ class DocumentAccessService
 
         if ($this->hasWorkspaceAccess($user, $document)) {
             return true;
+        }
+
+        if (! $this->passesFolderGate($user, $document)) {
+            return false;
         }
 
         return $this->hasViewClearance($user, $document);
@@ -278,7 +283,7 @@ class DocumentAccessService
             DocumentOrigin::Workspace->value,
         ];
 
-        return $query->where(function (Builder $q) use ($user, $workspaceOrigins) {
+        $query->where(function (Builder $q) use ($user, $workspaceOrigins) {
             // Circuit need-to-know
             $q->where('author_id', $user->id)
                 ->orWhere('document_owner_id', $user->id)
@@ -388,6 +393,71 @@ class DocumentAccessService
                 }
             }
         });
+
+        return $this->applyFolderVisibilityConstraint($query, $user);
+    }
+
+    /**
+     * Dossiers gated : grant dossier OU circuit / ACL document. Deny wins hors circuit.
+     */
+    private function applyFolderVisibilityConstraint(Builder $query, User $user): Builder
+    {
+        $visibility = $this->folders->resolveFolderVisibility($user);
+        if ($visibility['mode'] === 'all') {
+            return $query;
+        }
+
+        $gated = $visibility['gated'];
+        $allowed = $visibility['allowed'];
+
+        if ($gated === []) {
+            return $query;
+        }
+
+        return $query->where(function (Builder $q) use ($user, $gated, $allowed) {
+            $q->whereNull('folder_id')
+                ->orWhereNotIn('folder_id', $gated)
+                ->orWhereIn('folder_id', $allowed !== [] ? $allowed : [0])
+                ->orWhere('author_id', $user->id)
+                ->orWhere('document_owner_id', $user->id)
+                ->orWhere('current_assignee_id', $user->id)
+                ->orWhereHas('transmissions', function (Builder $t) use ($user) {
+                    $t->where('to_user_id', $user->id)->orWhere('from_user_id', $user->id);
+                })
+                ->orWhereHas('accessRules', function (Builder $r) use ($user) {
+                    $r->where('ability', DocumentAccessAbility::View->value)
+                        ->where(function (Builder $exp) {
+                            $exp->whereNull('expires_at')->orWhere('expires_at', '>', now());
+                        })
+                        ->where(function (Builder $rule) use ($user) {
+                            $rule->where('user_id', $user->id);
+                            if ($user->structure_id) {
+                                $rule->orWhere('structure_id', $user->structure_id);
+                            }
+                            $roleNames = $user->getRoleNames()->all();
+                            if ($roleNames !== []) {
+                                $rule->orWhereIn('role_name', $roleNames);
+                            }
+                        });
+                });
+        });
+    }
+
+    private function passesFolderGate(User $user, Document $document): bool
+    {
+        if (! $document->folder_id || $user->can('admin.access') || $user->can('ged.manage_folders')) {
+            return true;
+        }
+
+        $folder = $document->relationLoaded('folder')
+            ? $document->folder
+            : $document->folder()->first();
+
+        if (! $folder) {
+            return true;
+        }
+
+        return $this->folders->userHasFolderAbility($user, $folder, DocumentAccessAbility::View);
     }
 
     /**

@@ -30,7 +30,7 @@ class GedFolderController extends Controller
         $includeArchived = filter_var($request->query('include_archived'), FILTER_VALIDATE_BOOLEAN);
 
         return response()->json([
-            'data' => $this->folders->tree($includeArchived),
+            'data' => $this->folders->treeForUser($request->user(), $includeArchived),
         ]);
     }
 
@@ -62,14 +62,30 @@ class GedFolderController extends Controller
 
         $folder->load(['parent', 'children', 'structure', 'responsible', 'accessRules.user', 'accessRules.structure']);
 
+        abort_unless(
+            $this->folders->userHasFolderAbility(
+                $request->user(),
+                $folder,
+                DocumentAccessAbility::View
+            ) || $request->user()->can('admin.access'),
+            403,
+            'Accès au dossier refusé.'
+        );
+
+        $page = max(1, (int) $request->query('page', 1));
+        $perPage = (int) $request->query('per_page', 25);
+
         return response()->json([
             'folder' => $folder,
             'breadcrumb' => $this->folders->breadcrumb($folder),
             'documents' => $this->search->search($request->user(), [
                 'folder_id' => $folder->id,
+                'catalog' => $request->query('catalog', 'institutional'),
+                'q' => $request->query('q'),
                 'sort' => $request->query('sort', 'updated_at'),
                 'dir' => $request->query('dir', 'desc'),
-            ], (int) $request->query('per_page', 25)),
+                'page' => $page,
+            ], $perPage)->appends($request->query())->toArray(),
         ]);
     }
 

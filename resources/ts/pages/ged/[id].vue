@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import OnlyOfficeEditor from '@/components/parapheur/OnlyOfficeEditor.vue'
+import GedBackButton from '@/components/ged/GedBackButton.vue'
 import ParapheurPageHeader from '@/components/parapheur/ParapheurPageHeader.vue'
 import UserAutocomplete from '@/components/common/UserAutocomplete.vue'
 import {
@@ -102,6 +103,32 @@ const archive = async () => {
     return
   await $api(`/ged/documents/${id.value}/archive`, { method: 'POST', body: {} })
   await load()
+}
+
+const proposeToSae = async () => {
+  if (!doc.value?.id)
+    return
+  if (!confirm('Proposer ce document au SAE (versement brouillon) ?'))
+    return
+  errorMessage.value = ''
+  try {
+    const transfer = await $api('/archives/propose', {
+      method: 'POST',
+      body: {
+        document_id: doc.value.id,
+        structure_id: doc.value.structure_id || doc.value.owner_structure_id,
+        source_module: 'ged',
+        source_ref: doc.value.reference,
+        title: doc.value.title || doc.value.object,
+      },
+    })
+    await load()
+    if (transfer?.id)
+      await navigateTo({ name: 'archives-versements-id', params: { id: String(transfer.id) } })
+  }
+  catch (e: any) {
+    errorMessage.value = e?.data?.message || e?.message || 'Proposition SAE impossible'
+  }
 }
 
 const publicationAction = async (action: string) => {
@@ -276,6 +303,12 @@ const publicationHint = computed(() => {
       :subtitle="doc ? `${doc.reference}${doc.dossier_number ? ' · ' + doc.dossier_number : ''}` : ''"
       icon="tabler-file-description"
     >
+      <template #back>
+        <GedBackButton
+          to="ged-explorer"
+          prefer-history
+        />
+      </template>
       <VChip
         v-if="doc?.publication_status"
         class="me-2"
@@ -284,13 +317,6 @@ const publicationHint = computed(() => {
       >
         {{ labelOf(publicationStatusLabels, doc.publication_status) }}
       </VChip>
-      <VBtn
-        variant="tonal"
-        size="small"
-        :to="{ name: 'ged-explorer' }"
-      >
-        Explorer
-      </VBtn>
       <VBtn
         class="ms-2"
         :variant="favorited ? 'flat' : 'tonal'"
@@ -319,6 +345,16 @@ const publicationHint = computed(() => {
         @click="archive"
       >
         Archiver
+      </VBtn>
+      <VBtn
+        class="ms-2"
+        color="primary"
+        variant="tonal"
+        size="small"
+        prepend-icon="tabler-archive"
+        @click="proposeToSae"
+      >
+        Proposer au SAE
       </VBtn>
     </ParapheurPageHeader>
 

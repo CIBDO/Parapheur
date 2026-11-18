@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import GedBackButton from '@/components/ged/GedBackButton.vue'
 import ParapheurPageHeader from '@/components/parapheur/ParapheurPageHeader.vue'
 import { formatDateFr, labelOf, statusColor, statusLabels } from '@/utils/parapheurUi'
 
@@ -27,7 +28,11 @@ onMounted(async () => {
       title="Récemment consultés"
       subtitle="Historique personnel filtré par vos droits d’accès actuels"
       icon="tabler-history"
-    />
+    >
+      <template #back>
+        <GedBackButton to="ged" />
+      </template>
+    </ParapheurPageHeader>
     <VCard
       class="parapheur-section-card"
       :loading="loading"

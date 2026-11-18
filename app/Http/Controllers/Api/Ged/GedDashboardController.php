@@ -22,6 +22,7 @@ class GedDashboardController extends Controller
             'counts' => $this->search->dashboardCounts($request->user()),
             'indicators' => $this->search->indicators($request->user()),
             'recent' => $this->search->search($request->user(), [
+                'catalog' => 'institutional',
                 'sort' => 'created_at',
                 'dir' => 'desc',
             ], 8)->items(),
