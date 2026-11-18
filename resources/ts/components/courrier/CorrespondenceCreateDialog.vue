@@ -122,10 +122,8 @@ function syncSenderDefaults() {
   const structure = structures.value.find(s => s.id === form.value.sender_structure_id)
   if (!structure)
     return
-  if (!form.value.presentation.sender_title)
-    form.value.presentation.sender_title = structure.name || ''
-  if (!form.value.presentation.structure_code)
-    form.value.presentation.structure_code = structure.code || ''
+  form.value.presentation.sender_title = structure.name || form.value.presentation.sender_title
+  form.value.presentation.structure_code = structure.code || form.value.presentation.structure_code
 }
 
 function syncRecipientDefaults() {
@@ -133,8 +131,10 @@ function syncRecipientDefaults() {
   if (!correspondent)
     return
   form.value.presentation.recipient_title = correspondent.name || correspondent.sigle || ''
-  if (!form.value.presentation.recipient_city)
-    form.value.presentation.recipient_city = correspondent.city || correspondent.organization || form.value.presentation.place
+  form.value.presentation.recipient_city = correspondent.city
+    || correspondent.organization
+    || form.value.presentation.place
+    || 'Bamako'
 }
 
 function syncDesignationDefaults() {
@@ -188,8 +188,16 @@ async function createOrigin() {
 
 async function submit() {
   errorMsg.value = ''
+
+  if (!isArrival.value) {
+    const mainDesignation = form.value.lines[0]?.designation?.trim() || ''
+    if (mainDesignation)
+      form.value.subject = mainDesignation
+    form.value.piece_count = linesTotal.value || form.value.piece_count || 1
+  }
+
   if (!form.value.subject.trim()) {
-    errorMsg.value = isArrival.value ? 'Renseignez l’objet.' : 'Renseignez la désignation.'
+    errorMsg.value = isArrival.value ? 'Renseignez l’objet.' : 'Renseignez au moins une désignation.'
     activeTab.value = 'infos'
 
     return
@@ -251,6 +259,8 @@ async function submit() {
         return
       }
       syncDesignationDefaults()
+      syncSenderDefaults()
+      syncRecipientDefaults()
       const lines = form.value.lines
         .map(line => ({
           designation: line.designation.trim(),
@@ -304,13 +314,16 @@ watch(() => props.modelValue, (open) => {
 
 watch(() => form.value.sender_structure_id, syncSenderDefaults)
 watch(() => form.value.correspondent_id, syncRecipientDefaults)
-watch(() => form.value.subject, () => {
-  if (!isArrival.value)
-    syncDesignationDefaults()
+watch(() => form.value.lines.map(line => line.designation).join('|'), () => {
+  if (!isArrival.value) {
+    const main = form.value.lines[0]?.designation?.trim() || ''
+    if (main)
+      form.value.subject = main
+  }
 })
-watch(() => form.value.piece_count, () => {
-  if (!isArrival.value && form.value.lines.length === 1)
-    form.value.lines[0].quantity = form.value.piece_count || 1
+watch(linesTotal, (total) => {
+  if (!isArrival.value && total > 0)
+    form.value.piece_count = total
 })
 
 onMounted(async () => {
@@ -354,13 +367,10 @@ onMounted(async () => {
         class="px-4"
       >
         <VTab value="infos">
-          Infos courrier
-        </VTab>
-        <VTab value="pieces">
-          Pièces / désignations
+          Infos & désignations
         </VTab>
         <VTab value="signature">
-          Formule & signature
+          Signature
         </VTab>
       </VTabs>
       <VDivider v-if="!isArrival" />
@@ -587,18 +597,7 @@ onMounted(async () => {
                 </VCol>
                 <VCol
                   cols="12"
-                  md="4"
-                >
-                  <AppTextField
-                    v-model.number="form.piece_count"
-                    label="Nombre de pièces"
-                    type="number"
-                    min="1"
-                  />
-                </VCol>
-                <VCol
-                  cols="12"
-                  md="4"
+                  md="6"
                 >
                   <AppSelect
                     v-model="form.priority"
@@ -608,7 +607,7 @@ onMounted(async () => {
                 </VCol>
                 <VCol
                   cols="12"
-                  md="4"
+                  md="6"
                 >
                   <AppSelect
                     v-model="form.confidentiality"
@@ -617,136 +616,82 @@ onMounted(async () => {
                   />
                 </VCol>
                 <VCol cols="12">
+                  <div class="d-flex align-center justify-space-between mb-3">
+                    <div>
+                      <div class="text-subtitle-2">
+                        Désignations *
+                      </div>
+                      <div class="text-caption text-medium-emphasis">
+                        Pièces du bordereau — total {{ linesTotal }}
+                      </div>
+                    </div>
+                    <VBtn
+                      size="small"
+                      variant="tonal"
+                      color="primary"
+                      prepend-icon="tabler-plus"
+                      @click="addLine"
+                    >
+                      Ajouter
+                    </VBtn>
+                  </div>
+
+                  <div
+                    v-for="(line, index) in form.lines"
+                    :key="index"
+                    class="d-flex flex-wrap ga-2 mb-3 align-end"
+                  >
+                    <AppTextField
+                      v-model="line.designation"
+                      :label="index === 0 ? 'Désignation principale *' : 'Désignation'"
+                      class="flex-grow-1"
+                      style="min-inline-size: 220px;"
+                    />
+                    <AppTextField
+                      v-model.number="line.quantity"
+                      label="Nombre"
+                      type="number"
+                      min="0"
+                      style="max-inline-size: 110px;"
+                    />
+                    <AppTextField
+                      v-model="line.observation"
+                      label="Observation"
+                      style="min-inline-size: 140px;"
+                    />
+                    <VBtn
+                      icon
+                      size="small"
+                      variant="text"
+                      color="error"
+                      @click="removeLine(index)"
+                    >
+                      <VIcon icon="tabler-trash" />
+                    </VBtn>
+                  </div>
+
                   <AppTextarea
-                    v-model="form.subject"
-                    label="Objet / désignation principale *"
-                    rows="3"
-                  />
-                </VCol>
-                <VCol cols="12">
-                  <AppTextarea
-                    v-model="form.summary"
-                    label="Résumé"
-                    rows="3"
+                    v-model="form.slip_observations"
+                    label="Observations générales du bordereau"
+                    rows="2"
                   />
                 </VCol>
               </VRow>
-            </VWindowItem>
-
-            <VWindowItem value="pieces">
-              <div class="d-flex align-center justify-space-between mb-3">
-                <div>
-                  <div class="text-subtitle-2">
-                    Pièces du bordereau d’envoi
-                  </div>
-                  <div class="text-caption text-medium-emphasis">
-                    Total : {{ linesTotal }}
-                  </div>
-                </div>
-                <VBtn
-                  size="small"
-                  variant="tonal"
-                  color="primary"
-                  prepend-icon="tabler-plus"
-                  @click="addLine"
-                >
-                  Ajouter une pièce
-                </VBtn>
-              </div>
-
-              <div
-                v-for="(line, index) in form.lines"
-                :key="index"
-                class="d-flex flex-wrap ga-2 mb-3 align-end"
-              >
-                <AppTextField
-                  v-model="line.designation"
-                  label="Désignation"
-                  class="flex-grow-1"
-                  style="min-inline-size: 220px;"
-                />
-                <AppTextField
-                  v-model.number="line.quantity"
-                  label="Nombre"
-                  type="number"
-                  min="0"
-                  style="max-inline-size: 110px;"
-                />
-                <AppTextField
-                  v-model="line.observation"
-                  label="Observation"
-                  style="min-inline-size: 160px;"
-                />
-                <VBtn
-                  icon
-                  size="small"
-                  variant="text"
-                  color="error"
-                  @click="removeLine(index)"
-                >
-                  <VIcon icon="tabler-trash" />
-                </VBtn>
-              </div>
-
-              <AppTextarea
-                v-model="form.slip_observations"
-                label="Observations générales du bordereau"
-                rows="2"
-                class="mt-2"
-              />
             </VWindowItem>
 
             <VWindowItem value="signature">
-              <div class="text-subtitle-2 mb-2">
-                Formule du bordereau
-              </div>
-              <VRow>
-                <VCol
-                  cols="12"
-                  sm="6"
-                >
-                  <AppTextField
-                    v-model="form.presentation.place"
-                    label="Lieu"
-                  />
-                </VCol>
-                <VCol
-                  cols="12"
-                  sm="6"
-                >
-                  <AppTextField
-                    v-model="form.presentation.structure_code"
-                    label="Code de structure"
-                  />
-                </VCol>
-                <VCol cols="12">
-                  <AppTextField
-                    v-model="form.presentation.sender_title"
-                    label="Structure qui envoie"
-                  />
-                </VCol>
-                <VCol
-                  cols="12"
-                  sm="8"
-                >
-                  <AppTextField
-                    v-model="form.presentation.recipient_title"
-                    label="Destinataire (formule)"
-                  />
-                </VCol>
-                <VCol
-                  cols="12"
-                  sm="4"
-                >
-                  <AppTextField
-                    v-model="form.presentation.recipient_city"
-                    label="Ville"
-                  />
-                </VCol>
-              </VRow>
+              <VAlert
+                type="info"
+                variant="tonal"
+                density="compact"
+                class="mb-4"
+              >
+                Lieu, structure et destinataire du bordereau sont repris automatiquement
+                depuis le service émetteur et le destinataire.
+              </VAlert>
 
-              <div class="text-subtitle-2 mt-4 mb-2">
-                Signataire
+              <div class="text-subtitle-2 mb-2">
+                Signataire du bordereau
               </div>
               <VRow>
                 <VCol cols="12">
@@ -780,9 +725,9 @@ onMounted(async () => {
       </VCardText>
       <VCardActions>
         <VBtn
-          v-if="!isArrival && activeTab !== 'infos'"
+          v-if="!isArrival && activeTab === 'signature'"
           variant="text"
-          @click="activeTab = activeTab === 'signature' ? 'pieces' : 'infos'"
+          @click="activeTab = 'infos'"
         >
           Précédent
         </VBtn>
@@ -794,10 +739,10 @@ onMounted(async () => {
           Annuler
         </VBtn>
         <VBtn
-          v-if="!isArrival && activeTab !== 'signature'"
+          v-if="!isArrival && activeTab === 'infos'"
           color="primary"
           variant="tonal"
-          @click="activeTab = activeTab === 'infos' ? 'pieces' : 'signature'"
+          @click="activeTab = 'signature'"
         >
           Suivant
         </VBtn>
