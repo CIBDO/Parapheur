@@ -32,6 +32,11 @@ class ArchiveDigitizeController extends Controller
             'classification_node_id' => ['nullable', 'integer', 'exists:archive_classification_nodes,id'],
             'fonds_id' => ['nullable', 'integer', 'exists:archive_fonds,id'],
             'series_id' => ['nullable', 'integer', 'exists:archive_series,id'],
+            'grouping' => ['nullable', 'string', 'in:pieces,dossier'],
+            'source_channel' => ['nullable', 'string', 'in:upload,camera,scanner'],
+            'submit_after' => ['nullable', 'boolean'],
+            'piece_titles' => ['nullable'],
+            'piece_meta' => ['nullable'],
             'files' => ['required', 'array', 'min:1', 'max:50'],
             'files.*' => array_values(array_filter([
                 'required',
@@ -40,6 +45,10 @@ class ArchiveDigitizeController extends Controller
                 'mimes:'.AllowedDocumentUploads::MIMES.',tif,tiff',
             ])),
         ]);
+
+        $data['piece_titles'] = $this->decodeJsonList($request->input('piece_titles'));
+        $data['piece_meta'] = $this->decodeJsonList($request->input('piece_meta'));
+        $data['submit_after'] = $request->boolean('submit_after');
 
         $files = array_values(array_filter(
             $request->file('files', []),
@@ -53,5 +62,19 @@ class ArchiveDigitizeController extends Controller
         } catch (InvalidArgumentException $e) {
             return response()->json(['message' => $e->getMessage()], 422);
         }
+    }
+
+    /**
+     * @return list<mixed>
+     */
+    private function decodeJsonList(mixed $raw): array
+    {
+        if (is_string($raw)) {
+            $decoded = json_decode($raw, true);
+
+            return is_array($decoded) ? array_values($decoded) : [];
+        }
+
+        return is_array($raw) ? array_values($raw) : [];
     }
 }

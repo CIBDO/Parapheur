@@ -6,15 +6,18 @@ use App\Http\Controllers\Controller;
 use App\Models\ArchiveTransfer;
 use App\Services\Archives\ArchiveIngestService;
 use App\Services\Archives\ArchiveSearchService;
+use App\Services\Archives\ArchiveTransferSlipService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use InvalidArgumentException;
+use Symfony\Component\HttpFoundation\Response;
 
 class ArchiveTransferController extends Controller
 {
     public function __construct(
         private readonly ArchiveSearchService $search,
         private readonly ArchiveIngestService $ingest,
+        private readonly ArchiveTransferSlipService $slips,
     ) {}
 
     public function index(Request $request): JsonResponse
@@ -118,5 +121,12 @@ class ArchiveTransferController extends Controller
         } catch (InvalidArgumentException $e) {
             return response()->json(['message' => $e->getMessage()], 422);
         }
+    }
+
+    public function bordereau(Request $request, ArchiveTransfer $transfer): Response
+    {
+        $this->authorize('view', $transfer);
+
+        return $this->slips->download($transfer);
     }
 }

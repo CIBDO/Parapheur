@@ -245,6 +245,7 @@ Route::middleware(['auth:sanctum', 'auth.idle', 'password.changed'])->group(func
     Route::get('/archives/transfers', [ArchiveTransferController::class, 'index']);
     Route::post('/archives/transfers', [ArchiveTransferController::class, 'store']);
     Route::get('/archives/transfers/{transfer}', [ArchiveTransferController::class, 'show']);
+    Route::get('/archives/transfers/{transfer}/bordereau', [ArchiveTransferController::class, 'bordereau']);
     Route::post('/archives/transfers/{transfer}/submit', [ArchiveTransferController::class, 'submit']);
     Route::post('/archives/transfers/{transfer}/control', [ArchiveTransferController::class, 'control']);
     Route::post('/archives/transfers/{transfer}/accept', [ArchiveTransferController::class, 'accept']);

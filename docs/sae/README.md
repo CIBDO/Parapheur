@@ -29,11 +29,18 @@ Module distinct de la GED opérationnelle. Les binaires restent dans `documents`
 - `POST /archives/packages/{id}/restore` · `POST /archives/records/{id}/restore`
 - `GET|POST /archives/preventive/events` · `GET|POST /archives/preventive/climate`
 
-## Numérisation (phase 1)
+## Numérisation / poste de versement
 
-UI : `/archives/numerisation` — dépôt multi PDF/images, métadonnées, classement (fonds/série/nœud), création d’un versement SAE brouillon.  
-Le classement choisi est mémorisé sur les pièces et appliqué aux `archive_records` à la prise en charge / conservation.  
-Phase 2 (caméra / scanner TWAIN) reportée.
+UI : `/archives/numerisation` — assistant **4 étapes**
+
+1. **Capture + QC** — upload / caméra / scanner ; checksum SHA-256 ; alertes résolution / page blanche
+2. **Constitution** — ordre, intitulés, dates extrêmes, mode pièces ou dossier
+3. **Description** — profils, structure, fonds/série/nœud
+4. **Remise** — création versement (± soumission), **bordereau PDF** (`GET /archives/transfers/{id}/bordereau`)
+
+API : `POST /archives/digitize/batch` (`grouping`, `source_channel`, `piece_titles`, `piece_meta`, `submit_after`)
+
+Ops caméra : `Permissions-Policy: camera=(self)` · Scanner : `VITE_DYNAMSOFT_LICENSE`
 
 ## Ops checklist
 

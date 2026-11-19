@@ -362,7 +362,7 @@ export default [
         subject: 'Archives',
       },
       {
-        title: 'Numérisation',
+        title: 'Poste de versement',
         icon: { icon: 'tabler-scan' },
         to: 'archives-numerisation',
         action: 'create',

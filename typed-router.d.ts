@@ -41,6 +41,7 @@ declare module 'vue-router/auto-routes' {
     'archives-magasins': RouteRecordInfo<'archives-magasins', '/archives/magasins', Record<never, never>, Record<never, never>>,
     'archives-mes-versements': RouteRecordInfo<'archives-mes-versements', '/archives/mes-versements', Record<never, never>, Record<never, never>>,
     'archives-mouvements': RouteRecordInfo<'archives-mouvements', '/archives/mouvements', Record<never, never>, Record<never, never>>,
+    'archives-numerisation': RouteRecordInfo<'archives-numerisation', '/archives/numerisation', Record<never, never>, Record<never, never>>,
     'archives-occupation': RouteRecordInfo<'archives-occupation', '/archives/occupation', Record<never, never>, Record<never, never>>,
     'archives-preservation': RouteRecordInfo<'archives-preservation', '/archives/preservation', Record<never, never>, Record<never, never>>,
     'archives-prets': RouteRecordInfo<'archives-prets', '/archives/prets', Record<never, never>, Record<never, never>>,

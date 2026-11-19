@@ -20,11 +20,13 @@ class SecurityHeaders
         $response = $next($request);
 
         $onlyOfficeUrl = rtrim((string) config('onlyoffice.url', ''), '/');
-        $frameSrc = ["'self'"];
-        $scriptSrc = ["'self'", "'unsafe-inline'", "'unsafe-eval'"];
-        $connectSrc = ["'self'", 'ws:', 'wss:'];
+        // blob: : aperçu PDF/iframe local (poste de versement Archives)
+        $frameSrc = ["'self'", 'blob:'];
+        // unpkg : SDK Dynamsoft (scanner Archives, optionnel)
+        $scriptSrc = ["'self'", "'unsafe-inline'", "'unsafe-eval'", 'https://unpkg.com'];
+        $connectSrc = ["'self'", 'ws:', 'wss:', 'https://unpkg.com'];
         $imgSrc = ["'self'", 'data:', 'blob:'];
-        $styleSrc = ["'self'", "'unsafe-inline'"];
+        $styleSrc = ["'self'", "'unsafe-inline'", 'https://unpkg.com'];
         $fontSrc = ["'self'", 'data:'];
 
         if ($onlyOfficeUrl !== '') {
@@ -42,15 +44,20 @@ class SecurityHeaders
             $imgSrc[] = $origin;
         }
 
+        // Caméra document (poste numérisation Archives) + blob streams
+        $mediaSrc = ["'self'", 'blob:', 'mediastream:'];
+
         $csp = implode('; ', [
             "default-src 'self'",
             'frame-src '.implode(' ', array_unique($frameSrc)),
+            // Chrome PDF viewer dans iframe blob peut exiger object-src blob
+            "object-src 'self' blob:",
             'script-src '.implode(' ', array_unique($scriptSrc)),
             'style-src '.implode(' ', array_unique($styleSrc)),
             'img-src '.implode(' ', array_unique($imgSrc)),
             'font-src '.implode(' ', array_unique($fontSrc)),
             'connect-src '.implode(' ', array_unique($connectSrc)),
-            "object-src 'none'",
+            'media-src '.implode(' ', array_unique($mediaSrc)),
             "base-uri 'self'",
             "form-action 'self'",
             "frame-ancestors 'self'",
@@ -60,7 +67,7 @@ class SecurityHeaders
         $response->headers->set('X-Content-Type-Options', 'nosniff');
         $response->headers->set('X-Frame-Options', 'SAMEORIGIN');
         $response->headers->set('Referrer-Policy', 'strict-origin-when-cross-origin');
-        $response->headers->set('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+        $response->headers->set('Permissions-Policy', 'camera=(self), microphone=(), geolocation=()');
         $response->headers->set('X-XSS-Protection', '0');
 
         if ($request->isSecure() || app()->environment('production')) {

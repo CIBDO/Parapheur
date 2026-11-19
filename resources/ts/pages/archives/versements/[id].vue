@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import ParapheurPageHeader from '@/components/parapheur/ParapheurPageHeader.vue'
 import { formatDateFr, transferStatusColor, transferStatusLabels, useArchives } from '@/composables/useArchives'
+import { $api } from '@/utils/api'
 
 definePage({
   meta: { action: 'read', subject: 'Archives' },
@@ -15,6 +16,17 @@ const showReject = ref(false)
 
 async function load() {
   transfer.value = await getJson(`/archives/transfers/${route.params.id}`)
+}
+
+async function downloadBordereau() {
+  const id = Number(route.params.id)
+  const blob = await $api<Blob>(`/archives/transfers/${id}/bordereau`, { responseType: 'blob' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `bordereau-versement-${transfer.value?.reference || id}.pdf`
+  a.click()
+  URL.revokeObjectURL(url)
 }
 
 async function submit() {
@@ -64,6 +76,13 @@ onMounted(load)
         >
           {{ transferStatusLabels[transfer.status] || transfer.status }}
         </VChip>
+        <VBtn
+          variant="tonal"
+          prepend-icon="tabler-file-type-pdf"
+          @click="downloadBordereau"
+        >
+          Bordereau
+        </VBtn>
         <VBtn
           v-if="transfer.status === 'brouillon' || transfer.status === 'rejete'"
           color="primary"

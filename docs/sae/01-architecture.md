@@ -37,6 +37,6 @@ Vue (pages/archives + GED) → /api/archives → Controllers → Services → Mo
 ## Intégrations
 
 - GED : bouton « Proposer au SAE » → `POST /archives/propose`
-- Archives : poste numérisation → `POST /archives/digitize/batch` (crée documents + versement brouillon)
+- Archives : poste numérisation → `POST /archives/digitize/batch` (upload / caméra / scanner → documents + versement)
 - Courrier / Parapheur / Réunions / Tâches / Productions : même endpoint propose avec `document_id` + `source_module`
 - ONLYOFFICE : consultation seule de la version figée

@@ -70,4 +70,67 @@ class ArchivesDigitizeTest extends TestCase
         $this->assertSame($fonds->id, (int) ($item->metadata['fonds_id'] ?? 0));
         $this->assertSame($series->id, (int) ($item->metadata['series_id'] ?? 0));
     }
+
+    public function test_digitize_dossier_mode_creates_single_document_with_attachments(): void
+    {
+        $agent = User::query()->where('email', 'agent.dsi@dgtcp.local')->firstOrFail();
+        $structure = Structure::query()->where('code', 'DSI')->firstOrFail();
+        $type = DocumentType::query()->firstOrFail();
+
+        $response = $this->actingAs($agent, 'sanctum')
+            ->post('/api/archives/digitize/batch', [
+                'structure_id' => $structure->id,
+                'document_type_id' => $type->id,
+                'title' => 'Dossier scanné',
+                'grouping' => 'dossier',
+                'source_channel' => 'upload',
+                'files' => [
+                    UploadedFile::fake()->create('principal.pdf', 100, 'application/pdf'),
+                    UploadedFile::fake()->create('annexe.pdf', 50, 'application/pdf'),
+                ],
+            ]);
+
+        $response->assertCreated()
+            ->assertJsonPath('status', 'brouillon');
+
+        $transferId = (int) $response->json('id');
+        $this->assertSame(1, ArchiveTransferItem::query()->where('transfer_id', $transferId)->count());
+
+        $documentId = (int) ArchiveTransferItem::query()->where('transfer_id', $transferId)->value('document_id');
+        $this->assertDatabaseHas('document_attachments', [
+            'document_id' => $documentId,
+        ]);
+    }
+
+    public function test_digitize_can_submit_and_download_bordereau(): void
+    {
+        $agent = User::query()->where('email', 'agent.dsi@dgtcp.local')->firstOrFail();
+        $structure = Structure::query()->where('code', 'DSI')->firstOrFail();
+        $type = DocumentType::query()->firstOrFail();
+
+        $response = $this->actingAs($agent, 'sanctum')
+            ->post('/api/archives/digitize/batch', [
+                'structure_id' => $structure->id,
+                'document_type_id' => $type->id,
+                'title' => 'Versement avec bordereau',
+                'submit_after' => true,
+                'piece_meta' => json_encode([
+                    ['date_start' => '2024-01-01', 'date_end' => '2024-12-31', 'qc_status' => 'ok'],
+                ]),
+                'files' => [
+                    UploadedFile::fake()->create('scan.pdf', 90, 'application/pdf'),
+                ],
+            ]);
+
+        $response->assertCreated()
+            ->assertJsonPath('status', 'soumis');
+
+        $transferId = (int) $response->json('id');
+
+        $pdf = $this->actingAs($agent, 'sanctum')
+            ->get("/api/archives/transfers/{$transferId}/bordereau");
+
+        $pdf->assertOk();
+        $this->assertStringContainsString('application/pdf', (string) $pdf->headers->get('content-type'));
+    }
 }
