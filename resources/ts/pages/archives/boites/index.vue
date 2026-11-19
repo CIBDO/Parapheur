@@ -2,7 +2,9 @@
 import ParapheurPageHeader from '@/components/parapheur/ParapheurPageHeader.vue'
 import { useArchives } from '@/composables/useArchives'
 
-definePage({ meta: { action: 'read', subject: 'Archives' } })
+definePage({
+  meta: { action: 'read', subject: 'Archives' },
+})
 
 const router = useRouter()
 const { loading, fetchBoxes, createBox, fetchLocations, getJson } = useArchives()
@@ -11,6 +13,7 @@ const locations = ref<any[]>([])
 const structures = ref<any[]>([])
 const total = ref(0)
 const page = ref(1)
+const perPage = ref(15)
 const dialog = ref(false)
 const form = ref({
   structure_id: null as number | null,
@@ -30,7 +33,7 @@ const headers = [
 
 async function load() {
   const [boxes, locs, structs] = await Promise.all([
-    fetchBoxes({ page: page.value, per_page: 15 }),
+    fetchBoxes({ page: page.value, per_page: perPage.value }),
     fetchLocations(),
     getJson('/meta/structures').catch(() => ({ data: [] })),
   ])
@@ -48,7 +51,7 @@ async function create() {
   await load()
 }
 
-watch(page, () => load())
+watch([page, perPage], () => load())
 onMounted(load)
 </script>
 
@@ -70,27 +73,36 @@ onMounted(load)
     </ParapheurPageHeader>
 
     <VCard class="parapheur-section-card">
-      <VDataTableServer
-        v-model:page="page"
-        :headers="headers"
-        :items="items"
-        :items-length="total"
-        :loading="loading"
-        :items-per-page="15"
-      >
-        <template #item.location="{ item }">
-          {{ item.location?.full_code || '—' }}
-        </template>
-        <template #item.actions="{ item }">
-          <VBtn
-            size="small"
-            variant="tonal"
-            @click="router.push({ name: 'archives-boites-id', params: { id: item.id } })"
-          >
-            Ouvrir
-          </VBtn>
-        </template>
-      </VDataTableServer>
+      <VCardText>
+        <VDataTableServer
+          v-model:page="page"
+          v-model:items-per-page="perPage"
+          :headers="headers"
+          :items="items"
+          :items-length="total"
+          :loading="loading"
+          class="text-no-wrap"
+          @update:options="({ page: p, itemsPerPage }: any) => { page = p; perPage = itemsPerPage }"
+        >
+          <template #item.location="{ item }">
+            {{ item.location?.full_code || '—' }}
+          </template>
+          <template #item.actions="{ item }">
+            <VBtn
+              size="small"
+              variant="tonal"
+              @click="router.push({ name: 'archives-boites-id', params: { id: item.id } })"
+            >
+              Ouvrir
+            </VBtn>
+          </template>
+          <template #no-data>
+            <div class="text-medium-emphasis pa-4">
+              Aucune boîte.
+            </div>
+          </template>
+        </VDataTableServer>
+      </VCardText>
     </VCard>
 
     <VDialog

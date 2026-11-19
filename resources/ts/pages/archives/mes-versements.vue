@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import ParapheurPageHeader from '@/components/parapheur/ParapheurPageHeader.vue'
-import { transferStatusColor, transferStatusLabels, useArchives } from '@/composables/useArchives'
+import { formatDateFr, transferStatusColor, transferStatusLabels, useArchives } from '@/composables/useArchives'
 
 definePage({
   meta: { action: 'read', subject: 'Archives' },
@@ -63,17 +63,10 @@ onMounted(load)
           </VChip>
         </template>
         <template #item.created_at="{ item }">
-          {{ item.created_at ? new Date(item.created_at).toLocaleString('fr-FR') : '—' }}
+          {{ formatDateFr(item.created_at, true) }}
         </template>
         <template #item.actions="{ item }">
-          <div class="d-flex gap-2">
-            <VBtn
-              size="small"
-              variant="tonal"
-              @click="router.push({ name: 'archives-versements-id', params: { id: item.id } })"
-            >
-              Ouvrir
-            </VBtn>
+          <div class="d-flex gap-2 justify-end">
             <VBtn
               v-if="item.status === 'brouillon' || item.status === 'rejete'"
               size="small"
@@ -82,6 +75,18 @@ onMounted(load)
             >
               Soumettre
             </VBtn>
+            <VBtn
+              size="small"
+              variant="tonal"
+              @click="router.push({ name: 'archives-versements-id', params: { id: item.id } })"
+            >
+              Ouvrir
+            </VBtn>
+          </div>
+        </template>
+        <template #no-data>
+          <div class="text-medium-emphasis pa-4">
+            Aucun versement.
           </div>
         </template>
       </VDataTableServer>

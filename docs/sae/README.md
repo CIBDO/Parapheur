@@ -23,10 +23,17 @@ Module distinct de la GED opérationnelle. Les binaires restent dans `documents`
 ## API production
 
 - `POST /archives/propose` — proposition versement depuis un document
+- `POST /archives/digitize/batch` — numérisation (upload multi-fichiers → versement brouillon)
 - `POST /archives/records/{id}/hybrid` — support hybride
 - `POST /archives/imports/preview|…/commit` — import CSV
 - `POST /archives/packages/{id}/restore` · `POST /archives/records/{id}/restore`
 - `GET|POST /archives/preventive/events` · `GET|POST /archives/preventive/climate`
+
+## Numérisation (phase 1)
+
+UI : `/archives/numerisation` — dépôt multi PDF/images, métadonnées, classement (fonds/série/nœud), création d’un versement SAE brouillon.  
+Le classement choisi est mémorisé sur les pièces et appliqué aux `archive_records` à la prise en charge / conservation.  
+Phase 2 (caméra / scanner TWAIN) reportée.
 
 ## Ops checklist
 

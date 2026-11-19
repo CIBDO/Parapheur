@@ -5,16 +5,36 @@ import { useLayoutConfigStore } from '@layouts/stores/config';
 import type { NavLink } from '@layouts/types';
 import { getComputedNavLinkToProp, getDynamicI18nProps, isNavLinkActive } from '@layouts/utils';
 
-defineProps<{
+const props = defineProps<{
   item: NavLink;
 }>();
 
 const configStore = useLayoutConfigStore();
 const hideTitleAndBadge = configStore.isVerticalNavMini();
+const router = useRouter();
+
+const isRouteResolvable = computed(() => {
+  if (!props.item.to)
+    return true;
+  if (typeof props.item.to === 'string') {
+    if (props.item.to.startsWith('/'))
+      return true;
+
+    return router.hasRoute(props.item.to);
+  }
+  if ('name' in props.item.to && props.item.to.name)
+    return router.hasRoute(String(props.item.to.name));
+
+  return true;
+});
 </script>
 
 <template>
-  <li v-if="can(item.action, item.subject)" class="nav-link" :class="{ disabled: item.disable }">
+  <li
+    v-if="can(item.action, item.subject) && isRouteResolvable"
+    class="nav-link"
+    :class="{ disabled: item.disable }"
+  >
     <Component
       :is="item.to ? 'RouterLink' : 'a'"
       v-bind="getComputedNavLinkToProp(item)"

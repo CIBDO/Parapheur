@@ -73,13 +73,31 @@ onMounted(load)
           v-for="item in items"
           :key="item.id"
           :title="`${item.full_code} — ${item.name}`"
-          :subtitle="`${typeLabels[item.type] || item.type} · ${item.status} · occupation ${item.occupancy_rate ?? 0}%`"
-        />
-        <VListItem
-          v-if="!items.length"
-          title="Aucun emplacement"
-        />
+          :subtitle="`${typeLabels[item.type] || item.type}`"
+        >
+          <template #append>
+            <div
+              class="d-flex align-center gap-3"
+              style="min-width: 140px"
+            >
+              <VProgressLinear
+                :model-value="Number(item.occupancy_rate || 0)"
+                :color="Number(item.occupancy_rate || 0) >= 90 ? 'error' : Number(item.occupancy_rate || 0) >= 70 ? 'warning' : 'primary'"
+                height="6"
+                rounded
+                style="width: 80px"
+              />
+              <span class="text-caption text-medium-emphasis">{{ item.occupancy_rate ?? 0 }}%</span>
+            </div>
+          </template>
+        </VListItem>
       </VList>
+      <VCardText
+        v-if="!items.length"
+        class="text-medium-emphasis"
+      >
+        Aucun emplacement.
+      </VCardText>
     </VCard>
 
     <VDialog

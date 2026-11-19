@@ -1,17 +1,31 @@
 <script setup lang="ts">
 import ParapheurPageHeader from '@/components/parapheur/ParapheurPageHeader.vue'
 import { useApi } from '@/composables/useApi'
+import { useArchives } from '@/composables/useArchives'
 
 definePage({
   meta: { action: 'manage', subject: 'Archives' },
 })
 
+const { getJson } = useArchives()
 const structureId = ref<number | null>(null)
+const structures = ref<any[]>([])
 const importType = ref<'records' | 'physical'>('records')
 const file = ref<File | null>(null)
 const loading = ref(false)
 const error = ref<string | null>(null)
 const current = ref<any | null>(null)
+
+const structureItems = computed(() =>
+  structures.value.map(s => ({ title: s.name || s.code, value: s.id })),
+)
+
+async function loadStructures() {
+  const res = await getJson('/meta/structures').catch(() => ({ data: [] }))
+  structures.value = res.data || res || []
+  if (!structureId.value && structures.value[0])
+    structureId.value = structures.value[0].id
+}
 
 async function preview() {
   if (!structureId.value || !file.value)
@@ -61,13 +75,15 @@ function onFile(files: File[] | File | null) {
   const f = Array.isArray(files) ? files[0] : files
   file.value = f || null
 }
+
+onMounted(loadStructures)
 </script>
 
 <template>
   <div>
     <ParapheurPageHeader
       title="Import / reprise"
-      subtitle="CSV inventaires physiques ou dossiers numériques"
+      subtitle="CSV inventaires ou dossiers numériques"
       icon="tabler-file-import"
     />
 
@@ -86,10 +102,10 @@ function onFile(files: File[] | File | null) {
             cols="12"
             md="3"
           >
-            <VTextField
-              v-model.number="structureId"
-              label="Structure ID"
-              type="number"
+            <VSelect
+              v-model="structureId"
+              :items="structureItems"
+              label="Structure"
             />
           </VCol>
           <VCol
@@ -123,6 +139,7 @@ function onFile(files: File[] | File | null) {
             <VBtn
               color="primary"
               :loading="loading"
+              :disabled="!structureId || !file"
               @click="preview"
             >
               Prévisualiser
@@ -137,19 +154,22 @@ function onFile(files: File[] | File | null) {
       class="parapheur-section-card"
       :loading="loading"
     >
-      <VCardTitle class="d-flex align-center justify-space-between">
-        <span>{{ current.reference }} — {{ current.status }}</span>
+      <VCardTitle class="d-flex align-center justify-space-between flex-wrap gap-2">
+        <span>{{ current.reference }}</span>
         <VBtn
           v-if="current.status === 'preview'"
-          color="success"
+          color="primary"
           @click="commit"
         >
-          Confirmer l’import
+          Confirmer
         </VBtn>
       </VCardTitle>
       <VCardText>
         <div class="mb-3 text-medium-emphasis">
-          Lignes {{ current.row_count }} · valides {{ current.valid_count }} · doublons {{ current.duplicate_count }} · erreurs {{ current.error_count }} · commités {{ current.committed_count }}
+          {{ current.row_count }} lignes · {{ current.valid_count }} valides · {{ current.duplicate_count }} doublons · {{ current.error_count }} erreurs
+          <template v-if="current.committed_count">
+            · {{ current.committed_count }} importées
+          </template>
         </div>
         <VTable density="compact">
           <thead>
@@ -157,7 +177,6 @@ function onFile(files: File[] | File | null) {
               <th>Ligne</th>
               <th>Statut</th>
               <th>Message</th>
-              <th>Données</th>
             </tr>
           </thead>
           <tbody>
@@ -168,9 +187,6 @@ function onFile(files: File[] | File | null) {
               <td>{{ row.line }}</td>
               <td>{{ row.status }}</td>
               <td>{{ row.message }}</td>
-              <td class="text-caption">
-                {{ JSON.stringify(row.data) }}
-              </td>
             </tr>
           </tbody>
         </VTable>

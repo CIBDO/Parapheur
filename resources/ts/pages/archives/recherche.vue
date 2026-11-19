@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import ParapheurPageHeader from '@/components/parapheur/ParapheurPageHeader.vue'
-import { useArchives } from '@/composables/useArchives'
+import { recordStatusLabels, useArchives } from '@/composables/useArchives'
 
 definePage({
   meta: { action: 'read', subject: 'Archives' },
@@ -52,14 +52,26 @@ async function search() {
           v-for="item in items"
           :key="item.id"
           :title="item.title"
-          :subtitle="`${item.permanent_id} · ${item.reference || 'sans référence'}`"
+          :subtitle="[item.permanent_id, item.reference, item.structure?.code].filter(Boolean).join(' · ')"
           @click="router.push({ name: 'archives-records-id', params: { id: item.id } })"
-        />
-        <VListItem
-          v-if="!items.length"
-          title="Aucun résultat"
-        />
+        >
+          <template #append>
+            <VChip
+              size="small"
+              label
+              color="secondary"
+            >
+              {{ recordStatusLabels[item.status] || item.status }}
+            </VChip>
+          </template>
+        </VListItem>
       </VList>
+      <VCardText
+        v-if="!items.length"
+        class="text-medium-emphasis"
+      >
+        Aucun résultat.
+      </VCardText>
     </VCard>
   </div>
 </template>

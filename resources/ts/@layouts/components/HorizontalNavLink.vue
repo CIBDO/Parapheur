@@ -14,11 +14,29 @@ interface Props {
 const props = withDefaults(defineProps<Props>(), {
   isSubItem: false,
 });
+
+const router = useRouter();
+
+/** Évite de planter toute la barre si un `to` nom de route est invalide. */
+const isRouteResolvable = computed(() => {
+  if (!props.item.to)
+    return true;
+  if (typeof props.item.to === 'string') {
+    if (props.item.to.startsWith('/'))
+      return true;
+
+    return router.hasRoute(props.item.to);
+  }
+  if ('name' in props.item.to && props.item.to.name)
+    return router.hasRoute(String(props.item.to.name));
+
+  return true;
+});
 </script>
 
 <template>
   <li
-    v-if="can(item.action, item.subject)"
+    v-if="can(item.action, item.subject) && isRouteResolvable"
     class="nav-link"
     :class="[
       {

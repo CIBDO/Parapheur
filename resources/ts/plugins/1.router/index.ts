@@ -9,8 +9,13 @@ import { redirects, routes } from './additional-routes';
 import { setupGuards } from './guards';
 
 function recursiveLayouts(route: RouteRecordRaw): RouteRecordRaw {
-  if (route.children) {
-    for (let i = 0; i < route.children.length; i++) route.children[i] = recursiveLayouts(route.children[i]);
+  if (route.children?.length) {
+    for (let i = 0; i < route.children.length; i++)
+      route.children[i] = recursiveLayouts(route.children[i]);
+
+    // Parent with its own page component (ex: foo.vue + foo/[id].vue) must still get a layout.
+    if (route.component || (route as RouteRecordRaw & { components?: unknown }).components)
+      return setupLayouts([route])[0];
 
     return route;
   }

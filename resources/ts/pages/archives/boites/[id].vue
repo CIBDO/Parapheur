@@ -2,7 +2,9 @@
 import ParapheurPageHeader from '@/components/parapheur/ParapheurPageHeader.vue'
 import { useArchives } from '@/composables/useArchives'
 
-definePage({ meta: { action: 'read', subject: 'Archives' } })
+definePage({
+  meta: { action: 'read', subject: 'Archives' },
+})
 
 const route = useRoute()
 const { loading, getJson, assignBox, fetchLocations } = useArchives()

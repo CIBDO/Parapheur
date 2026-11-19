@@ -362,9 +362,16 @@ export default [
         subject: 'Archives',
       },
       {
+        title: 'Numérisation',
+        icon: { icon: 'tabler-scan' },
+        to: 'archives-numerisation',
+        action: 'create',
+        subject: 'Archives',
+      },
+      {
         title: 'Versements à contrôler',
         icon: { icon: 'tabler-file-check' },
-        to: 'archives-versements-a-controler',
+        to: 'archives-versements-controle',
         action: 'validate',
         subject: 'Archives',
       },

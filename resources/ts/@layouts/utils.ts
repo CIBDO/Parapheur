@@ -17,10 +17,16 @@ export const getComputedNavLinkToProp = computed(() => (link: NavLink) => {
     rel: link.rel,
   };
 
-  // If route is string => it assumes string is route name => Create route object from route name
-  // If route is not string => It assumes it's route object => returns passed route object
-  if (link.to) props.to = typeof link.to === 'string' ? { name: link.to } : link.to;
-  else props.href = link.href;
+  // String starting with `/` => path. Other strings => route name.
+  if (link.to) {
+    if (typeof link.to === 'string')
+      props.to = link.to.startsWith('/') ? link.to : { name: link.to };
+    else
+      props.to = link.to;
+  }
+  else {
+    props.href = link.href;
+  }
 
   return props;
 });
@@ -46,6 +52,12 @@ export const resolveNavLinkRouteName = (link: NavLink, router: Router) => {
 export const isNavLinkActive = (link: NavLink, router: Router) => {
   // Matched routes array of current route
   const matchedRoutes = router.currentRoute.value.matched;
+
+  if (typeof link.to === 'string' && link.to.startsWith('/')) {
+    const path = router.currentRoute.value.path;
+
+    return path === link.to || path.startsWith(`${link.to}/`);
+  }
 
   // Check if provided route matches route's matched route
   const resolveRoutedName = resolveNavLinkRouteName(link, router);

@@ -1,15 +1,16 @@
 <script setup lang="ts">
 import ParapheurPageHeader from '@/components/parapheur/ParapheurPageHeader.vue'
-import { useArchives } from '@/composables/useArchives'
+import { formatDateFr, useArchives } from '@/composables/useArchives'
 
 definePage({
   meta: { action: 'manage', subject: 'Archives' },
 })
 
-const { getJson, postJson, loading, error } = useArchives()
+const { getJson, postJson, fetchLocations, loading, error } = useArchives()
 const structureId = ref<number | null>(null)
+const structures = ref<any[]>([])
+const locations = ref<any[]>([])
 const events = ref<any[]>([])
-const climate = ref<any[]>([])
 
 const eventForm = ref({
   event_type: 'incident',
@@ -26,15 +27,51 @@ const climateForm = ref({
   notes: '',
 })
 
+const structureItems = computed(() =>
+  structures.value.map(s => ({ title: s.name || s.code, value: s.id })),
+)
+const locationItems = computed(() =>
+  locations.value.map(l => ({ title: `${l.full_code} — ${l.name}`, value: l.id })),
+)
+
+const eventTypeItems = [
+  { title: 'Incident', value: 'incident' },
+  { title: 'Infiltration', value: 'infiltration' },
+  { title: 'Dégradation', value: 'degradation' },
+  { title: 'Infestation', value: 'infestation' },
+  { title: 'Incendie', value: 'incendie' },
+  { title: 'Sécurité', value: 'securite' },
+  { title: 'Nettoyage', value: 'nettoyage' },
+  { title: 'Intervention', value: 'intervention' },
+]
+
+const severityItems = [
+  { title: 'Info', value: 'info' },
+  { title: 'Attention', value: 'warning' },
+  { title: 'Critique', value: 'critical' },
+]
+
+async function loadMeta() {
+  const res = await getJson('/meta/structures').catch(() => ({ data: [] }))
+  structures.value = res.data || res || []
+  if (!structureId.value && structures.value[0])
+    structureId.value = structures.value[0].id
+  await onStructureChange()
+}
+
+async function onStructureChange() {
+  if (!structureId.value)
+    return
+  const locs = await fetchLocations({ structure_id: structureId.value })
+  locations.value = locs.data || locs || []
+  await load()
+}
+
 async function load() {
   if (!structureId.value)
     return
-  const [ev, cl] = await Promise.all([
-    getJson(`/archives/preventive/events?structure_id=${structureId.value}`),
-    getJson(`/archives/preventive/climate?structure_id=${structureId.value}`),
-  ])
+  const ev = await getJson(`/archives/preventive/events?structure_id=${structureId.value}`)
   events.value = ev.data || ev || []
-  climate.value = cl.data || cl || []
 }
 
 async function submitEvent() {
@@ -56,15 +93,18 @@ async function submitClimate() {
     structure_id: structureId.value,
     ...climateForm.value,
   })
+  climateForm.value.notes = ''
   await load()
 }
+
+onMounted(loadMeta)
 </script>
 
 <template>
   <div>
     <ParapheurPageHeader
       title="Conservation préventive"
-      subtitle="Incidents, climat (T° / humidité) — saisie manuelle"
+      subtitle="Incidents et relevés climatiques"
       icon="tabler-temperature"
     />
 
@@ -77,20 +117,14 @@ async function submitClimate() {
     </VAlert>
 
     <VCard class="parapheur-section-card mb-4">
-      <VCardText class="d-flex ga-3 align-center">
-        <VTextField
-          v-model.number="structureId"
-          label="Structure ID"
-          type="number"
-          style="max-width: 200px"
+      <VCardText>
+        <VSelect
+          v-model="structureId"
+          :items="structureItems"
+          label="Structure"
+          style="max-width: 360px"
+          @update:model-value="onStructureChange"
         />
-        <VBtn
-          color="primary"
-          :loading="loading"
-          @click="load"
-        >
-          Charger
-        </VBtn>
       </VCardText>
     </VCard>
 
@@ -100,43 +134,42 @@ async function submitClimate() {
         md="6"
       >
         <VCard class="parapheur-section-card">
-          <VCardTitle>Signaler un événement</VCardTitle>
-          <VCardText>
+          <VCardTitle>Événement</VCardTitle>
+          <VCardText class="d-flex flex-column gap-3">
             <VSelect
               v-model="eventForm.event_type"
-              :items="['incident', 'infiltration', 'degradation', 'infestation', 'incendie', 'securite', 'nettoyage', 'intervention', 'climat']"
+              :items="eventTypeItems"
               label="Type"
-              class="mb-2"
             />
             <VSelect
               v-model="eventForm.severity"
-              :items="['info', 'warning', 'critical']"
+              :items="severityItems"
               label="Sévérité"
-              class="mb-2"
             />
             <VTextField
               v-model="eventForm.title"
               label="Titre"
-              class="mb-2"
             />
             <VTextarea
               v-model="eventForm.description"
               label="Description"
               rows="2"
-              class="mb-2"
             />
-            <VTextField
-              v-model.number="eventForm.location_id"
-              label="Emplacement ID (opt.)"
-              type="number"
-              class="mb-2"
+            <VSelect
+              v-model="eventForm.location_id"
+              :items="locationItems"
+              label="Emplacement"
+              clearable
             />
-            <VBtn
-              color="primary"
-              @click="submitEvent"
-            >
-              Enregistrer
-            </VBtn>
+            <div>
+              <VBtn
+                color="primary"
+                :loading="loading"
+                @click="submitEvent"
+              >
+                Enregistrer
+              </VBtn>
+            </div>
           </VCardText>
         </VCard>
       </VCol>
@@ -146,45 +179,53 @@ async function submitClimate() {
       >
         <VCard class="parapheur-section-card">
           <VCardTitle>Relevé climatique</VCardTitle>
-          <VCardText>
-            <VTextField
-              v-model.number="climateForm.location_id"
-              label="Emplacement ID"
-              type="number"
-              class="mb-2"
+          <VCardText class="d-flex flex-column gap-3">
+            <VSelect
+              v-model="climateForm.location_id"
+              :items="locationItems"
+              label="Emplacement"
             />
             <VTextField
               v-model.number="climateForm.temperature_c"
               label="Température (°C)"
               type="number"
-              class="mb-2"
             />
             <VTextField
               v-model.number="climateForm.humidity_pct"
               label="Humidité (%)"
               type="number"
-              class="mb-2"
             />
             <VTextField
               v-model="climateForm.notes"
               label="Notes"
-              class="mb-2"
             />
-            <VBtn
-              color="primary"
-              @click="submitClimate"
-            >
-              Enregistrer
-            </VBtn>
+            <div>
+              <VBtn
+                color="primary"
+                :loading="loading"
+                @click="submitClimate"
+              >
+                Enregistrer
+              </VBtn>
+            </div>
           </VCardText>
         </VCard>
       </VCol>
     </VRow>
 
     <VCard class="parapheur-section-card mt-4">
-      <VCardTitle>Événements récents</VCardTitle>
+      <VCardTitle>Événements</VCardTitle>
       <VCardText>
-        <VTable density="compact">
+        <div
+          v-if="!events.length"
+          class="text-medium-emphasis"
+        >
+          Aucun événement pour cette structure.
+        </div>
+        <VTable
+          v-else
+          density="compact"
+        >
           <thead>
             <tr>
               <th>Date</th>
@@ -198,7 +239,7 @@ async function submitClimate() {
               v-for="e in events"
               :key="e.id"
             >
-              <td>{{ e.occurred_at }}</td>
+              <td>{{ formatDateFr(e.occurred_at, true) }}</td>
               <td>{{ e.event_type }}</td>
               <td>{{ e.severity }}</td>
               <td>{{ e.title }}</td>

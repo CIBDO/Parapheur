@@ -78,6 +78,23 @@ export function useArchives() {
     },
     createTransfer: (body: Record<string, unknown>) => postJson('/archives/transfers', body),
     proposeFromDocument: (body: Record<string, unknown>) => postJson('/archives/propose', body),
+    digitizeBatch: async (form: FormData) => {
+      loading.value = true
+      error.value = null
+      try {
+        const { data, error: err, response } = await useApi('/archives/digitize/batch').post(form).json()
+        if (err.value || (response.value && response.value.status >= 400))
+          throw new Error(data.value?.message || 'Numérisation impossible')
+        return data.value
+      }
+      catch (e: any) {
+        error.value = e?.message || 'Erreur'
+        throw e
+      }
+      finally {
+        loading.value = false
+      }
+    },
     updateHybrid: (recordId: number, body: Record<string, unknown>) =>
       postJson(`/archives/records/${recordId}/hybrid`, body),
     restoreRecord: (recordId: number) => postJson(`/archives/records/${recordId}/restore`),
@@ -205,4 +222,23 @@ export const transferStatusColor = (status: string) => {
     case 'pris_en_charge': return 'info'
     default: return 'secondary'
   }
+}
+
+export const recordStatusLabels: Record<string, string> = {
+  en_versement: 'En versement',
+  conserve: 'Conservé',
+  communique: 'Communiqué',
+  elimine: 'Éliminé',
+  transfere: 'Transféré',
+}
+
+export function formatDateFr(value?: string | null, withTime = false) {
+  if (!value)
+    return '—'
+  const d = new Date(value)
+  if (Number.isNaN(d.getTime()))
+    return value
+  return withTime
+    ? d.toLocaleString('fr-FR')
+    : d.toLocaleDateString('fr-FR')
 }

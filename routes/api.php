@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\Archives\ArchiveBoxController;
 use App\Http\Controllers\Api\Archives\ArchiveClassificationController;
 use App\Http\Controllers\Api\Archives\ArchiveCommunicationController;
 use App\Http\Controllers\Api\Archives\ArchiveDashboardController;
+use App\Http\Controllers\Api\Archives\ArchiveDigitizeController;
 use App\Http\Controllers\Api\Archives\ArchiveDispositionController;
 use App\Http\Controllers\Api\Archives\ArchiveHoldController;
 use App\Http\Controllers\Api\Archives\ArchiveImportController;
@@ -240,6 +241,7 @@ Route::middleware(['auth:sanctum', 'auth.idle', 'password.changed'])->group(func
     // ——— Archives institutionnelles (SAE) ———
     Route::get('/archives/dashboard', ArchiveDashboardController::class);
     Route::post('/archives/propose', ArchiveProposeController::class);
+    Route::post('/archives/digitize/batch', [ArchiveDigitizeController::class, 'batch']);
     Route::get('/archives/transfers', [ArchiveTransferController::class, 'index']);
     Route::post('/archives/transfers', [ArchiveTransferController::class, 'store']);
     Route::get('/archives/transfers/{transfer}', [ArchiveTransferController::class, 'show']);

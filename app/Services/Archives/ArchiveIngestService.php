@@ -31,6 +31,9 @@ class ArchiveIngestService
      *   source_module?: string|null,
      *   source_ref?: string|null,
      *   medium?: string|null,
+     *   classification_node_id?: int|null,
+     *   fonds_id?: int|null,
+     *   series_id?: int|null,
      * }  $data
      */
     public function createTransfer(User $actor, array $data): ArchiveTransfer
@@ -52,8 +55,14 @@ class ArchiveIngestService
                     : 'electronique',
             ]);
 
+            $classification = array_filter([
+                'classification_node_id' => $data['classification_node_id'] ?? null,
+                'fonds_id' => $data['fonds_id'] ?? null,
+                'series_id' => $data['series_id'] ?? null,
+            ], fn ($v) => $v !== null && $v !== '');
+
             foreach (array_values($data['document_ids'] ?? []) as $index => $documentId) {
-                $this->attachDocument($transfer, (int) $documentId, $index);
+                $this->attachDocument($transfer, (int) $documentId, $index, $classification);
             }
 
             $this->audit->log('transfer.created', $transfer, $actor, [
@@ -173,8 +182,15 @@ class ArchiveIngestService
         return $result;
     }
 
-    private function attachDocument(ArchiveTransfer $transfer, int $documentId, int $sortOrder): ArchiveTransferItem
-    {
+    /**
+     * @param  array<string, mixed>  $extraMetadata
+     */
+    private function attachDocument(
+        ArchiveTransfer $transfer,
+        int $documentId,
+        int $sortOrder,
+        array $extraMetadata = [],
+    ): ArchiveTransferItem {
         $document = Document::query()->with(['officialVersion', 'latestVersion'])->findOrFail($documentId);
         $version = $document->officialVersion ?: $document->latestVersion;
 
@@ -187,10 +203,10 @@ class ArchiveIngestService
             'document_version_id' => $version?->id,
             'title' => $document->title ?: $document->object,
             'checksum' => $version?->checksum,
-            'metadata' => [
+            'metadata' => array_merge([
                 'reference' => $document->reference,
                 'origin' => $document->origin?->value ?? $document->origin,
-            ],
+            ], $extraMetadata),
             'sort_order' => $sortOrder,
         ]);
     }
@@ -206,6 +222,8 @@ class ArchiveIngestService
             $medium = 'electronique';
         }
 
+        $meta = is_array($item->metadata) ? $item->metadata : [];
+
         $record = ArchiveRecord::query()->create([
             'permanent_id' => $this->nextPermanentId(),
             'reference' => $document->reference,
@@ -215,6 +233,9 @@ class ArchiveIngestService
             'confidentiality' => $document->confidentiality?->value ?? (string) $document->confidentiality,
             'structure_id' => $transfer->structure_id,
             'producer_unit_id' => $transfer->producer_unit_id,
+            'fonds_id' => isset($meta['fonds_id']) ? (int) $meta['fonds_id'] : null,
+            'series_id' => isset($meta['series_id']) ? (int) $meta['series_id'] : null,
+            'classification_node_id' => isset($meta['classification_node_id']) ? (int) $meta['classification_node_id'] : null,
             'transfer_id' => $transfer->id,
             'document_id' => $document->id,
             'document_version_id' => $version?->id,

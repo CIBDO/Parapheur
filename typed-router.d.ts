@@ -50,7 +50,7 @@ declare module 'vue-router/auto-routes' {
     'archives-records-id': RouteRecordInfo<'archives-records-id', '/archives/records/:id', { id: ParamValue<true> }, { id: ParamValue<false> }>,
     'archives-sort-final': RouteRecordInfo<'archives-sort-final', '/archives/sort-final', Record<never, never>, Record<never, never>>,
     'archives-versements-id': RouteRecordInfo<'archives-versements-id', '/archives/versements/:id', { id: ParamValue<true> }, { id: ParamValue<false> }>,
-    'archives-versements-a-controler': RouteRecordInfo<'archives-versements-a-controler', '/archives/versements-a-controler', Record<never, never>, Record<never, never>>,
+    'archives-versements-controle': RouteRecordInfo<'archives-versements-controle', '/archives/versements-controle', Record<never, never>, Record<never, never>>,
     'change-password': RouteRecordInfo<'change-password', '/change-password', Record<never, never>, Record<never, never>>,
     'courrier': RouteRecordInfo<'courrier', '/courrier', Record<never, never>, Record<never, never>>,
     'courrier-a-affecter': RouteRecordInfo<'courrier-a-affecter', '/courrier/a-affecter', Record<never, never>, Record<never, never>>,

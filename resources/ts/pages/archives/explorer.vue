@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import ParapheurPageHeader from '@/components/parapheur/ParapheurPageHeader.vue'
-import { useArchives } from '@/composables/useArchives'
+import { formatDateFr, recordStatusLabels, useArchives } from '@/composables/useArchives'
 
 definePage({
   meta: { action: 'read', subject: 'Archives' },
@@ -19,6 +19,7 @@ const headers = [
   { title: 'Titre', key: 'title' },
   { title: 'Structure', key: 'structure' },
   { title: 'Statut', key: 'status' },
+  { title: 'Conservé le', key: 'conserved_at' },
   { title: '', key: 'actions', sortable: false },
 ]
 
@@ -46,8 +47,11 @@ onMounted(load)
           label="Rechercher"
           prepend-inner-icon="tabler-search"
           hide-details
+          clearable
           class="mb-4"
+          style="max-width: 420px"
           @keyup.enter="load"
+          @click:clear="() => { q = ''; load() }"
         />
         <VDataTableServer
           v-model:page="page"
@@ -59,7 +63,19 @@ onMounted(load)
           @update:options="({ page: p, itemsPerPage }: any) => { page = p; perPage = itemsPerPage }"
         >
           <template #item.structure="{ item }">
-            {{ item.structure?.code || '—' }}
+            {{ item.structure?.name || item.structure?.code || '—' }}
+          </template>
+          <template #item.status="{ item }">
+            <VChip
+              size="small"
+              label
+              color="secondary"
+            >
+              {{ recordStatusLabels[item.status] || item.status }}
+            </VChip>
+          </template>
+          <template #item.conserved_at="{ item }">
+            {{ formatDateFr(item.conserved_at) }}
           </template>
           <template #item.actions="{ item }">
             <VBtn
@@ -69,6 +85,11 @@ onMounted(load)
             >
               Ouvrir
             </VBtn>
+          </template>
+          <template #no-data>
+            <div class="text-medium-emphasis pa-4">
+              Aucune archive.
+            </div>
           </template>
         </VDataTableServer>
       </VCardText>

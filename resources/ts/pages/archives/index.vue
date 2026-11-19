@@ -14,7 +14,7 @@ const recent = ref<any[]>([])
 
 const cards = computed(() => [
   { key: 'records_total', title: 'Archives', icon: 'tabler-archive', color: 'primary', to: 'archives-explorer' },
-  { key: 'transfers_pending', title: 'À contrôler', icon: 'tabler-file-check', color: 'warning', to: 'archives-versements-a-controler' },
+  { key: 'transfers_pending', title: 'À contrôler', icon: 'tabler-file-check', color: 'warning', to: 'archives-versements-controle' },
   { key: 'transfers_mine', title: 'Mes versements', icon: 'tabler-upload', color: 'info', to: 'archives-mes-versements' },
   { key: 'records_conserved', title: 'Conservées', icon: 'tabler-lock', color: 'success', to: 'archives-explorer' },
 ])
@@ -128,7 +128,7 @@ onMounted(async () => {
               v-else
               class="text-medium-emphasis"
             >
-              Aucune archive consultable pour le moment.
+              Aucune archive récente.
             </div>
           </VCardText>
         </VCard>

@@ -598,6 +598,7 @@ declare module 'vue' {
     readonly formatCourrierDate: UnwrapRef<typeof import('./resources/ts/utils/courrierUi')['formatCourrierDate']>
     readonly formatCourrierDateTime: UnwrapRef<typeof import('./resources/ts/utils/courrierUi')['formatCourrierDateTime']>
     readonly formatDate: UnwrapRef<typeof import('./resources/ts/@core/utils/formatters')['formatDate']>
+    readonly formatDateFr: UnwrapRef<typeof import('./resources/ts/composables/useArchives')['formatDateFr']>
     readonly formatDateFr: UnwrapRef<typeof import('./resources/ts/utils/parapheurUi')['formatDateFr']>
     readonly formatDateTimeFr: UnwrapRef<typeof import('./resources/ts/utils/parapheurUi')['formatDateTimeFr']>
     readonly formatDateToMonthShort: UnwrapRef<typeof import('./resources/ts/@core/utils/formatters')['formatDateToMonthShort']>
