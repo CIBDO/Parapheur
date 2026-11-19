@@ -504,8 +504,9 @@ onMounted(async () => {
               variant="tonal"
               icon="tabler-mail"
             >
-              Chaque jour à 07:30, un email est envoyé aux producteurs dont les éléments du jour
-              n’ont pas encore été transmis. Aucun autre rappel automatique.
+              Chaque matin (à partir de 07:30, heure de Bamako), un email est envoyé aux producteurs
+              dont les éléments du jour n’ont pas encore été transmis. Aucun autre rappel automatique.
+              Nécessite le cron schedule:run et un SMTP réel (MAIL_MAILER=smtp).
             </VAlert>
           </div>
 

@@ -64,7 +64,7 @@ class ProductionDefinitionService
      */
     public function create(User $actor, array $data): ProductionObligation
     {
-        return DB::transaction(function () use ($actor, $data) {
+        $obligation = DB::transaction(function () use ($actor, $data) {
             $obligation = ProductionObligation::query()->create($this->mapFields($data, $actor));
             $this->syncActors($obligation, $data);
             $this->syncReminderRules($obligation, $data['reminder_rules'] ?? []);
@@ -73,6 +73,10 @@ class ProductionDefinitionService
 
             return $this->load($obligation);
         });
+
+        $this->bootstrapOccurrences($obligation, $actor);
+
+        return $this->load($obligation);
     }
 
     /**
@@ -97,7 +101,7 @@ class ProductionDefinitionService
 
     public function setActive(User $actor, ProductionObligation $obligation, bool $active): ProductionObligation
     {
-        return DB::transaction(function () use ($actor, $obligation, $active) {
+        $loaded = DB::transaction(function () use ($actor, $obligation, $active) {
             $before = ['is_active' => $obligation->is_active];
             $obligation->is_active = $active;
             $obligation->save();
@@ -108,6 +112,40 @@ class ProductionDefinitionService
 
             return $this->load($obligation);
         });
+
+        if ($active) {
+            $this->bootstrapOccurrences($loaded, $actor);
+        }
+
+        return $loaded;
+    }
+
+    /**
+     * Crée immédiatement l’occurrence du jour (si due) au lieu d’attendre le cron 00:15.
+     */
+    private function bootstrapOccurrences(ProductionObligation $obligation, User $actor): void
+    {
+        if (! $obligation->is_active) {
+            return;
+        }
+
+        try {
+            $date = now('Africa/Bamako')->startOfDay();
+            $occurrences = app(ProductionOccurrenceService::class);
+            $recurrence = app(RecurrenceService::class);
+            $fresh = $obligation->fresh(['actors', 'calendar', 'suspensions']) ?? $obligation;
+
+            if (! $recurrence->shouldGenerate($fresh, $date)) {
+                return;
+            }
+
+            $occurrence = $occurrences->createIfMissing($fresh, $date, $actor);
+            if ($occurrence->wasRecentlyCreated ?? false) {
+                app(ProductionFolderService::class)->attachToMatchingFolders($occurrence);
+            }
+        } catch (\Throwable $e) {
+            report($e);
+        }
     }
 
     /**

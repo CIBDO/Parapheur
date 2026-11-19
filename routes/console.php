@@ -55,13 +55,26 @@ Schedule::command('parapheur:purge-workspace-trash')
 
 Schedule::command('parapheur:generate-productions --sync')
     ->dailyAt('00:15')
+    ->timezone('Africa/Bamako')
     ->withoutOverlapping()
     ->appendOutputTo(storage_path('logs/production-generation.log'));
 
+// Fenêtre matinale (pas un créneau d’une seule minute) : sur hébergement partagé
+// le cron peut glisser de quelques minutes et rater dailyAt('07:30').
+// Le service déduplique déjà (1 mail / producteur / jour).
 Schedule::command('parapheur:remind-productions')
-    ->dailyAt('07:30')
+    ->everyFifteenMinutes()
+    ->between('07:30', '10:00')
+    ->timezone('Africa/Bamako')
     ->withoutOverlapping()
     ->appendOutputTo(storage_path('logs/production-reminders.log'));
+
+// Drain la file (mails ShouldQueue : transmissions productions, etc.).
+// Suffit avec le seul cron schedule:run ; le 2ᵉ cron queue:work reste optionnel.
+Schedule::command('queue:work --stop-when-empty --tries=3 --max-time=50')
+    ->everyMinute()
+    ->withoutOverlapping(5)
+    ->appendOutputTo(storage_path('logs/queue-work.log'));
 
 Schedule::command('parapheur:publish-announcements')
     ->everyMinute()
