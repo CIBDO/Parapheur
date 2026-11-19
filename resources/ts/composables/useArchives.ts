@@ -252,14 +252,3 @@ export const recordStatusLabels: Record<string, string> = {
   elimine: 'Éliminé',
   transfere: 'Transféré',
 }
-
-export function formatDateFr(value?: string | null, withTime = false) {
-  if (!value)
-    return '—'
-  const d = new Date(value)
-  if (Number.isNaN(d.getTime()))
-    return value
-  return withTime
-    ? d.toLocaleString('fr-FR')
-    : d.toLocaleDateString('fr-FR')
-}

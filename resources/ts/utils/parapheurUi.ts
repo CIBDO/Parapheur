@@ -126,14 +126,16 @@ export const priorityColor = (priority?: string) => {
   return 'secondary'
 }
 
-export const formatDateFr = (value?: string | null) => {
+export const formatDateFr = (value?: string | null, withTime = false) => {
   if (!value)
     return '—'
   const date = new Date(value)
   if (Number.isNaN(date.getTime()))
     return '—'
 
-  return date.toLocaleDateString('fr-FR')
+  return withTime
+    ? date.toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })
+    : date.toLocaleDateString('fr-FR')
 }
 
 export const formatDateTimeFr = (value?: string | null) => {

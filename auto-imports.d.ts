@@ -218,6 +218,7 @@ declare global {
   const reactiveOmit: typeof import('@vueuse/core')['reactiveOmit']
   const reactivePick: typeof import('@vueuse/core')['reactivePick']
   const readonly: typeof import('vue')['readonly']
+  const recordStatusLabels: typeof import('./resources/ts/composables/useArchives')['recordStatusLabels']
   const ref: typeof import('vue')['ref']
   const refAutoReset: typeof import('@vueuse/core')['refAutoReset']
   const refDebounced: typeof import('@vueuse/core')['refDebounced']
@@ -602,7 +603,6 @@ declare module 'vue' {
     readonly formatCourrierDate: UnwrapRef<typeof import('./resources/ts/utils/courrierUi')['formatCourrierDate']>
     readonly formatCourrierDateTime: UnwrapRef<typeof import('./resources/ts/utils/courrierUi')['formatCourrierDateTime']>
     readonly formatDate: UnwrapRef<typeof import('./resources/ts/@core/utils/formatters')['formatDate']>
-    readonly formatDateFr: UnwrapRef<typeof import('./resources/ts/composables/useArchives')['formatDateFr']>
     readonly formatDateFr: UnwrapRef<typeof import('./resources/ts/utils/parapheurUi')['formatDateFr']>
     readonly formatDateTimeFr: UnwrapRef<typeof import('./resources/ts/utils/parapheurUi')['formatDateTimeFr']>
     readonly formatDateToMonthShort: UnwrapRef<typeof import('./resources/ts/@core/utils/formatters')['formatDateToMonthShort']>
@@ -718,6 +718,7 @@ declare module 'vue' {
     readonly reactiveOmit: UnwrapRef<typeof import('@vueuse/core')['reactiveOmit']>
     readonly reactivePick: UnwrapRef<typeof import('@vueuse/core')['reactivePick']>
     readonly readonly: UnwrapRef<typeof import('vue')['readonly']>
+    readonly recordStatusLabels: UnwrapRef<typeof import('./resources/ts/composables/useArchives')['recordStatusLabels']>
     readonly ref: UnwrapRef<typeof import('vue')['ref']>
     readonly refAutoReset: UnwrapRef<typeof import('@vueuse/core')['refAutoReset']>
     readonly refDebounced: UnwrapRef<typeof import('@vueuse/core')['refDebounced']>

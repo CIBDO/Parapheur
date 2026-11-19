@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import ParapheurPageHeader from '@/components/parapheur/ParapheurPageHeader.vue'
-import { formatDateFr, useArchives } from '@/composables/useArchives'
+import { useArchives } from '@/composables/useArchives'
+import { formatDateFr } from '@/utils/parapheurUi'
 
 definePage({
   meta: { action: 'manage', subject: 'Archives' },
