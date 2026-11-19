@@ -2,7 +2,7 @@
 import ParapheurPageHeader from '@/components/parapheur/ParapheurPageHeader.vue'
 import { useArchives } from '@/composables/useArchives'
 
-definePage({ meta: { action: 'read', subject: 'Archives' } })
+definePage({ meta: { action: 'read', subject: 'ArchivesLoans' } })
 
 const { loading, fetchLoans, fetchBoxes, createLoan, validateLoan, checkoutLoan, returnLoan } = useArchives()
 const items = ref<any[]>([])

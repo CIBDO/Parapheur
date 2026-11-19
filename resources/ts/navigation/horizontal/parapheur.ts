@@ -232,14 +232,14 @@ export default [
         icon: { icon: 'tabler-building-warehouse' },
         to: '/archives/magasins',
         action: 'read',
-        subject: 'Archives',
+        subject: 'ArchivesLocations',
       },
       {
         title: 'Boîtes',
         icon: { icon: 'tabler-box' },
         to: '/archives/boites',
         action: 'read',
-        subject: 'Archives',
+        subject: 'ArchivesBoxes',
       },
       {
         title: 'Préservation',

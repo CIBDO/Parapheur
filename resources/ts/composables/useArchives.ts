@@ -118,6 +118,27 @@ export function useArchives() {
       return getJson(`/archives/locations/occupation${suffix}`)
     },
     createLocation: (body: Record<string, unknown>) => postJson('/archives/locations', body),
+    updateLocation: async (id: number, body: Record<string, unknown>) => {
+      loading.value = true
+      error.value = null
+      try {
+        const { data, error: err, response } = await useApi(`/archives/locations/${id}`).put(body).json()
+        if (err.value || (response.value && response.value.status >= 400))
+          throw new Error(data.value?.message || 'Mise à jour emplacement impossible')
+        return data.value
+      }
+      catch (e: any) {
+        error.value = e?.message || 'Erreur'
+        throw e
+      }
+      finally {
+        loading.value = false
+      }
+    },
+    fetchSeries: (fondsId?: number) => {
+      const suffix = fondsId ? `?fonds_id=${fondsId}` : ''
+      return getJson(`/archives/series${suffix}`)
+    },
     fetchBoxes: (params: Record<string, string | number | boolean> = {}) => {
       const qs = new URLSearchParams()
       Object.entries(params).forEach(([k, v]) => {

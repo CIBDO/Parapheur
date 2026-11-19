@@ -14,7 +14,18 @@
 | `archives.auditer` | Journaux |
 | `archives.administrer` | Admin plan / fonds |
 
-Permissions Phase 2+ (`gerer_magasins`, `proposer_elimination`, …) déclarées mais non exposées en UI avant livrables correspondants.
+Permissions Phase 2+ mappées CASL / menu :
+
+| Permission | Subject CASL |
+|------------|--------------|
+| `archives.gerer_magasins` / `gerer_emplacements` | `ArchivesLocations` |
+| `archives.gerer_boites` | `ArchivesBoxes` |
+| `archives.gerer_prets` | `ArchivesLoans` |
+| `archives.gerer_recolement` | `ArchivesInventory` |
+| `archives.gerer_conservation` | `ArchivesRetention` |
+| `archives.proposer/autoriser/executer_elimination` | `ArchivesDisposition` |
+| `archives.communiquer` | `ArchivesCommunications` |
+| `archives.exporter` | `export` sur `Archives` |
 
 ## Workflow versement
 

@@ -42,6 +42,12 @@ API : `POST /archives/digitize/batch` (`grouping`, `source_channel`, `piece_titl
 
 Ops caméra : `Permissions-Policy: camera=(self)` · Scanner : `VITE_DYNAMSOFT_LICENSE`
 
+## Recherche
+
+UI `/archives/recherche` — filtres métadonnées combinables (pas de plein texte PDF).
+
+API : `GET /archives/records` avec `q`, `status`, `structure_id`, `fonds_id`, `series_id`, `typology`, `medium`, `box_id`, `location_id`, `date_from`, `date_to`.
+
 ## Ops checklist
 
 1. `php artisan migrate`
@@ -49,8 +55,8 @@ Ops caméra : `Permissions-Policy: camera=(self)` · Scanner : `VITE_DYNAMSOFT_L
 3. Configurer `.env` : `ARCHIVES_*`, optionnellement S3 + `ARCHIVES_OBJECT_LOCK=true`
 4. Schedule : `archives:verify-integrity` (quotidien)
 5. Optionnel : installer Ghostscript pour migration PDF/A
-6. Smoke UI : GED « Proposer au SAE », Import, Conservation préventive, Préservation
+6. Smoke UI : GED « Proposer au SAE », Recherche avancée, Magasins, Import, Conservation préventive, Préservation
 
 ## Hors scope assumé
 
-- Capteurs IoT, provisionnement bucket Object Lock, tableau de gestion officiel Mali (délais).
+- Capteurs IoT, provisionnement bucket Object Lock, tableau de gestion officiel Mali (délais), indexation plein texte PDF.

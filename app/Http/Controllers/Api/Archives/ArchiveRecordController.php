@@ -22,7 +22,19 @@ class ArchiveRecordController extends Controller
 
         $page = $this->search->searchRecords(
             $request->user(),
-            $request->only(['status', 'structure_id', 'fonds_id', 'series_id', 'q']),
+            $request->only([
+                'status',
+                'structure_id',
+                'fonds_id',
+                'series_id',
+                'typology',
+                'medium',
+                'box_id',
+                'location_id',
+                'date_from',
+                'date_to',
+                'q',
+            ]),
             (int) $request->integer('per_page', 15)
         );
 

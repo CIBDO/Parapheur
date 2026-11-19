@@ -63,6 +63,14 @@ class AbilityMapper
             ['action' => 'manage', 'subject' => 'GedAdmin'],
             ['action' => 'manage', 'subject' => 'Archives'],
             ['action' => 'manage', 'subject' => 'ArchivesAdmin'],
+            ['action' => 'export', 'subject' => 'Archives'],
+            ['action' => 'manage', 'subject' => 'ArchivesLocations'],
+            ['action' => 'manage', 'subject' => 'ArchivesBoxes'],
+            ['action' => 'manage', 'subject' => 'ArchivesLoans'],
+            ['action' => 'manage', 'subject' => 'ArchivesInventory'],
+            ['action' => 'manage', 'subject' => 'ArchivesRetention'],
+            ['action' => 'manage', 'subject' => 'ArchivesDisposition'],
+            ['action' => 'manage', 'subject' => 'ArchivesCommunications'],
             ['action' => 'manage', 'subject' => 'Workspace'],
             ['action' => 'manage', 'subject' => 'WorkspaceAdmin'],
             ['action' => 'manage', 'subject' => 'Library'],
@@ -246,9 +254,67 @@ class AbilityMapper
             'archives.classer' => [
                 ['action' => 'update', 'subject' => 'Archives'],
             ],
+            'archives.communiquer' => [
+                ['action' => 'create', 'subject' => 'ArchivesCommunications'],
+                ['action' => 'read', 'subject' => 'ArchivesCommunications'],
+            ],
+            'archives.gerer_conservation' => [
+                ['action' => 'manage', 'subject' => 'ArchivesRetention'],
+                ['action' => 'read', 'subject' => 'ArchivesRetention'],
+            ],
+            'archives.proposer_elimination' => [
+                ['action' => 'create', 'subject' => 'ArchivesDisposition'],
+                ['action' => 'read', 'subject' => 'ArchivesDisposition'],
+            ],
+            'archives.autoriser_elimination' => [
+                ['action' => 'validate', 'subject' => 'ArchivesDisposition'],
+                ['action' => 'read', 'subject' => 'ArchivesDisposition'],
+            ],
+            'archives.executer_elimination' => [
+                ['action' => 'manage', 'subject' => 'ArchivesDisposition'],
+                ['action' => 'read', 'subject' => 'ArchivesDisposition'],
+            ],
+            'archives.gerer_magasins' => [
+                ['action' => 'manage', 'subject' => 'ArchivesLocations'],
+                ['action' => 'read', 'subject' => 'ArchivesLocations'],
+            ],
+            'archives.gerer_emplacements' => [
+                ['action' => 'manage', 'subject' => 'ArchivesLocations'],
+                ['action' => 'read', 'subject' => 'ArchivesLocations'],
+            ],
+            'archives.gerer_boites' => [
+                ['action' => 'manage', 'subject' => 'ArchivesBoxes'],
+                ['action' => 'read', 'subject' => 'ArchivesBoxes'],
+            ],
+            'archives.gerer_prets' => [
+                ['action' => 'manage', 'subject' => 'ArchivesLoans'],
+                ['action' => 'read', 'subject' => 'ArchivesLoans'],
+            ],
+            'archives.gerer_recolement' => [
+                ['action' => 'manage', 'subject' => 'ArchivesInventory'],
+                ['action' => 'read', 'subject' => 'ArchivesInventory'],
+            ],
+            'archives.exporter' => [
+                ['action' => 'export', 'subject' => 'Archives'],
+            ],
             'archives.administrer' => [
                 ['action' => 'manage', 'subject' => 'Archives'],
                 ['action' => 'manage', 'subject' => 'ArchivesAdmin'],
+                ['action' => 'export', 'subject' => 'Archives'],
+                ['action' => 'read', 'subject' => 'ArchivesLocations'],
+                ['action' => 'manage', 'subject' => 'ArchivesLocations'],
+                ['action' => 'read', 'subject' => 'ArchivesBoxes'],
+                ['action' => 'manage', 'subject' => 'ArchivesBoxes'],
+                ['action' => 'read', 'subject' => 'ArchivesLoans'],
+                ['action' => 'manage', 'subject' => 'ArchivesLoans'],
+                ['action' => 'read', 'subject' => 'ArchivesInventory'],
+                ['action' => 'manage', 'subject' => 'ArchivesInventory'],
+                ['action' => 'read', 'subject' => 'ArchivesRetention'],
+                ['action' => 'manage', 'subject' => 'ArchivesRetention'],
+                ['action' => 'read', 'subject' => 'ArchivesDisposition'],
+                ['action' => 'manage', 'subject' => 'ArchivesDisposition'],
+                ['action' => 'read', 'subject' => 'ArchivesCommunications'],
+                ['action' => 'create', 'subject' => 'ArchivesCommunications'],
             ],
             'workspace.create_shared' => [
                 ['action' => 'create', 'subject' => 'Workspace'],

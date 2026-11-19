@@ -232,8 +232,10 @@ declare global {
   const resolveUnref: typeof import('@vueuse/core')['resolveUnref']
   const resolveVuetifyTheme: typeof import('./resources/ts/@core/utils/vuetify')['resolveVuetifyTheme']
   const rgbaToHex: typeof import('./resources/ts/@core/utils/colorConverter')['rgbaToHex']
+  const runQc: typeof import('./resources/ts/composables/useDigitizeQc')['runQc']
   const setActivePinia: typeof import('pinia')['setActivePinia']
   const setMapStoreSuffix: typeof import('pinia')['setMapStoreSuffix']
+  const sha256Hex: typeof import('./resources/ts/composables/useDigitizeQc')['sha256Hex']
   const shallowReactive: typeof import('vue')['shallowReactive']
   const shallowReadonly: typeof import('vue')['shallowReadonly']
   const shallowRef: typeof import('vue')['shallowRef']
@@ -345,6 +347,8 @@ declare global {
   const useDeviceOrientation: typeof import('@vueuse/core')['useDeviceOrientation']
   const useDevicePixelRatio: typeof import('@vueuse/core')['useDevicePixelRatio']
   const useDevicesList: typeof import('@vueuse/core')['useDevicesList']
+  const useDigitizeCamera: typeof import('./resources/ts/composables/useDigitizeCamera')['useDigitizeCamera']
+  const useDigitizeScanner: typeof import('./resources/ts/composables/useDigitizeScanner')['useDigitizeScanner']
   const useDisplayMedia: typeof import('@vueuse/core')['useDisplayMedia']
   const useDocumentVisibility: typeof import('@vueuse/core')['useDocumentVisibility']
   const useDraggable: typeof import('@vueuse/core')['useDraggable']
@@ -728,8 +732,10 @@ declare module 'vue' {
     readonly resolveUnref: UnwrapRef<typeof import('@vueuse/core')['resolveUnref']>
     readonly resolveVuetifyTheme: UnwrapRef<typeof import('./resources/ts/@core/utils/vuetify')['resolveVuetifyTheme']>
     readonly rgbaToHex: UnwrapRef<typeof import('./resources/ts/@core/utils/colorConverter')['rgbaToHex']>
+    readonly runQc: UnwrapRef<typeof import('./resources/ts/composables/useDigitizeQc')['runQc']>
     readonly setActivePinia: UnwrapRef<typeof import('pinia')['setActivePinia']>
     readonly setMapStoreSuffix: UnwrapRef<typeof import('pinia')['setMapStoreSuffix']>
+    readonly sha256Hex: UnwrapRef<typeof import('./resources/ts/composables/useDigitizeQc')['sha256Hex']>
     readonly shallowReactive: UnwrapRef<typeof import('vue')['shallowReactive']>
     readonly shallowReadonly: UnwrapRef<typeof import('vue')['shallowReadonly']>
     readonly shallowRef: UnwrapRef<typeof import('vue')['shallowRef']>
@@ -839,6 +845,8 @@ declare module 'vue' {
     readonly useDeviceOrientation: UnwrapRef<typeof import('@vueuse/core')['useDeviceOrientation']>
     readonly useDevicePixelRatio: UnwrapRef<typeof import('@vueuse/core')['useDevicePixelRatio']>
     readonly useDevicesList: UnwrapRef<typeof import('@vueuse/core')['useDevicesList']>
+    readonly useDigitizeCamera: UnwrapRef<typeof import('./resources/ts/composables/useDigitizeCamera')['useDigitizeCamera']>
+    readonly useDigitizeScanner: UnwrapRef<typeof import('./resources/ts/composables/useDigitizeScanner')['useDigitizeScanner']>
     readonly useDisplayMedia: UnwrapRef<typeof import('@vueuse/core')['useDisplayMedia']>
     readonly useDocumentVisibility: UnwrapRef<typeof import('@vueuse/core')['useDocumentVisibility']>
     readonly useDraggable: UnwrapRef<typeof import('@vueuse/core')['useDraggable']>

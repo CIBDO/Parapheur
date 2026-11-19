@@ -77,6 +77,17 @@ export const canNavigate = (to: RouteLocationNormalized) => {
       return true;
   }
 
+  if (subject === 'ArchivesLocations' || subject === 'ArchivesBoxes' || subject === 'ArchivesLoans'
+    || subject === 'ArchivesInventory' || subject === 'ArchivesRetention' || subject === 'ArchivesDisposition'
+    || subject === 'ArchivesCommunications') {
+    if (ability.can('manage', subject) || ability.can('read', subject) || ability.can('manage', 'Archives'))
+      return true;
+  }
+  if (subject === 'Archives' && action === 'export') {
+    if (ability.can('export', 'Archives') || ability.can('manage', 'Archives'))
+      return true;
+  }
+
   return to.matched.some(route => {
     const a = route.meta.action;
     const s = route.meta.subject;

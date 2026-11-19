@@ -50,13 +50,15 @@ class ArchiveSearchService
     }
 
     /**
+     * Recherche métadonnées (pas de plein texte PDF).
+     *
      * @param  array<string, mixed>  $filters
      * @return LengthAwarePaginator<int, ArchiveRecord>
      */
     public function searchRecords(User $user, array $filters = [], int $perPage = 15): LengthAwarePaginator
     {
         $query = ArchiveRecord::query()
-            ->with(['structure', 'fonds', 'series', 'classificationNode', 'document'])
+            ->with(['structure', 'fonds', 'series', 'classificationNode', 'document', 'box', 'location'])
             ->orderByDesc('conserved_at')
             ->orderByDesc('id');
 
@@ -78,13 +80,60 @@ class ArchiveSearchService
             $query->where('series_id', (int) $filters['series_id']);
         }
 
+        if (! empty($filters['typology'])) {
+            $query->where('typology', 'like', '%'.trim((string) $filters['typology']).'%');
+        }
+
+        if (! empty($filters['medium'])) {
+            $query->where('medium', (string) $filters['medium']);
+        }
+
+        if (! empty($filters['box_id'])) {
+            $query->where('box_id', (int) $filters['box_id']);
+        }
+
+        if (! empty($filters['location_id'])) {
+            $query->where('location_id', (int) $filters['location_id']);
+        }
+
+        if (! empty($filters['date_from'])) {
+            $query->where(function ($builder) use ($filters) {
+                $from = (string) $filters['date_from'];
+                $builder->whereDate('date_end', '>=', $from)
+                    ->orWhere(function ($q) use ($from) {
+                        $q->whereNull('date_end')->whereDate('date_start', '>=', $from);
+                    });
+            });
+        }
+
+        if (! empty($filters['date_to'])) {
+            $query->where(function ($builder) use ($filters) {
+                $to = (string) $filters['date_to'];
+                $builder->whereDate('date_start', '<=', $to)
+                    ->orWhere(function ($q) use ($to) {
+                        $q->whereNull('date_start')->whereDate('date_end', '<=', $to);
+                    });
+            });
+        }
+
         if (! empty($filters['q'])) {
             $q = '%'.trim((string) $filters['q']).'%';
             $query->where(function ($builder) use ($q) {
                 $builder->where('title', 'like', $q)
                     ->orWhere('reference', 'like', $q)
                     ->orWhere('permanent_id', 'like', $q)
-                    ->orWhere('description', 'like', $q);
+                    ->orWhere('description', 'like', $q)
+                    ->orWhere('physical_reference', 'like', $q)
+                    ->orWhere('typology', 'like', $q)
+                    ->orWhereHas('box', fn ($box) => $box->where('code', 'like', $q))
+                    ->orWhereHas('location', fn ($loc) => $loc->where('full_code', 'like', $q)
+                        ->orWhere('name', 'like', $q))
+                    ->orWhereHas('document', function ($doc) use ($q) {
+                        $doc->where('keywords', 'like', $q)
+                            ->orWhere('title', 'like', $q)
+                            ->orWhere('object', 'like', $q)
+                            ->orWhere('reference', 'like', $q);
+                    });
             });
         }
 

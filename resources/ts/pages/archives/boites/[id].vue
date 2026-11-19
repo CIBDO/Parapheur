@@ -3,7 +3,7 @@ import ParapheurPageHeader from '@/components/parapheur/ParapheurPageHeader.vue'
 import { useArchives } from '@/composables/useArchives'
 
 definePage({
-  meta: { action: 'read', subject: 'Archives' },
+  meta: { action: 'read', subject: 'ArchivesBoxes' },
 })
 
 const route = useRoute()

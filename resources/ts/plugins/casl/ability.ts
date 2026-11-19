@@ -1,6 +1,6 @@
 import { createMongoAbility } from '@casl/ability'
 
-export type Actions = 'create' | 'read' | 'update' | 'delete' | 'manage' | 'validate' | 'vise' | 'act' | 'transmit' | 'pilot'
+export type Actions = 'create' | 'read' | 'update' | 'delete' | 'manage' | 'validate' | 'vise' | 'act' | 'transmit' | 'pilot' | 'export'
 
 export type Subjects =
   | 'all'
@@ -33,6 +33,13 @@ export type Subjects =
   | 'GedAdmin'
   | 'Archives'
   | 'ArchivesAdmin'
+  | 'ArchivesLocations'
+  | 'ArchivesBoxes'
+  | 'ArchivesLoans'
+  | 'ArchivesInventory'
+  | 'ArchivesRetention'
+  | 'ArchivesDisposition'
+  | 'ArchivesCommunications'
   | 'Workspace'
   | 'WorkspaceAdmin'
   | 'Library'

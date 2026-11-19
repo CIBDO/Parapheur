@@ -2,12 +2,25 @@
 import ParapheurPageHeader from '@/components/parapheur/ParapheurPageHeader.vue'
 import { useArchives } from '@/composables/useArchives'
 
-definePage({ meta: { action: 'read', subject: 'Archives' } })
+definePage({ meta: { action: 'export', subject: 'Archives' } })
 
 const { loading, fetchResponsibleReport, fetchDgReport, exportMetadata } = useArchives()
 const responsible = ref<Record<string, any>>({})
 const dg = ref<Record<string, any> | null>(null)
 const exportCount = ref<number | null>(null)
+
+const metricLabels: Record<string, string> = {
+  records_total: 'Archives totales',
+  boxes_total: 'Boîtes',
+  transfers_pending: 'Versements en attente',
+  retention_due: 'Échéances de conservation',
+  holds_active: 'Gels actifs',
+  dispositions_pending: 'Sorts finaux en cours',
+  loans_open: 'Prêts ouverts',
+  locations_saturated: 'Emplacements saturés',
+}
+
+const metricKeys = Object.keys(metricLabels)
 
 onMounted(async () => {
   responsible.value = await fetchResponsibleReport()
@@ -36,6 +49,7 @@ async function doExport() {
         <VBtn
           color="primary"
           variant="tonal"
+          :loading="loading"
           @click="doExport"
         >
           Exporter métadonnées
@@ -43,9 +57,9 @@ async function doExport() {
       </template>
     </ParapheurPageHeader>
 
-    <VRow :loading="loading">
+    <VRow>
       <VCol
-        v-for="key in ['records_total', 'boxes_total', 'transfers_pending', 'retention_due', 'holds_active', 'dispositions_pending', 'loans_open', 'locations_saturated']"
+        v-for="key in metricKeys"
         :key="key"
         cols="12"
         sm="6"
@@ -54,10 +68,65 @@ async function doExport() {
         <VCard class="parapheur-section-card">
           <VCardText>
             <div class="text-caption text-medium-emphasis">
-              {{ key }}
+              {{ metricLabels[key] }}
             </div>
             <div class="text-h5">
               {{ responsible[key] ?? 0 }}
+            </div>
+          </VCardText>
+        </VCard>
+      </VCol>
+    </VRow>
+
+    <VRow class="mt-2">
+      <VCol
+        cols="12"
+        md="6"
+      >
+        <VCard class="parapheur-section-card">
+          <VCardItem>
+            <VCardTitle>Par typologie</VCardTitle>
+          </VCardItem>
+          <VCardText>
+            <VList v-if="(responsible.by_typology || []).length">
+              <VListItem
+                v-for="row in responsible.by_typology"
+                :key="row.typology || 'sans'"
+                :title="row.typology || 'Non renseignée'"
+                :subtitle="`${row.total} archive(s)`"
+              />
+            </VList>
+            <div
+              v-else
+              class="text-medium-emphasis"
+            >
+              Aucune répartition.
+            </div>
+          </VCardText>
+        </VCard>
+      </VCol>
+      <VCol
+        cols="12"
+        md="6"
+      >
+        <VCard class="parapheur-section-card">
+          <VCardItem>
+            <VCardTitle>Par structure</VCardTitle>
+          </VCardItem>
+          <VCardText>
+            <VList v-if="(responsible.by_structure || []).length">
+              <VListItem
+                v-for="row in responsible.by_structure"
+                :key="row.structure_id"
+                :title="row.structure?.name || row.structure?.code || `Structure #${row.structure_id}`"
+                :subtitle="`${row.total} archive(s)`"
+              />
+            </VList>
+            <div
+              v-else
+              class="text-medium-emphasis"
+            >
+              Aucune répartition.
             </div>
           </VCardText>
         </VCard>

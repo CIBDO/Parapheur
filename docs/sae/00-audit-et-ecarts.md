@@ -21,6 +21,9 @@
 - Import CSV (preview / commit), conservation préventive manuelle
 - Support hybride (`medium`, `physical_reference`)
 - Disks `archives` / `archives_replica` S3-ready + `ARCHIVES_OBJECT_LOCK`
+- Recherche avancée **métadonnées** (filtres statut/structure/fonds/série/typologie/support/boîte/emplacement/période + `q` cote/boîte/mots-clés document)
+- UI magasins arborescente + édition capacités ; dashboard/rapports enrichis
+- Permissions Phase 2+ mappées CASL (`ArchivesLocations`, `ArchivesBoxes`, `ArchivesLoans`, …) et menu filtré
 
 ## Écarts résiduels (hors code / ops)
 
@@ -28,3 +31,4 @@
 - Délais de rétention Mali : saisie métier (templates non validés, délais à 0)
 - Capteurs IoT climatiques : API manuelle seulement
 - Conversion PDF/A : nécessite Ghostscript (`gs`) sur le serveur
+- Plein texte PDF (contenu binaire) : hors scope actuel (métadonnées seulement)

@@ -4,6 +4,8 @@ namespace Tests\Feature;
 
 use App\Enums\DocumentOrigin;
 use App\Enums\DocumentStatus;
+use App\Models\ArchiveRecord;
+use App\Models\ArchiveStorageLocation;
 use App\Models\ArchiveTransfer;
 use App\Models\Document;
 use App\Models\DocumentType;
@@ -118,5 +120,113 @@ class ArchivesModuleTest extends TestCase
         $this->assertTrue(
             ArchiveTransfer::query()->count() >= 0
         );
+    }
+
+    public function test_records_metadata_search_filters_typology_medium_and_location(): void
+    {
+        $admin = User::query()->where('email', 'admin@dgtcp.local')->firstOrFail();
+        $agent = User::query()->where('email', 'agent.dsi@dgtcp.local')->firstOrFail();
+        $structure = Structure::query()->where('code', 'DSI')->firstOrFail();
+        $type = DocumentType::query()->firstOrFail();
+
+        $location = ArchiveStorageLocation::query()->create([
+            'structure_id' => $structure->id,
+            'type' => 'room',
+            'code' => 'SAL-RCH',
+            'name' => 'Salle recherche',
+            'full_code' => 'SAL-RCH',
+            'status' => 'disponible',
+            'capacity_boxes' => 10,
+            'occupied_boxes' => 0,
+            'is_active' => true,
+        ]);
+
+        $makeDoc = function (string $ref) use ($agent, $structure, $type) {
+            $document = Document::query()->create([
+                'reference' => $ref,
+                'object' => $ref,
+                'title' => $ref,
+                'document_type_id' => $type->id,
+                'structure_id' => $structure->id,
+                'author_id' => $agent->id,
+                'status' => DocumentStatus::Valide->value,
+                'priority' => 'normale',
+                'confidentiality' => 'normal',
+                'expected_action' => 'consultation',
+                'origin' => DocumentOrigin::Ged->value,
+                'document_date' => now()->toDateString(),
+                'current_version' => 1,
+                'archive_status' => 'actif',
+                'keywords' => ['budget', 'exercice'],
+            ]);
+            DocumentVersion::query()->create([
+                'document_id' => $document->id,
+                'version_number' => 1,
+                'disk' => 'local',
+                'path' => 'documents/test/'.$ref.'.pdf',
+                'original_name' => $ref.'.pdf',
+                'mime_type' => 'application/pdf',
+                'size' => 100,
+                'checksum' => hash('sha256', $ref),
+                'uploaded_by' => $agent->id,
+                'is_official' => true,
+            ]);
+
+            return $document;
+        };
+
+        $docMatch = $makeDoc('GED-SAE-RCH-OK');
+        $docOther = $makeDoc('GED-SAE-RCH-NO');
+
+        foreach ([$docMatch, $docOther] as $document) {
+            $create = $this->actingAs($agent, 'sanctum')
+                ->postJson('/api/archives/transfers', [
+                    'structure_id' => $structure->id,
+                    'title' => 'Versement '.$document->reference,
+                    'document_ids' => [$document->id],
+                ])
+                ->assertCreated();
+            $tid = $create->json('id');
+            $this->actingAs($agent, 'sanctum')->postJson("/api/archives/transfers/{$tid}/submit")->assertOk();
+            $this->actingAs($admin, 'sanctum')->postJson("/api/archives/transfers/{$tid}/accept")->assertOk();
+            $this->actingAs($admin, 'sanctum')->postJson("/api/archives/transfers/{$tid}/take-over")->assertOk();
+        }
+
+        $recordMatch = ArchiveRecord::query()->where('document_id', $docMatch->id)->firstOrFail();
+        $recordMatch->fill([
+            'typology' => 'courrier',
+            'medium' => 'hybride',
+            'location_id' => $location->id,
+            'physical_reference' => 'COT-RCH-01',
+            'date_start' => '2024-01-01',
+            'date_end' => '2024-12-31',
+        ])->save();
+
+        $recordOther = ArchiveRecord::query()->where('document_id', $docOther->id)->firstOrFail();
+        $recordOther->fill([
+            'typology' => 'dossier',
+            'medium' => 'electronique',
+        ])->save();
+
+        $this->actingAs($admin, 'sanctum')
+            ->getJson('/api/archives/records?typology=courrier&medium=hybride&location_id='.$location->id)
+            ->assertOk()
+            ->assertJsonFragment(['id' => $recordMatch->id])
+            ->assertJsonMissing(['id' => $recordOther->id]);
+
+        $this->actingAs($admin, 'sanctum')
+            ->getJson('/api/archives/records?q=COT-RCH')
+            ->assertOk()
+            ->assertJsonFragment(['id' => $recordMatch->id]);
+
+        $this->actingAs($admin, 'sanctum')
+            ->getJson('/api/archives/records?q=SAL-RCH')
+            ->assertOk()
+            ->assertJsonFragment(['id' => $recordMatch->id]);
+
+        $this->actingAs($admin, 'sanctum')
+            ->getJson('/api/archives/records?date_from=2024-06-01&date_to=2024-06-30')
+            ->assertOk()
+            ->assertJsonFragment(['id' => $recordMatch->id]);
     }
 }
