@@ -122,6 +122,24 @@ class ArchiveLocationController extends Controller
         return response()->json($this->locations->update($request->user(), $location, $data));
     }
 
+    public function destroy(Request $request, ArchiveStorageLocation $location): JsonResponse
+    {
+        abort_unless(
+            $request->user()->can('archives.gerer_emplacements')
+            || $request->user()->can('archives.administrer')
+            || $request->user()->can('admin.access'),
+            403
+        );
+
+        try {
+            $this->locations->delete($request->user(), $location);
+        } catch (InvalidArgumentException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+
+        return response()->json(['ok' => true]);
+    }
+
     public function occupation(Request $request): JsonResponse
     {
         abort_unless($this->access->canViewModule($request->user()), 403);

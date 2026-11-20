@@ -81,6 +81,16 @@ class ArchiveLocationService
         return $location->fresh(['parent', 'structure', 'children']);
     }
 
+    public function delete(User $actor, ArchiveStorageLocation $location): void
+    {
+        if ($location->children()->exists() || $location->boxes()->exists()) {
+            throw new InvalidArgumentException('Impossible de supprimer un emplacement ayant des enfants ou des boîtes.');
+        }
+
+        $this->audit->log('location.deleted', $location, $actor);
+        $location->delete();
+    }
+
     public function assertCapacity(ArchiveStorageLocation $location, bool $allowOverride = false): void
     {
         if ($allowOverride) {

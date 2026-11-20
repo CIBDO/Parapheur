@@ -57,6 +57,66 @@ class ArchiveClassificationService
     /**
      * @param  array<string, mixed>  $data
      */
+    public function updateFonds(User $actor, ArchiveFonds $fonds, array $data): ArchiveFonds
+    {
+        $fonds->fill([
+            'code' => array_key_exists('code', $data) ? strtoupper(trim((string) $data['code'])) : $fonds->code,
+            'name' => $data['name'] ?? $fonds->name,
+            'description' => array_key_exists('description', $data) ? $data['description'] : $fonds->description,
+            'structure_id' => array_key_exists('structure_id', $data) ? $data['structure_id'] : $fonds->structure_id,
+            'is_active' => array_key_exists('is_active', $data) ? (bool) $data['is_active'] : $fonds->is_active,
+            'sort_order' => $data['sort_order'] ?? $fonds->sort_order,
+        ])->save();
+
+        $this->audit->log('fonds.updated', $fonds, $actor);
+
+        return $fonds->fresh(['series', 'structure']);
+    }
+
+    public function deleteFonds(User $actor, ArchiveFonds $fonds): void
+    {
+        if ($fonds->series()->exists() || $fonds->records()->exists()
+            || ArchiveClassificationNode::query()->where('fonds_id', $fonds->id)->exists()) {
+            throw new InvalidArgumentException('Impossible de supprimer un fonds lié à des séries, nœuds ou archives.');
+        }
+
+        $this->audit->log('fonds.deleted', $fonds, $actor);
+        $fonds->delete();
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    public function updateSeries(User $actor, ArchiveSeries $series, array $data): ArchiveSeries
+    {
+        $series->fill([
+            'fonds_id' => array_key_exists('fonds_id', $data) ? (int) $data['fonds_id'] : $series->fonds_id,
+            'code' => array_key_exists('code', $data) ? strtoupper(trim((string) $data['code'])) : $series->code,
+            'name' => $data['name'] ?? $series->name,
+            'description' => array_key_exists('description', $data) ? $data['description'] : $series->description,
+            'is_active' => array_key_exists('is_active', $data) ? (bool) $data['is_active'] : $series->is_active,
+            'sort_order' => $data['sort_order'] ?? $series->sort_order,
+        ])->save();
+
+        $this->audit->log('series.updated', $series, $actor);
+
+        return $series->fresh(['fonds']);
+    }
+
+    public function deleteSeries(User $actor, ArchiveSeries $series): void
+    {
+        if ($series->records()->exists()
+            || ArchiveClassificationNode::query()->where('series_id', $series->id)->exists()) {
+            throw new InvalidArgumentException('Impossible de supprimer une série liée à des nœuds ou archives.');
+        }
+
+        $this->audit->log('series.deleted', $series, $actor);
+        $series->delete();
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
     public function createNode(User $actor, array $data): ArchiveClassificationNode
     {
         return DB::transaction(function () use ($actor, $data) {

@@ -42,11 +42,52 @@ export function useArchives() {
     }
   }
 
+  async function putJson<T = any>(url: string, body: Record<string, unknown> = {}): Promise<T> {
+    loading.value = true
+    error.value = null
+    try {
+      const { data, error: err, response } = await useApi(url).put(body).json()
+      if (err.value || (response.value && response.value.status >= 400)) {
+        throw new Error(data.value?.message || 'Erreur API archives')
+      }
+      return data.value as T
+    }
+    catch (e: any) {
+      error.value = e?.message || 'Erreur'
+      throw e
+    }
+    finally {
+      loading.value = false
+    }
+  }
+
+  async function deleteJson<T = any>(url: string): Promise<T> {
+    loading.value = true
+    error.value = null
+    try {
+      const { data, error: err, response } = await useApi(url).delete().json()
+      if (err.value || (response.value && response.value.status >= 400)) {
+        throw new Error(data.value?.message || 'Erreur API archives')
+      }
+      return data.value as T
+    }
+    catch (e: any) {
+      error.value = e?.message || 'Erreur'
+      throw e
+    }
+    finally {
+      loading.value = false
+    }
+  }
+
   return {
     loading,
     error,
     getJson,
     postJson,
+    putJson,
+    deleteJson,
+    fetchMetaOptions: () => getJson('/archives/meta/options'),
     fetchDashboard: () => getJson('/archives/dashboard'),
     fetchTransfers: (params: Record<string, string | number | boolean> = {}) => {
       const qs = new URLSearchParams()
@@ -66,7 +107,13 @@ export function useArchives() {
       const suffix = qs.toString() ? `?${qs}` : ''
       return getJson(`/archives/records${suffix}`)
     },
-    fetchFonds: () => getJson('/archives/fonds'),
+    fetchFonds: (activeOnly = true) => getJson(`/archives/fonds?active_only=${activeOnly ? 1 : 0}`),
+    createFonds: (body: Record<string, unknown>) => postJson('/archives/fonds', body),
+    updateFonds: (id: number, body: Record<string, unknown>) => putJson(`/archives/fonds/${id}`, body),
+    deleteFonds: (id: number) => deleteJson(`/archives/fonds/${id}`),
+    createSeries: (body: Record<string, unknown>) => postJson('/archives/series', body),
+    updateSeries: (id: number, body: Record<string, unknown>) => putJson(`/archives/series/${id}`, body),
+    deleteSeries: (id: number) => deleteJson(`/archives/series/${id}`),
     fetchNodes: (params: Record<string, string | number | boolean> = {}) => {
       const qs = new URLSearchParams()
       Object.entries(params).forEach(([k, v]) => {
@@ -76,6 +123,9 @@ export function useArchives() {
       const suffix = qs.toString() ? `?${qs}` : ''
       return getJson(`/archives/classification-nodes${suffix}`)
     },
+    createNode: (body: Record<string, unknown>) => postJson('/archives/classification-nodes', body),
+    updateNode: (id: number, body: Record<string, unknown>) => putJson(`/archives/classification-nodes/${id}`, body),
+    deleteNode: (id: number) => deleteJson(`/archives/classification-nodes/${id}`),
     createTransfer: (body: Record<string, unknown>) => postJson('/archives/transfers', body),
     proposeFromDocument: (body: Record<string, unknown>) => postJson('/archives/propose', body),
     digitizeBatch: async (form: FormData) => {
@@ -118,23 +168,8 @@ export function useArchives() {
       return getJson(`/archives/locations/occupation${suffix}`)
     },
     createLocation: (body: Record<string, unknown>) => postJson('/archives/locations', body),
-    updateLocation: async (id: number, body: Record<string, unknown>) => {
-      loading.value = true
-      error.value = null
-      try {
-        const { data, error: err, response } = await useApi(`/archives/locations/${id}`).put(body).json()
-        if (err.value || (response.value && response.value.status >= 400))
-          throw new Error(data.value?.message || 'Mise à jour emplacement impossible')
-        return data.value
-      }
-      catch (e: any) {
-        error.value = e?.message || 'Erreur'
-        throw e
-      }
-      finally {
-        loading.value = false
-      }
-    },
+    updateLocation: (id: number, body: Record<string, unknown>) => putJson(`/archives/locations/${id}`, body),
+    deleteLocation: (id: number) => deleteJson(`/archives/locations/${id}`),
     fetchSeries: (fondsId?: number) => {
       const suffix = fondsId ? `?fonds_id=${fondsId}` : ''
       return getJson(`/archives/series${suffix}`)
@@ -170,8 +205,9 @@ export function useArchives() {
     startInventory: (id: number) => postJson(`/archives/inventories/${id}/start`),
     scanInventory: (id: number, code: string) => postJson(`/archives/inventories/${id}/scan`, { code }),
     closeInventory: (id: number) => postJson(`/archives/inventories/${id}/close`),
-    fetchRetentionRules: () => getJson('/archives/retention-rules'),
+    fetchRetentionRules: (activeOnly = true) => getJson(`/archives/retention-rules?active_only=${activeOnly ? 1 : 0}`),
     createRetentionRule: (body: Record<string, unknown>) => postJson('/archives/retention-rules', body),
+    updateRetentionRule: (id: number, body: Record<string, unknown>) => putJson(`/archives/retention-rules/${id}`, body),
     validateRetentionRule: (id: number) => postJson(`/archives/retention-rules/${id}/validate`),
     fetchRetentionDue: () => getJson('/archives/retention/due'),
     applyRetention: (recordId: number, ruleId: number) =>

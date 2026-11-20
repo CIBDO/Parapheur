@@ -2,14 +2,28 @@
 import ParapheurPageHeader from '@/components/parapheur/ParapheurPageHeader.vue'
 import { useArchives } from '@/composables/useArchives'
 
-definePage({ meta: { action: 'read', subject: 'ArchivesLocations' } })
+definePage({ meta: { action: 'manage', subject: 'ArchivesAdmin' } })
 
-const { loading, fetchLocations, createLocation, updateLocation, getJson } = useArchives()
+const {
+  loading,
+  error,
+  fetchLocations,
+  createLocation,
+  updateLocation,
+  deleteLocation,
+  fetchMetaOptions,
+  getJson,
+} = useArchives()
+
 const items = ref<any[]>([])
 const structures = ref<any[]>([])
+const typeFilter = ref<string | null>(null)
 const dialog = ref(false)
 const editDialog = ref(false)
-const typeFilter = ref<string | null>(null)
+const snack = ref('')
+const typeItems = ref<{ title: string; value: string }[]>([])
+const statusItems = ref<{ title: string; value: string }[]>([])
+
 const form = ref({
   structure_id: null as number | null,
   parent_id: null as number | null,
@@ -19,6 +33,7 @@ const form = ref({
   capacity_boxes: null as number | null,
   capacity_linear_meters: null as number | null,
 })
+
 const editForm = ref({
   id: 0,
   name: '',
@@ -31,28 +46,6 @@ const editForm = ref({
   notes: '',
   is_active: true,
 })
-
-const typeLabels: Record<string, string> = {
-  site: 'Site',
-  building: 'Bâtiment',
-  room: 'Salle',
-  zone: 'Zone',
-  rack: 'Rayonnage',
-  bay: 'Travée',
-  face: 'Face',
-  shelf: 'Tablette',
-  slot: 'Emplacement',
-  cabinet: 'Armoire',
-}
-
-const statusItems = [
-  { title: 'Disponible', value: 'disponible' },
-  { title: 'Occupé', value: 'occupe' },
-  { title: 'Indisponible', value: 'indisponible' },
-  { title: 'Quarantaine', value: 'quarantaine' },
-]
-
-const typeFilterItems = Object.entries(typeLabels).map(([value, title]) => ({ title, value }))
 
 function depthOf(item: any, byId: Map<number, any>, memo = new Map<number, number>()): number {
   if (memo.has(item.id))
@@ -76,30 +69,44 @@ const treeItems = computed(() => {
     .sort((a, b) => String(a.full_code).localeCompare(String(b.full_code)))
 })
 
+const typeLabel = (value: string) => typeItems.value.find(i => i.value === value)?.title || value
+const statusLabel = (value: string) => statusItems.value.find(i => i.value === value)?.title || value
+
 async function load() {
-  const [locs, structs] = await Promise.all([
+  const [locs, structs, meta] = await Promise.all([
     fetchLocations(),
     getJson('/meta/structures').catch(() => ({ data: [] })),
+    fetchMetaOptions(),
   ])
   items.value = locs.data || []
   structures.value = structs.data || structs || []
+  typeItems.value = meta.data?.location_types || []
+  statusItems.value = meta.data?.location_statuses || []
   if (!form.value.structure_id && structures.value[0])
     form.value.structure_id = structures.value[0].id
+  if (!form.value.type && typeItems.value[0])
+    form.value.type = typeItems.value.find(t => t.value === 'room')?.value || typeItems.value[0].value
 }
 
 async function create() {
-  await createLocation({ ...form.value })
-  dialog.value = false
-  form.value = {
-    structure_id: form.value.structure_id,
-    parent_id: null,
-    type: 'room',
-    code: '',
-    name: '',
-    capacity_boxes: null,
-    capacity_linear_meters: null,
+  try {
+    await createLocation({ ...form.value })
+    dialog.value = false
+    form.value = {
+      structure_id: form.value.structure_id,
+      parent_id: null,
+      type: form.value.type,
+      code: '',
+      name: '',
+      capacity_boxes: null,
+      capacity_linear_meters: null,
+    }
+    snack.value = 'Emplacement créé'
+    await load()
   }
-  await load()
+  catch (e: any) {
+    snack.value = e?.message || error.value || 'Échec'
+  }
 }
 
 function openEdit(item: any) {
@@ -119,10 +126,29 @@ function openEdit(item: any) {
 }
 
 async function saveEdit() {
-  const { id, ...body } = editForm.value
-  await updateLocation(id, body)
-  editDialog.value = false
-  await load()
+  try {
+    const { id, ...body } = editForm.value
+    await updateLocation(id, body)
+    editDialog.value = false
+    snack.value = 'Emplacement mis à jour'
+    await load()
+  }
+  catch (e: any) {
+    snack.value = e?.message || error.value || 'Échec'
+  }
+}
+
+async function remove(item: any) {
+  if (!confirm(`Supprimer « ${item.full_code} » ?`))
+    return
+  try {
+    await deleteLocation(item.id)
+    snack.value = 'Emplacement supprimé'
+    await load()
+  }
+  catch (e: any) {
+    snack.value = e?.message || 'Suppression impossible'
+  }
 }
 
 onMounted(load)
@@ -132,7 +158,7 @@ onMounted(load)
   <div>
     <ParapheurPageHeader
       title="Magasins et emplacements"
-      subtitle="Hiérarchie physique configurable (salle → rayonnage → travée → tablette…)"
+      subtitle="Hiérarchie physique — création, édition et suppression"
       icon="tabler-building-warehouse"
     >
       <template #actions>
@@ -145,11 +171,20 @@ onMounted(load)
       </template>
     </ParapheurPageHeader>
 
+    <VSnackbar
+      v-model="snack"
+      :timeout="4000"
+    >
+      {{ snack }}
+    </VSnackbar>
+
     <VCard class="parapheur-section-card mb-4">
       <VCardText>
         <VSelect
           v-model="typeFilter"
-          :items="typeFilterItems"
+          :items="typeItems"
+          item-title="title"
+          item-value="value"
           label="Filtrer par type"
           clearable
           hide-details
@@ -177,24 +212,24 @@ onMounted(load)
             {{ item.full_code }} — {{ item.name }}
           </VListItemTitle>
           <VListItemSubtitle>
-            {{ typeLabels[item.type] || item.type }}
+            {{ typeLabel(item.type) }}
             · {{ item.occupied_boxes ?? 0 }}/{{ item.capacity_boxes ?? '∞' }} boîtes
             <template v-if="item.capacity_linear_meters != null">
               · {{ item.occupied_linear_meters ?? 0 }}/{{ item.capacity_linear_meters }} ml
             </template>
-            · {{ item.status || '—' }}
+            · {{ statusLabel(item.status) }}
           </VListItemSubtitle>
           <template #append>
             <div
-              class="d-flex align-center gap-3"
-              style="min-width: 140px"
+              class="d-flex align-center gap-2"
+              style="min-width: 180px"
             >
               <VProgressLinear
                 :model-value="Number(item.occupancy_rate || 0)"
                 :color="Number(item.occupancy_rate || 0) >= 90 ? 'error' : Number(item.occupancy_rate || 0) >= 70 ? 'warning' : 'primary'"
                 height="6"
                 rounded
-                style="width: 80px"
+                style="width: 70px"
               />
               <span class="text-caption text-medium-emphasis">{{ item.occupancy_rate ?? 0 }}%</span>
               <VBtn
@@ -204,6 +239,14 @@ onMounted(load)
               >
                 Éditer
               </VBtn>
+              <VBtn
+                size="small"
+                color="error"
+                variant="text"
+                @click.stop="remove(item)"
+              >
+                ×
+              </VBtn>
             </div>
           </template>
         </VListItem>
@@ -212,7 +255,7 @@ onMounted(load)
         v-if="!treeItems.length"
         class="text-medium-emphasis"
       >
-        Aucun emplacement.
+        Aucun emplacement en base. Créez le premier magasin.
       </VCardText>
     </VCard>
 
@@ -230,7 +273,9 @@ onMounted(load)
           />
           <VSelect
             v-model="form.type"
-            :items="typeFilterItems"
+            :items="typeItems"
+            item-title="title"
+            item-value="value"
             label="Type"
           />
           <VSelect
@@ -268,6 +313,7 @@ onMounted(load)
           </VBtn>
           <VBtn
             color="primary"
+            :loading="loading"
             @click="create"
           >
             Enregistrer
@@ -290,6 +336,8 @@ onMounted(load)
           <VSelect
             v-model="editForm.status"
             :items="statusItems"
+            item-title="title"
+            item-value="value"
             label="Statut"
           />
           <VTextField

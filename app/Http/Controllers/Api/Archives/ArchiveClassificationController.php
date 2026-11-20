@@ -54,6 +54,43 @@ class ArchiveClassificationController extends Controller
         return response()->json($this->classification->createFonds($request->user(), $data), 201);
     }
 
+    public function fondsUpdate(Request $request, ArchiveFonds $fonds): JsonResponse
+    {
+        abort_unless(
+            $request->user()->can('archives.administrer')
+            || $request->user()->can('archives.classer')
+            || $request->user()->can('admin.access'),
+            403
+        );
+
+        $data = $request->validate([
+            'code' => ['sometimes', 'string', 'max:64'],
+            'name' => ['sometimes', 'string', 'max:255'],
+            'description' => ['nullable', 'string'],
+            'structure_id' => ['nullable', 'integer', 'exists:structures,id'],
+            'is_active' => ['nullable', 'boolean'],
+            'sort_order' => ['nullable', 'integer', 'min:0'],
+        ]);
+
+        return response()->json($this->classification->updateFonds($request->user(), $fonds, $data));
+    }
+
+    public function fondsDestroy(Request $request, ArchiveFonds $fonds): JsonResponse
+    {
+        abort_unless(
+            $request->user()->can('archives.administrer') || $request->user()->can('admin.access'),
+            403
+        );
+
+        try {
+            $this->classification->deleteFonds($request->user(), $fonds);
+        } catch (InvalidArgumentException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+
+        return response()->json(['ok' => true]);
+    }
+
     public function seriesIndex(Request $request): JsonResponse
     {
         abort_unless($this->access->canViewModule($request->user()), 403);
@@ -85,6 +122,43 @@ class ArchiveClassificationController extends Controller
         ]);
 
         return response()->json($this->classification->createSeries($request->user(), $data), 201);
+    }
+
+    public function seriesUpdate(Request $request, ArchiveSeries $series): JsonResponse
+    {
+        abort_unless(
+            $request->user()->can('archives.administrer')
+            || $request->user()->can('archives.classer')
+            || $request->user()->can('admin.access'),
+            403
+        );
+
+        $data = $request->validate([
+            'fonds_id' => ['sometimes', 'integer', 'exists:archive_fonds,id'],
+            'code' => ['sometimes', 'string', 'max:64'],
+            'name' => ['sometimes', 'string', 'max:255'],
+            'description' => ['nullable', 'string'],
+            'is_active' => ['nullable', 'boolean'],
+            'sort_order' => ['nullable', 'integer', 'min:0'],
+        ]);
+
+        return response()->json($this->classification->updateSeries($request->user(), $series, $data));
+    }
+
+    public function seriesDestroy(Request $request, ArchiveSeries $series): JsonResponse
+    {
+        abort_unless(
+            $request->user()->can('archives.administrer') || $request->user()->can('admin.access'),
+            403
+        );
+
+        try {
+            $this->classification->deleteSeries($request->user(), $series);
+        } catch (InvalidArgumentException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+
+        return response()->json(['ok' => true]);
     }
 
     public function nodesIndex(Request $request): JsonResponse

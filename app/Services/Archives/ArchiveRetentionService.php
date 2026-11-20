@@ -45,6 +45,47 @@ class ArchiveRetentionService
         return $rule;
     }
 
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    public function updateRule(User $actor, ArchiveRetentionRule $rule, array $data): ArchiveRetentionRule
+    {
+        if ($rule->is_validated && ! ($data['force'] ?? false)) {
+            // Une règle validée reste consultable ; on peut seulement désactiver sans forcer.
+            if (array_key_exists('is_active', $data) && count($data) <= 2) {
+                $rule->is_active = (bool) $data['is_active'];
+                $rule->save();
+                $this->audit->log('retention.rule_toggled', $rule, $actor);
+
+                return $rule->fresh(['structure', 'series', 'validator']);
+            }
+
+            throw new InvalidArgumentException('Règle déjà validée : créez une nouvelle version ou désactivez-la.');
+        }
+
+        $rule->fill([
+            'code' => array_key_exists('code', $data) ? strtoupper(trim((string) $data['code'])) : $rule->code,
+            'name' => $data['name'] ?? $rule->name,
+            'description' => array_key_exists('description', $data) ? $data['description'] : $rule->description,
+            'typology' => array_key_exists('typology', $data) ? $data['typology'] : $rule->typology,
+            'structure_id' => array_key_exists('structure_id', $data) ? $data['structure_id'] : $rule->structure_id,
+            'series_id' => array_key_exists('series_id', $data) ? $data['series_id'] : $rule->series_id,
+            'trigger_event' => $data['trigger_event'] ?? $rule->trigger_event,
+            'current_years' => array_key_exists('current_years', $data) ? (int) $data['current_years'] : $rule->current_years,
+            'intermediate_years' => array_key_exists('intermediate_years', $data) ? (int) $data['intermediate_years'] : $rule->intermediate_years,
+            'final_disposition' => $data['final_disposition'] ?? $rule->final_disposition,
+            'legal_basis' => array_key_exists('legal_basis', $data) ? $data['legal_basis'] : $rule->legal_basis,
+            'authority' => array_key_exists('authority', $data) ? $data['authority'] : $rule->authority,
+            'valid_from' => array_key_exists('valid_from', $data) ? $data['valid_from'] : $rule->valid_from,
+            'valid_to' => array_key_exists('valid_to', $data) ? $data['valid_to'] : $rule->valid_to,
+            'is_active' => array_key_exists('is_active', $data) ? (bool) $data['is_active'] : $rule->is_active,
+        ])->save();
+
+        $this->audit->log('retention.rule_updated', $rule, $actor);
+
+        return $rule->fresh(['structure', 'series', 'validator']);
+    }
+
     public function validateRule(User $actor, ArchiveRetentionRule $rule): ArchiveRetentionRule
     {
         if (! $actor->can('archives.gerer_conservation') && ! $actor->can('archives.administrer') && ! $actor->can('admin.access')) {

@@ -62,6 +62,40 @@ class ArchiveRetentionController extends Controller
         return response()->json($this->retention->createRule($request->user(), $data), 201);
     }
 
+    public function update(Request $request, ArchiveRetentionRule $rule): JsonResponse
+    {
+        abort_unless(
+            $request->user()->can('archives.gerer_conservation')
+            || $request->user()->can('archives.administrer')
+            || $request->user()->can('admin.access'),
+            403
+        );
+
+        $data = $request->validate([
+            'code' => ['sometimes', 'string', 'max:64'],
+            'name' => ['sometimes', 'string', 'max:255'],
+            'description' => ['nullable', 'string'],
+            'typology' => ['nullable', 'string', 'max:64'],
+            'structure_id' => ['nullable', 'integer', 'exists:structures,id'],
+            'series_id' => ['nullable', 'integer', 'exists:archive_series,id'],
+            'trigger_event' => ['nullable', 'string', 'max:64'],
+            'current_years' => ['nullable', 'integer', 'min:0', 'max:200'],
+            'intermediate_years' => ['nullable', 'integer', 'min:0', 'max:200'],
+            'final_disposition' => ['nullable', 'string', 'max:64'],
+            'legal_basis' => ['nullable', 'string', 'max:255'],
+            'authority' => ['nullable', 'string', 'max:255'],
+            'valid_from' => ['nullable', 'date'],
+            'valid_to' => ['nullable', 'date'],
+            'is_active' => ['nullable', 'boolean'],
+        ]);
+
+        try {
+            return response()->json($this->retention->updateRule($request->user(), $rule, $data));
+        } catch (InvalidArgumentException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+    }
+
     public function validateRule(Request $request, ArchiveRetentionRule $rule): JsonResponse
     {
         try {
