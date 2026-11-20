@@ -20,7 +20,13 @@ const structures = ref<any[]>([])
 const typeFilter = ref<string | null>(null)
 const dialog = ref(false)
 const editDialog = ref(false)
-const snack = ref('')
+const snack = ref(false)
+const snackText = ref('')
+
+function notify(msg: string) {
+  snackText.value = msg
+  snack.value = true
+}
 const typeItems = ref<{ title: string; value: string }[]>([])
 const statusItems = ref<{ title: string; value: string }[]>([])
 
@@ -101,11 +107,11 @@ async function create() {
       capacity_boxes: null,
       capacity_linear_meters: null,
     }
-    snack.value = 'Emplacement créé'
+    notify('Emplacement créé')
     await load()
   }
   catch (e: any) {
-    snack.value = e?.message || error.value || 'Échec'
+    notify(e?.message || error.value || 'Échec')
   }
 }
 
@@ -130,11 +136,11 @@ async function saveEdit() {
     const { id, ...body } = editForm.value
     await updateLocation(id, body)
     editDialog.value = false
-    snack.value = 'Emplacement mis à jour'
+    notify('Emplacement mis à jour')
     await load()
   }
   catch (e: any) {
-    snack.value = e?.message || error.value || 'Échec'
+    notify(e?.message || error.value || 'Échec')
   }
 }
 
@@ -143,11 +149,11 @@ async function remove(item: any) {
     return
   try {
     await deleteLocation(item.id)
-    snack.value = 'Emplacement supprimé'
+    notify('Emplacement supprimé')
     await load()
   }
   catch (e: any) {
-    snack.value = e?.message || 'Suppression impossible'
+    notify(e?.message || 'Suppression impossible')
   }
 }
 
@@ -174,9 +180,7 @@ onMounted(load)
     <VSnackbar
       v-model="snack"
       :timeout="4000"
-    >
-      {{ snack }}
-    </VSnackbar>
+    >{{ snackText }}</VSnackbar>
 
     <VCard class="parapheur-section-card mb-4">
       <VCardText>

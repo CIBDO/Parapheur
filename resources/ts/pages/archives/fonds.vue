@@ -21,8 +21,14 @@ const {
 
 const fonds = ref<any[]>([])
 const structures = ref<any[]>([])
-const snack = ref('')
+const snack = ref(false)
+const snackText = ref('')
 const fondsDialog = ref(false)
+
+function notify(msg: string) {
+  snackText.value = msg
+  snack.value = true
+}
 const seriesDialog = ref(false)
 const editingFonds = ref<any | null>(null)
 const editingSeries = ref<any | null>(null)
@@ -77,11 +83,11 @@ async function saveFonds() {
     else
       await createFonds({ ...fondsForm.value })
     fondsDialog.value = false
-    snack.value = 'Fonds enregistré'
+    notify('Fonds enregistré')
     await load()
   }
   catch (e: any) {
-    snack.value = e?.message || error.value || 'Échec'
+    notify(e?.message || error.value || 'Échec')
   }
 }
 
@@ -90,11 +96,11 @@ async function removeFonds(item: any) {
     return
   try {
     await deleteFonds(item.id)
-    snack.value = 'Fonds supprimé'
+    notify('Fonds supprimé')
     await load()
   }
   catch (e: any) {
-    snack.value = e?.message || 'Suppression impossible'
+    notify(e?.message || 'Suppression impossible')
   }
 }
 
@@ -129,11 +135,11 @@ async function saveSeries() {
     else
       await createSeries({ ...seriesForm.value })
     seriesDialog.value = false
-    snack.value = 'Série enregistrée'
+    notify('Série enregistrée')
     await load()
   }
   catch (e: any) {
-    snack.value = e?.message || error.value || 'Échec'
+    notify(e?.message || error.value || 'Échec')
   }
 }
 
@@ -142,11 +148,11 @@ async function removeSeries(serie: any) {
     return
   try {
     await deleteSeries(serie.id)
-    snack.value = 'Série supprimée'
+    notify('Série supprimée')
     await load()
   }
   catch (e: any) {
-    snack.value = e?.message || 'Suppression impossible'
+    notify(e?.message || 'Suppression impossible')
   }
 }
 
@@ -179,9 +185,7 @@ onMounted(load)
     <VSnackbar
       v-model="snack"
       :timeout="4000"
-    >
-      {{ snack }}
-    </VSnackbar>
+    >{{ snackText }}</VSnackbar>
 
     <VRow>
       <VCol

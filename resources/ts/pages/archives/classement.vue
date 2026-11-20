@@ -23,7 +23,13 @@ const fonds = ref<any[]>([])
 const series = ref<any[]>([])
 const levelItems = ref<{ title: string; value: string }[]>([])
 const dialog = ref(false)
-const snack = ref('')
+const snack = ref(false)
+const snackText = ref('')
+
+function notify(msg: string) {
+  snackText.value = msg
+  snack.value = true
+}
 const editing = ref<any | null>(null)
 
 const form = ref({
@@ -101,11 +107,11 @@ async function save() {
       await createNode({ ...form.value })
     }
     dialog.value = false
-    snack.value = 'Nœud enregistré'
+    notify('Nœud enregistré')
     await load()
   }
   catch (e: any) {
-    snack.value = e?.message || error.value || 'Échec'
+    notify(e?.message || error.value || 'Échec')
   }
 }
 
@@ -114,11 +120,11 @@ async function remove(node: any) {
     return
   try {
     await deleteNode(node.id)
-    snack.value = 'Nœud supprimé'
+    notify('Nœud supprimé')
     await load()
   }
   catch (e: any) {
-    snack.value = e?.message || 'Suppression impossible'
+    notify(e?.message || 'Suppression impossible')
   }
 }
 
@@ -147,9 +153,7 @@ onMounted(load)
     <VSnackbar
       v-model="snack"
       :timeout="4000"
-    >
-      {{ snack }}
-    </VSnackbar>
+    >{{ snackText }}</VSnackbar>
 
     <VCard class="parapheur-section-card">
       <VList :loading="loading">

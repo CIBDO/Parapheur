@@ -9,6 +9,8 @@ use App\Enums\TaskSource;
 use App\Enums\TaskStatus;
 use App\Events\TaskCreated;
 use App\Models\AuditLog;
+use App\Models\ProductionObligation;
+use App\Models\ProductionOccurrence;
 use App\Models\Task;
 use App\Models\TaskAttachment;
 use App\Models\TaskComment;
@@ -172,76 +174,264 @@ class TaskService
     }
 
     /**
+     * Création manuelle par un agent : le périmètre de collaboration s'applique.
+     *
      * @param  array<string, mixed>  $data
      */
     public function create(User $actor, array $data): Task
     {
         return DB::transaction(function () use ($actor, $data) {
-            $asDraft = (bool) ($data['as_draft'] ?? false);
-            $assigneeId = $data['assignee_id'] ?? null;
+            $this->assertCollaboratorsInScope($actor, $data);
 
-            if ($assigneeId) {
-                $assignee = User::query()->findOrFail((int) $assigneeId);
-                if (! $this->access->canAssignTo($actor, $assignee)) {
-                    abort(403, 'Cet utilisateur est hors de votre périmètre de collaboration.');
-                }
-            }
-
-            foreach ($data['contributor_ids'] ?? [] as $contributorId) {
-                $contributor = User::query()->find((int) $contributorId);
-                if ($contributor && ! $this->access->canAssignTo($actor, $contributor)) {
-                    abort(403, 'Un contributeur est hors de votre périmètre de collaboration.');
-                }
-            }
-
-            if (! empty($data['validator_id'])) {
-                $validator = User::query()->find((int) $data['validator_id']);
-                if ($validator && ! $this->access->canAssignTo($actor, $validator)) {
-                    abort(403, 'Le validateur est hors de votre périmètre de collaboration.');
-                }
-            }
-
-            $status = $asDraft || ! $assigneeId
-                ? TaskStatus::Brouillon
-                : TaskStatus::Imputee;
-
-            $task = Task::query()->create([
-                'reference' => $this->numbering->nextNumber(NumberingSequenceCode::Task),
-                'parent_id' => $data['parent_id'] ?? null,
-                'instruction_id' => $data['instruction_id'] ?? null,
-                'task_type_id' => $data['task_type_id'] ?? null,
-                'created_by' => $actor->id,
-                'assignee_id' => $assigneeId,
-                'structure_id' => $data['structure_id'] ?? $actor->structure_id,
-                'validator_id' => $data['validator_id'] ?? $actor->id,
-                'title' => $data['title'],
-                'description' => $data['description'] ?? null,
-                'status' => $status,
-                'priority' => $data['priority'] ?? DocumentPriority::Normale->value,
-                'confidentiality' => $data['confidentiality'] ?? DocumentConfidentiality::Normal->value,
-                'source_kind' => $data['source_kind'] ?? TaskSource::Manual->value,
-                'source_type' => $data['source_type'] ?? null,
-                'source_id' => $data['source_id'] ?? null,
-                'progress' => (int) ($data['progress'] ?? 0),
-                'starts_at' => $data['starts_at'] ?? null,
-                'due_at' => $data['due_at'] ?? null,
-                'is_personal' => (bool) ($data['is_personal'] ?? false),
-                'tags' => $data['tags'] ?? null,
+            return $this->persistCreatedTask($actor, $data, [
+                'context' => 'manual',
+                'history_comment' => 'Création de la tâche',
             ]);
-
-            $this->syncContributors($task, $data['contributor_ids'] ?? []);
-            $this->recordHistory($task, $actor, 'created', null, $status->value, 'Création de la tâche');
-            $this->audit->log('task.created', $task, ['actor_id' => $actor->id]);
-
-            if ($status === TaskStatus::Imputee && $task->assignee_id) {
-                $this->notifications->notifyAssigned($task, $actor);
-            }
-
-            $this->reminders->scheduleFor($task);
-            event(new TaskCreated($task, $actor));
-
-            return $task->fresh(['assignee', 'creator', 'contributors']);
         });
+    }
+
+    /**
+     * Création système pour une occurrence de production automatique.
+     *
+     * Contourne canAssignTo() (périmètre de collaboration) tout en n'autorisant
+     * que les acteurs configurés sur une obligation active — sans ouvrir les
+     * droits de collaboration entre structures.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    public function createFromProduction(
+        User $systemActor,
+        ProductionObligation $obligation,
+        ProductionOccurrence $occurrence,
+        array $data = [],
+    ): Task {
+        return DB::transaction(function () use ($systemActor, $obligation, $occurrence, $data) {
+            $payload = $this->buildProductionTaskPayload(
+                $systemActor,
+                $obligation,
+                $occurrence,
+                $data
+            );
+
+            $this->assertProductionSystemAssignees($systemActor, $obligation, $occurrence, $payload);
+
+            return $this->persistCreatedTask($systemActor, $payload, [
+                'context' => 'production_system',
+                'history_comment' => 'Création système (production automatique)',
+                'obligation_id' => $obligation->id,
+                'occurrence_id' => $occurrence->id,
+            ]);
+        });
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    private function assertCollaboratorsInScope(User $actor, array $data): void
+    {
+        $assigneeId = $data['assignee_id'] ?? null;
+
+        if ($assigneeId) {
+            $assignee = User::query()->findOrFail((int) $assigneeId);
+            if (! $this->access->canAssignTo($actor, $assignee)) {
+                abort(403, 'Cet utilisateur est hors de votre périmètre de collaboration.');
+            }
+        }
+
+        foreach ($data['contributor_ids'] ?? [] as $contributorId) {
+            $contributor = User::query()->find((int) $contributorId);
+            if ($contributor && ! $this->access->canAssignTo($actor, $contributor)) {
+                abort(403, 'Un contributeur est hors de votre périmètre de collaboration.');
+            }
+        }
+
+        if (! empty($data['validator_id'])) {
+            $validator = User::query()->find((int) $data['validator_id']);
+            if ($validator && ! $this->access->canAssignTo($actor, $validator)) {
+                abort(403, 'Le validateur est hors de votre périmètre de collaboration.');
+            }
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    private function buildProductionTaskPayload(
+        User $systemActor,
+        ProductionObligation $obligation,
+        ProductionOccurrence $occurrence,
+        array $data,
+    ): array {
+        if (! $obligation->is_active) {
+            throw new InvalidArgumentException(
+                'Seules les obligations de production actives peuvent générer des tâches système.'
+            );
+        }
+
+        if ((int) $occurrence->production_obligation_id !== (int) $obligation->id) {
+            throw new InvalidArgumentException(
+                'L\'occurrence ne correspond pas à l\'obligation de production.'
+            );
+        }
+
+        $validatorId = $data['validator_id']
+            ?? $obligation->validators()->orderBy('step_order')->value('user_id')
+            ?? $systemActor->id;
+
+        return array_merge($data, [
+            'title' => $data['title'] ?? ($obligation->label.' — '.optional($occurrence->reference_date)->format('d/m/Y')),
+            'description' => $data['description'] ?? $obligation->description,
+            'assignee_id' => $data['assignee_id'] ?? $occurrence->responsible_id ?? $obligation->producer_id,
+            'structure_id' => $data['structure_id'] ?? $obligation->structure_id ?? $systemActor->structure_id,
+            'validator_id' => $validatorId,
+            'contributor_ids' => $data['contributor_ids'] ?? [],
+            'due_at' => $data['due_at'] ?? $occurrence->deadline_at,
+            'confidentiality' => $data['confidentiality']
+                ?? $obligation->confidentiality?->value
+                ?? $obligation->confidentiality
+                ?? DocumentConfidentiality::Normal->value,
+            'source_kind' => TaskSource::Production->value,
+            'source_type' => ProductionOccurrence::class,
+            'source_id' => $occurrence->id,
+            'as_draft' => false,
+        ]);
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    private function assertProductionSystemAssignees(
+        User $systemActor,
+        ProductionObligation $obligation,
+        ProductionOccurrence $occurrence,
+        array $data,
+    ): void {
+        $allowedAssigneeIds = array_values(array_unique(array_filter([
+            $obligation->producer_id ? (int) $obligation->producer_id : null,
+            $obligation->deputy_id ? (int) $obligation->deputy_id : null,
+            $occurrence->responsible_id ? (int) $occurrence->responsible_id : null,
+        ])));
+
+        $assigneeId = isset($data['assignee_id']) ? (int) $data['assignee_id'] : null;
+        if (! $assigneeId || ! in_array($assigneeId, $allowedAssigneeIds, true)) {
+            abort(422, 'Le responsable de la tâche de production doit être le producteur (ou suppléant) configuré sur l\'obligation.');
+        }
+
+        User::query()->findOrFail($assigneeId);
+
+        $allowedValidatorIds = $obligation->validators()
+            ->pluck('user_id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+        $allowedValidatorIds = array_values(array_unique(array_filter(array_merge(
+            $allowedValidatorIds,
+            $allowedAssigneeIds,
+            [(int) $systemActor->id],
+        ))));
+
+        $validatorId = isset($data['validator_id']) ? (int) $data['validator_id'] : null;
+        if ($validatorId && ! in_array($validatorId, $allowedValidatorIds, true)) {
+            abort(422, 'Le validateur de la tâche de production doit être configuré sur l\'obligation.');
+        }
+
+        if ($validatorId) {
+            User::query()->findOrFail($validatorId);
+        }
+
+        $allowedContributorIds = $obligation->contributors()
+            ->pluck('user_id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+        $allowedRecipientIds = $obligation->recipients()
+            ->pluck('user_id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+        $allowedParticipantIds = array_values(array_unique(array_merge(
+            $allowedContributorIds,
+            $allowedRecipientIds,
+            $allowedAssigneeIds,
+            $allowedValidatorIds,
+        )));
+
+        foreach ($data['contributor_ids'] ?? [] as $contributorId) {
+            $id = (int) $contributorId;
+            if (! in_array($id, $allowedParticipantIds, true)) {
+                abort(422, 'Un contributeur de la tâche de production n\'est pas configuré sur l\'obligation.');
+            }
+            User::query()->findOrFail($id);
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @param  array<string, mixed>  $meta
+     */
+    private function persistCreatedTask(User $actor, array $data, array $meta = []): Task
+    {
+        $asDraft = (bool) ($data['as_draft'] ?? false);
+        $assigneeId = $data['assignee_id'] ?? null;
+
+        $status = $asDraft || ! $assigneeId
+            ? TaskStatus::Brouillon
+            : TaskStatus::Imputee;
+
+        $task = Task::query()->create([
+            'reference' => $this->numbering->nextNumber(NumberingSequenceCode::Task),
+            'parent_id' => $data['parent_id'] ?? null,
+            'instruction_id' => $data['instruction_id'] ?? null,
+            'task_type_id' => $data['task_type_id'] ?? null,
+            'created_by' => $actor->id,
+            'assignee_id' => $assigneeId,
+            'structure_id' => $data['structure_id'] ?? $actor->structure_id,
+            'validator_id' => $data['validator_id'] ?? $actor->id,
+            'title' => $data['title'],
+            'description' => $data['description'] ?? null,
+            'status' => $status,
+            'priority' => $data['priority'] ?? DocumentPriority::Normale->value,
+            'confidentiality' => $data['confidentiality'] ?? DocumentConfidentiality::Normal->value,
+            'source_kind' => $data['source_kind'] ?? TaskSource::Manual->value,
+            'source_type' => $data['source_type'] ?? null,
+            'source_id' => $data['source_id'] ?? null,
+            'progress' => (int) ($data['progress'] ?? 0),
+            'starts_at' => $data['starts_at'] ?? null,
+            'due_at' => $data['due_at'] ?? null,
+            'is_personal' => (bool) ($data['is_personal'] ?? false),
+            'tags' => $data['tags'] ?? null,
+        ]);
+
+        $this->syncContributors($task, $data['contributor_ids'] ?? []);
+
+        $historyComment = (string) ($meta['history_comment'] ?? 'Création de la tâche');
+        $historyProps = array_filter([
+            'creation_context' => $meta['context'] ?? null,
+            'obligation_id' => $meta['obligation_id'] ?? null,
+            'occurrence_id' => $meta['occurrence_id'] ?? null,
+        ], fn ($value) => $value !== null);
+        $this->recordHistory(
+            $task,
+            $actor,
+            'created',
+            null,
+            $status->value,
+            $historyComment,
+            $historyProps
+        );
+        $this->audit->log('task.created', $task, array_filter([
+            'actor_id' => $actor->id,
+            'creation_context' => $meta['context'] ?? null,
+            'obligation_id' => $meta['obligation_id'] ?? null,
+            'occurrence_id' => $meta['occurrence_id'] ?? null,
+        ], fn ($value) => $value !== null));
+
+        if ($status === TaskStatus::Imputee && $task->assignee_id) {
+            $this->notifications->notifyAssigned($task, $actor);
+        }
+
+        $this->reminders->scheduleFor($task);
+        event(new TaskCreated($task, $actor));
+
+        return $task->fresh(['assignee', 'creator', 'contributors']);
     }
 
     /**

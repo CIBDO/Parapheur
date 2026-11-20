@@ -19,10 +19,13 @@ use App\Models\ProductionTransmissionRecipient;
 use App\Models\SlaCalendar;
 use App\Models\SlaCalendarException;
 use App\Models\Structure;
+use App\Models\Task;
 use App\Models\TaskType;
 use App\Models\User;
 use App\Services\Productions\ProductionOccurrenceService;
 use App\Services\Productions\RecurrenceService;
+use App\Services\Tasks\TaskAccessService;
+use App\Services\Tasks\TaskService;
 use Carbon\Carbon;
 use Database\Seeders\ProductionPermissionSeeder;
 use Database\Seeders\TaskPermissionSeeder;
@@ -118,6 +121,7 @@ class ProductionModuleTest extends TestCase
         $this->assertSame(0, $second['created']);
         $this->assertSame(1, ProductionOccurrence::query()
             ->where('production_obligation_id', $obligation['id'])
+            ->whereDate('reference_date', $date->toDateString())
             ->count());
     }
 
@@ -547,6 +551,118 @@ class ProductionModuleTest extends TestCase
             ->where('production_occurrence_id', $occurrence->id)
             ->where('is_rectificative', true)
             ->count());
+    }
+
+    public function test_system_generation_creates_task_across_structures_without_collaboration_scope(): void
+    {
+        $structureA = Structure::query()->create([
+            'code' => 'PROD-A',
+            'name' => 'Structure A',
+            'is_active' => true,
+            'is_access_boundary' => true,
+        ]);
+        $structureB = Structure::query()->create([
+            'code' => 'PROD-B',
+            'name' => 'Structure B',
+            'is_active' => true,
+            'is_access_boundary' => true,
+        ]);
+
+        $systemActor = User::factory()->create(['structure_id' => $structureA->id]);
+        $systemActor->assignRole('Agent');
+
+        $producer = User::factory()->create(['structure_id' => $structureB->id]);
+        $producer->assignRole('Agent');
+
+        $validator = User::factory()->create(['structure_id' => $structureB->id]);
+        $validator->assignRole('Directeur');
+
+        $this->assertFalse(
+            app(TaskAccessService::class)->canAssignTo($systemActor, $producer),
+            'Précondition : l\'acteur système ne peut pas collaborer avec le producteur.'
+        );
+
+        $obligation = ProductionObligation::query()->create([
+            'code' => 'CROSS-STRUCT',
+            'label' => 'Production multi-structures',
+            'structure_id' => $structureB->id,
+            'producer_id' => $producer->id,
+            'frequency' => ProductionFrequency::Daily->value,
+            'deadline_time' => '10:00:00',
+            'validation_required' => true,
+            'is_active' => true,
+            'created_by' => $systemActor->id,
+        ]);
+        ProductionObligationActor::query()->create([
+            'production_obligation_id' => $obligation->id,
+            'role' => 'validator',
+            'user_id' => $validator->id,
+            'step_order' => 1,
+        ]);
+
+        $result = app(ProductionOccurrenceService::class)
+            ->generateForDate(Carbon::parse('2026-10-12'), $systemActor);
+
+        $this->assertSame(1, $result['created']);
+
+        $occurrence = ProductionOccurrence::query()
+            ->where('production_obligation_id', $obligation->id)
+            ->firstOrFail();
+
+        $this->assertNotNull($occurrence->task_id);
+
+        $task = Task::query()->findOrFail($occurrence->task_id);
+        $this->assertSame($producer->id, $task->assignee_id);
+        $this->assertSame($validator->id, $task->validator_id);
+        $this->assertSame($systemActor->id, $task->created_by);
+        $this->assertSame('production', $task->source_kind?->value ?? $task->source_kind);
+        $this->assertSame(ProductionOccurrence::class, $task->source_type);
+        $this->assertSame($occurrence->id, $task->source_id);
+    }
+
+    public function test_create_from_production_rejects_assignee_outside_obligation(): void
+    {
+        $structure = Structure::query()->create([
+            'code' => 'PROD-C',
+            'name' => 'Structure C',
+            'is_active' => true,
+        ]);
+
+        $systemActor = User::factory()->create(['structure_id' => $structure->id]);
+        $producer = User::factory()->create(['structure_id' => $structure->id]);
+        $stranger = User::factory()->create(['structure_id' => $structure->id]);
+
+        $obligation = ProductionObligation::query()->create([
+            'code' => 'GUARD-ASSIGN',
+            'label' => 'Garde affectation',
+            'structure_id' => $structure->id,
+            'producer_id' => $producer->id,
+            'frequency' => ProductionFrequency::Once->value,
+            'schedule_config' => ['date' => '2026-10-12'],
+            'deadline_time' => '10:00:00',
+            'is_active' => true,
+            'created_by' => $systemActor->id,
+        ]);
+
+        $occurrence = ProductionOccurrence::query()->create([
+            'reference' => 'PO-GUARD-1',
+            'production_obligation_id' => $obligation->id,
+            'period_key' => '2026-10-12',
+            'reference_date' => '2026-10-12',
+            'period_start' => '2026-10-12',
+            'period_end' => '2026-10-12',
+            'deadline_at' => '2026-10-12 10:00:00',
+            'structure_id' => $structure->id,
+            'responsible_id' => $producer->id,
+            'status' => ProductionOccurrenceStatus::AProduire->value,
+        ]);
+
+        $this->expectException(\Symfony\Component\HttpKernel\Exception\HttpException::class);
+
+        app(TaskService::class)->createFromProduction($systemActor, $obligation, $occurrence, [
+            'title' => 'Tâche illégale',
+            'assignee_id' => $stranger->id,
+        ]);
     }
 
     private function attachFile(ProductionOccurrence $occurrence, User $author, string $name = 'livrable.pdf'): ProductionFile

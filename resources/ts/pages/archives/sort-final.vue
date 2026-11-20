@@ -23,7 +23,13 @@ const structures = ref<any[]>([])
 const selected = ref<any | null>(null)
 const dialog = ref(false)
 const refuseDialog = ref(false)
-const snack = ref('')
+const snack = ref(false)
+const snackText = ref('')
+
+function notify(msg: string) {
+  snackText.value = msg
+  snack.value = true
+}
 const refuseReason = ref('')
 const dispositionTypes = ref<{ title: string; value: string }[]>([])
 const statusItems = ref<{ title: string; value: string }[]>([])
@@ -80,13 +86,13 @@ async function save() {
   try {
     const created = await createDisposition({ ...form.value })
     dialog.value = false
-    snack.value = 'Proposition créée'
+    notify('Proposition créée')
     await load()
     if (created?.id)
       await open(created.id)
   }
   catch (e: any) {
-    snack.value = e?.message || error.value || 'Échec'
+    notify(e?.message || error.value || 'Échec')
   }
 }
 
@@ -95,12 +101,12 @@ async function authorize() {
     return
   try {
     await authorizeDisposition(selected.value.id, {})
-    snack.value = 'Proposition autorisée'
+    notify('Proposition autorisée')
     await open(selected.value.id)
     await load()
   }
   catch (e: any) {
-    snack.value = e?.message || 'Autorisation impossible'
+    notify(e?.message || 'Autorisation impossible')
   }
 }
 
@@ -115,12 +121,12 @@ async function confirmRefuse() {
   try {
     await refuseDisposition(selected.value.id, refuseReason.value.trim())
     refuseDialog.value = false
-    snack.value = 'Proposition refusée'
+    notify('Proposition refusée')
     await open(selected.value.id)
     await load()
   }
   catch (e: any) {
-    snack.value = e?.message || 'Refus impossible'
+    notify(e?.message || 'Refus impossible')
   }
 }
 
@@ -131,12 +137,12 @@ async function execute() {
     return
   try {
     await executeDisposition(selected.value.id)
-    snack.value = 'Sort final exécuté'
+    notify('Sort final exécuté')
     await open(selected.value.id)
     await load()
   }
   catch (e: any) {
-    snack.value = e?.message || 'Exécution impossible'
+    notify(e?.message || 'Exécution impossible')
   }
 }
 
@@ -163,9 +169,7 @@ onMounted(load)
     <VSnackbar
       v-model="snack"
       :timeout="4000"
-    >
-      {{ snack }}
-    </VSnackbar>
+    >{{ snackText }}</VSnackbar>
 
     <VRow>
       <VCol

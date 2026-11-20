@@ -24,7 +24,13 @@ const series = ref<any[]>([])
 const dispositionItems = ref<{ title: string; value: string }[]>([])
 const triggerItems = ref<{ title: string; value: string }[]>([])
 const dialog = ref(false)
-const snack = ref('')
+const snack = ref(false)
+const snackText = ref('')
+
+function notify(msg: string) {
+  snackText.value = msg
+  snack.value = true
+}
 const editing = ref<any | null>(null)
 const validateOnCreate = ref(false)
 
@@ -113,22 +119,22 @@ async function save() {
         await validateRetentionRule(created.id)
     }
     dialog.value = false
-    snack.value = 'Règle enregistrée'
+    notify('Règle enregistrée')
     await load()
   }
   catch (e: any) {
-    snack.value = e?.message || error.value || 'Échec'
+    notify(e?.message || error.value || 'Échec')
   }
 }
 
 async function validate(rule: any) {
   try {
     await validateRetentionRule(rule.id)
-    snack.value = 'Règle validée'
+    notify('Règle validée')
     await load()
   }
   catch (e: any) {
-    snack.value = e?.message || 'Validation impossible'
+    notify(e?.message || 'Validation impossible')
   }
 }
 
@@ -138,7 +144,7 @@ async function toggleActive(rule: any) {
     await load()
   }
   catch (e: any) {
-    snack.value = e?.message || 'Mise à jour impossible'
+    notify(e?.message || 'Mise à jour impossible')
   }
 }
 
@@ -165,9 +171,7 @@ onMounted(load)
     <VSnackbar
       v-model="snack"
       :timeout="4000"
-    >
-      {{ snack }}
-    </VSnackbar>
+    >{{ snackText }}</VSnackbar>
 
     <VRow>
       <VCol

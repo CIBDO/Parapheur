@@ -4,8 +4,6 @@ namespace App\Services\Productions;
 
 use App\Enums\NumberingSequenceCode;
 use App\Enums\ProductionOccurrenceStatus;
-use App\Enums\TaskSource;
-use App\Enums\TaskStatus;
 use App\Models\DocumentView;
 use App\Models\ProductionEvent;
 use App\Models\ProductionGenerationRun;
@@ -242,19 +240,18 @@ class ProductionOccurrenceService
 
                 if ($actor && $responsibleId) {
                     $taskTypeId = TaskType::query()->where('code', 'production')->value('id');
-                    $task = $this->tasks->create($actor, [
+                    $validatorId = $obligation->validators()->orderBy('step_order')->value('user_id')
+                        ?: $actor->id;
+
+                    $task = $this->tasks->createFromProduction($actor, $obligation, $occurrence, [
                         'title' => $obligation->label.' — '.$date->format('d/m/Y'),
                         'description' => $obligation->description,
                         'assignee_id' => $responsibleId,
                         'structure_id' => $obligation->structure_id,
                         'due_at' => $deadline,
                         'task_type_id' => $taskTypeId,
-                        'source_kind' => TaskSource::Production->value,
-                        'source_type' => ProductionOccurrence::class,
-                        'source_id' => $occurrence->id,
                         'confidentiality' => $obligation->confidentiality?->value ?? $obligation->confidentiality,
-                        'validator_id' => $obligation->actors()->where('role', 'validator')->orderBy('step_order')->value('user_id')
-                            ?: $actor->id,
+                        'validator_id' => $validatorId,
                     ]);
                     $occurrence->task_id = $task->id;
                     $occurrence->save();
