@@ -120,7 +120,8 @@ class RecurrenceService
             ProductionFrequency::Daily => true,
             ProductionFrequency::BusinessDays => $day->isWeekday(),
             ProductionFrequency::Weekly => (int) ($config['weekday'] ?? Carbon::FRIDAY) === $day->dayOfWeek,
-            ProductionFrequency::Weekdays => in_array($day->dayOfWeek, $config['weekdays'] ?? [], true),
+            // schedule_config.weekdays : Carbon dayOfWeek (0=dim … 6=sam). Vide = lun–ven.
+            ProductionFrequency::Weekdays => $this->matchesSelectedWeekdays($day, $config),
             ProductionFrequency::Biweekly => $this->matchesBiweekly($day, $config),
             ProductionFrequency::Semimonthly => in_array($day->day, $config['days'] ?? [1, 15], true),
             ProductionFrequency::Monthly => $day->day === (int) ($config['day'] ?? 1),
@@ -135,6 +136,23 @@ class RecurrenceService
                 || in_array($day->toDateString(), $config['dates'] ?? [], true),
             default => false,
         };
+    }
+
+    /**
+     * @param  array<string, mixed>  $config
+     */
+    private function matchesSelectedWeekdays(CarbonInterface $day, array $config): bool
+    {
+        $days = array_values(array_unique(array_map(
+            'intval',
+            $config['weekdays'] ?? [1, 2, 3, 4, 5]
+        )));
+
+        if ($days === []) {
+            $days = [1, 2, 3, 4, 5];
+        }
+
+        return in_array($day->dayOfWeek, $days, true);
     }
 
     /**

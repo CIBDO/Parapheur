@@ -183,12 +183,30 @@ class ProductionDefinitionService
      */
     private function mapFields(array $data, User $actor, bool $creating = true): array
     {
-        $frequency = $data['frequency'] ?? ProductionFrequency::Daily->value;
-        if (! in_array($frequency, array_map(fn ($c) => $c->value, ProductionFrequency::cases()), true)) {
-            throw ValidationException::withMessages(['frequency' => 'Fréquence invalide.']);
+        if ($creating) {
+            return $this->mapFieldsForCreate($data, $actor);
         }
 
-        $fields = [
+        return $this->mapFieldsForUpdate($data);
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    private function mapFieldsForCreate(array $data, User $actor): array
+    {
+        if (! array_key_exists('code', $data) || ! array_key_exists('label', $data)) {
+            throw ValidationException::withMessages([
+                'code' => 'Le code est obligatoire.',
+                'label' => 'Le libellé est obligatoire.',
+            ]);
+        }
+
+        $frequency = $data['frequency'] ?? ProductionFrequency::Daily->value;
+        $this->assertValidFrequency($frequency);
+
+        return [
             'code' => strtoupper((string) $data['code']),
             'label' => $data['label'],
             'description' => $data['description'] ?? null,
@@ -200,9 +218,7 @@ class ProductionDefinitionService
             'calendar_id' => $data['calendar_id'] ?? null,
             'frequency' => $frequency,
             'schedule_config' => $data['schedule_config'] ?? null,
-            'deadline_time' => isset($data['deadline_time'])
-                ? (strlen((string) $data['deadline_time']) === 5 ? $data['deadline_time'].':00' : $data['deadline_time'])
-                : '10:00:00',
+            'deadline_time' => $this->normalizeDeadlineTime($data['deadline_time'] ?? '10:00:00'),
             'timezone' => $data['timezone'] ?? 'Africa/Bamako',
             'valid_from' => $data['valid_from'] ?? null,
             'valid_until' => $data['valid_until'] ?? null,
@@ -220,13 +236,129 @@ class ProductionDefinitionService
             'workflow_id' => $data['workflow_id'] ?? null,
             'archive_enabled' => (bool) ($data['archive_enabled'] ?? true),
             'is_active' => (bool) ($data['is_active'] ?? true),
+            'created_by' => $actor->id,
         ];
+    }
 
-        if ($creating) {
-            $fields['created_by'] = $actor->id;
+    /**
+     * Mise à jour partielle : seuls les champs présents dans la requête sont appliqués
+     * (évite l’erreur « Undefined array key code » et l’effacement des producteurs).
+     *
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    private function mapFieldsForUpdate(array $data): array
+    {
+        $fields = [];
+
+        if (array_key_exists('code', $data)) {
+            $fields['code'] = strtoupper((string) $data['code']);
+        }
+        if (array_key_exists('label', $data)) {
+            $fields['label'] = $data['label'];
+        }
+        if (array_key_exists('description', $data)) {
+            $fields['description'] = $data['description'];
+        }
+        if (array_key_exists('category', $data)) {
+            $fields['category'] = $data['category'];
+        }
+        if (array_key_exists('domain', $data)) {
+            $fields['domain'] = $data['domain'];
+        }
+        if (array_key_exists('structure_id', $data)) {
+            $fields['structure_id'] = $data['structure_id'];
+        }
+        if (array_key_exists('producer_id', $data)) {
+            $fields['producer_id'] = $data['producer_id'];
+        }
+        if (array_key_exists('deputy_id', $data)) {
+            $fields['deputy_id'] = $data['deputy_id'];
+        }
+        if (array_key_exists('calendar_id', $data)) {
+            $fields['calendar_id'] = $data['calendar_id'];
+        }
+        if (array_key_exists('frequency', $data)) {
+            $this->assertValidFrequency($data['frequency']);
+            $fields['frequency'] = $data['frequency'];
+        }
+        if (array_key_exists('schedule_config', $data)) {
+            $fields['schedule_config'] = $data['schedule_config'];
+        }
+        if (array_key_exists('deadline_time', $data)) {
+            $fields['deadline_time'] = $this->normalizeDeadlineTime($data['deadline_time']);
+        }
+        if (array_key_exists('timezone', $data)) {
+            $fields['timezone'] = $data['timezone'] ?: 'Africa/Bamako';
+        }
+        if (array_key_exists('valid_from', $data)) {
+            $fields['valid_from'] = $data['valid_from'];
+        }
+        if (array_key_exists('valid_until', $data)) {
+            $fields['valid_until'] = $data['valid_until'];
+        }
+        if (array_key_exists('confidentiality', $data)) {
+            $fields['confidentiality'] = $data['confidentiality'];
+        }
+        if (array_key_exists('deliverable_type', $data)) {
+            $fields['deliverable_type'] = $data['deliverable_type'];
+        }
+        if (array_key_exists('allowed_formats', $data)) {
+            $fields['allowed_formats'] = $data['allowed_formats'];
+        }
+        if (array_key_exists('min_files', $data)) {
+            $fields['min_files'] = $data['min_files'];
+        }
+        if (array_key_exists('max_files', $data)) {
+            $fields['max_files'] = $data['max_files'];
+        }
+        if (array_key_exists('max_file_size_kb', $data)) {
+            $fields['max_file_size_kb'] = $data['max_file_size_kb'];
+        }
+        if (array_key_exists('template_document_id', $data)) {
+            $fields['template_document_id'] = $data['template_document_id'];
+        }
+        if (array_key_exists('validation_required', $data)) {
+            $fields['validation_required'] = (bool) $data['validation_required'];
+        }
+        if (array_key_exists('validation_mode', $data)) {
+            $fields['validation_mode'] = $data['validation_mode'];
+        }
+        if (array_key_exists('auto_transmit', $data)) {
+            $fields['auto_transmit'] = (bool) $data['auto_transmit'];
+        }
+        if (array_key_exists('submit_to_parapheur', $data)) {
+            $fields['submit_to_parapheur'] = (bool) $data['submit_to_parapheur'];
+        }
+        if (array_key_exists('workflow_id', $data)) {
+            $fields['workflow_id'] = $data['workflow_id'];
+        }
+        if (array_key_exists('archive_enabled', $data)) {
+            $fields['archive_enabled'] = (bool) $data['archive_enabled'];
+        }
+        if (array_key_exists('is_active', $data)) {
+            $fields['is_active'] = (bool) $data['is_active'];
         }
 
         return $fields;
+    }
+
+    private function assertValidFrequency(mixed $frequency): void
+    {
+        if (! in_array($frequency, array_map(fn ($c) => $c->value, ProductionFrequency::cases()), true)) {
+            throw ValidationException::withMessages(['frequency' => 'Fréquence invalide.']);
+        }
+    }
+
+    private function normalizeDeadlineTime(mixed $deadlineTime): ?string
+    {
+        if ($deadlineTime === null || $deadlineTime === '') {
+            return null;
+        }
+
+        $value = (string) $deadlineTime;
+
+        return strlen($value) === 5 ? $value.':00' : $value;
     }
 
     /**

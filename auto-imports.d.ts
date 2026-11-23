@@ -204,6 +204,8 @@ declare global {
   const productionFrequencyLabels: typeof import('./resources/ts/utils/tasksUi')['productionFrequencyLabels']
   const productionStatusColor: typeof import('./resources/ts/utils/tasksUi')['productionStatusColor']
   const productionStatusLabels: typeof import('./resources/ts/utils/tasksUi')['productionStatusLabels']
+  const productionWeekdayLabel: typeof import('./resources/ts/utils/tasksUi')['productionWeekdayLabel']
+  const productionWeekdayOptions: typeof import('./resources/ts/utils/tasksUi')['productionWeekdayOptions']
   const provide: typeof import('vue')['provide']
   const provideLocal: typeof import('@vueuse/core')['provideLocal']
   const publicationStatusColor: typeof import('./resources/ts/utils/gedUi')['publicationStatusColor']
@@ -704,6 +706,8 @@ declare module 'vue' {
     readonly productionFrequencyLabels: UnwrapRef<typeof import('./resources/ts/utils/tasksUi')['productionFrequencyLabels']>
     readonly productionStatusColor: UnwrapRef<typeof import('./resources/ts/utils/tasksUi')['productionStatusColor']>
     readonly productionStatusLabels: UnwrapRef<typeof import('./resources/ts/utils/tasksUi')['productionStatusLabels']>
+    readonly productionWeekdayLabel: UnwrapRef<typeof import('./resources/ts/utils/tasksUi')['productionWeekdayLabel']>
+    readonly productionWeekdayOptions: UnwrapRef<typeof import('./resources/ts/utils/tasksUi')['productionWeekdayOptions']>
     readonly provide: UnwrapRef<typeof import('vue')['provide']>
     readonly provideLocal: UnwrapRef<typeof import('@vueuse/core')['provideLocal']>
     readonly publicationStatusColor: UnwrapRef<typeof import('./resources/ts/utils/gedUi')['publicationStatusColor']>

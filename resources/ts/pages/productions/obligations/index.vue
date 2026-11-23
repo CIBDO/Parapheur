@@ -1,7 +1,11 @@
 <script setup lang="ts">
 import ParapheurPageHeader from '@/components/parapheur/ParapheurPageHeader.vue'
 import UserAutocomplete from '@/components/common/UserAutocomplete.vue'
-import { productionFrequencyLabels } from '@/utils/tasksUi'
+import {
+  productionFrequencyLabels,
+  productionWeekdayLabel,
+  productionWeekdayOptions,
+} from '@/utils/tasksUi'
 
 definePage({
   meta: {
@@ -40,6 +44,7 @@ const emptyForm = () => ({
   calendar_id: null as number | null,
   confidentiality: 'restreint',
   schedule_weekday: 5,
+  schedule_weekdays: [1, 2, 3, 4, 5] as number[],
   schedule_day: 1,
   schedule_month: 1,
   schedule_days: '1,15',
@@ -102,6 +107,10 @@ const scheduleConfig = () => {
   const frequency = form.value.frequency
   if (frequency === 'weekly' || frequency === 'biweekly')
     return { weekday: Number(form.value.schedule_weekday) }
+  if (frequency === 'weekdays') {
+    const days = [...form.value.schedule_weekdays].map(Number).filter(day => day >= 0 && day <= 6)
+    return { weekdays: days.length ? days : [1, 2, 3, 4, 5] }
+  }
   if (frequency === 'semimonthly')
     return { days: form.value.schedule_days.split(',').map(part => Number(part.trim())).filter(Boolean) }
   if (frequency === 'monthly' || frequency === 'quarterly' || frequency === 'semiannual')
@@ -114,11 +123,50 @@ const scheduleConfig = () => {
   return null
 }
 
+const frequencyHint = computed(() => {
+  switch (form.value.frequency) {
+    case 'daily':
+      return 'Une occurrence chaque jour, y compris samedi et dimanche.'
+    case 'business_days':
+      return 'Lundi à vendredi uniquement (week-end exclu). Les jours fériés suivent le calendrier choisi.'
+    case 'weekdays':
+      return 'Cochez précisément les jours où une production doit être générée et notifiée.'
+    default:
+      return ''
+  }
+})
+
+const selectedWeekdaysLabel = computed(() => {
+  if (form.value.frequency !== 'weekdays')
+    return ''
+
+  return form.value.schedule_weekdays
+    .slice()
+    .sort((a, b) => (a === 0 ? 7 : a) - (b === 0 ? 7 : b))
+    .map(productionWeekdayLabel)
+    .join(', ')
+})
+
+const toggleScheduleWeekday = (day: number) => {
+  const current = form.value.schedule_weekdays
+  if (current.includes(day))
+    form.value.schedule_weekdays = current.filter(value => value !== day)
+  else
+    form.value.schedule_weekdays = [...current, day]
+}
+
+const canSubmitWizard = computed(() => {
+  if (form.value.frequency === 'weekdays' && !form.value.schedule_weekdays.length)
+    return false
+
+  return Boolean(form.value.code.trim() && form.value.label.trim())
+})
+
 const create = async () => {
   creating.value = true
   try {
     const {
-      schedule_weekday, schedule_day, schedule_month, schedule_days, once_date,
+      schedule_weekday, schedule_weekdays, schedule_day, schedule_month, schedule_days, once_date,
       recipient_user_id, include_dg, include_dga, ...payload
     } = form.value
     const recipients: { role_name?: string; user_id?: number | null }[] = []
@@ -390,6 +438,8 @@ onMounted(async () => {
               v-model="form.frequency"
               :items="frequencies"
               label="Fréquence"
+              :hint="frequencyHint"
+              persistent-hint
             />
             <AppTextField
               v-model="form.deadline_time"
@@ -401,14 +451,39 @@ onMounted(async () => {
               v-if="form.frequency === 'weekly' || form.frequency === 'biweekly'"
               v-model="form.schedule_weekday"
               label="Jour de la semaine"
-              :items="[
-                { title: 'Lundi', value: 1 },
-                { title: 'Mardi', value: 2 },
-                { title: 'Mercredi', value: 3 },
-                { title: 'Jeudi', value: 4 },
-                { title: 'Vendredi', value: 5 },
-              ]"
+              :items="[...productionWeekdayOptions]"
             />
+            <div
+              v-if="form.frequency === 'weekdays'"
+              class="d-flex flex-column gap-2"
+            >
+              <div class="text-body-2 font-weight-medium">
+                Jours d’envoi
+              </div>
+              <div class="text-caption text-medium-emphasis mb-1">
+                Sélectionnez un ou plusieurs jours. Aucune occurrence ni notification hors de ces jours.
+              </div>
+              <div class="d-flex flex-wrap gap-2">
+                <VChip
+                  v-for="day in productionWeekdayOptions"
+                  :key="day.value"
+                  :color="form.schedule_weekdays.includes(day.value) ? 'primary' : undefined"
+                  :variant="form.schedule_weekdays.includes(day.value) ? 'flat' : 'outlined'"
+                  filter
+                  :filter-icon="form.schedule_weekdays.includes(day.value) ? 'tabler-check' : undefined"
+                  label
+                  @click="toggleScheduleWeekday(day.value)"
+                >
+                  {{ day.title }}
+                </VChip>
+              </div>
+              <div
+                v-if="!form.schedule_weekdays.length"
+                class="text-caption text-error"
+              >
+                Choisissez au moins un jour.
+              </div>
+            </div>
             <AppTextField
               v-if="form.frequency === 'semimonthly'"
               v-model="form.schedule_days"
@@ -520,7 +595,9 @@ onMounted(async () => {
             />
             <VListItem
               title="Fréquence"
-              :subtitle="`${productionFrequencyLabels[form.frequency] || form.frequency} · ${form.deadline_time}`"
+              :subtitle="selectedWeekdaysLabel
+                ? `${productionFrequencyLabels[form.frequency]} · ${selectedWeekdaysLabel} · ${form.deadline_time}`
+                : `${productionFrequencyLabels[form.frequency] || form.frequency} · ${form.deadline_time}`"
             />
             <VListItem
               title="Validation"
@@ -547,6 +624,7 @@ onMounted(async () => {
           <VBtn
             v-if="step < wizardSteps.length"
             color="primary"
+            :disabled="step === 3 && form.frequency === 'weekdays' && !form.schedule_weekdays.length"
             @click="step++"
           >
             Suivant
@@ -556,6 +634,7 @@ onMounted(async () => {
             color="primary"
             prepend-icon="tabler-check"
             :loading="creating"
+            :disabled="!canSubmitWizard"
             @click="create"
           >
             Activer

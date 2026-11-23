@@ -82,10 +82,10 @@ export const productionStatusLabels: Record<string, string> = {
 
 export const productionFrequencyLabels: Record<string, string> = {
   once: 'Ponctuelle',
-  daily: 'Quotidienne',
-  business_days: 'Jours ouvrables',
+  daily: 'Quotidienne (7 j/7)',
+  business_days: 'Jours ouvrables (lun–ven)',
   weekly: 'Hebdomadaire',
-  weekdays: 'Jours de la semaine',
+  weekdays: 'Jours choisis de la semaine',
   biweekly: 'Toutes les deux semaines',
   semimonthly: 'Deux fois par mois',
   monthly: 'Mensuelle',
@@ -94,6 +94,21 @@ export const productionFrequencyLabels: Record<string, string> = {
   annual: 'Annuelle',
   specific_dates: 'Dates spécifiques',
   custom: 'Personnalisée',
+}
+
+/** Carbon dayOfWeek : 0 = dimanche … 6 = samedi */
+export const productionWeekdayOptions = [
+  { title: 'Lundi', value: 1 },
+  { title: 'Mardi', value: 2 },
+  { title: 'Mercredi', value: 3 },
+  { title: 'Jeudi', value: 4 },
+  { title: 'Vendredi', value: 5 },
+  { title: 'Samedi', value: 6 },
+  { title: 'Dimanche', value: 0 },
+] as const
+
+export const productionWeekdayLabel = (day: number): string => {
+  return productionWeekdayOptions.find(item => item.value === day)?.title ?? String(day)
 }
 
 export const productionDelayLabels: Record<string, string> = {

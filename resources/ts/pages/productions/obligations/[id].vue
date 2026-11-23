@@ -1,7 +1,11 @@
 <script setup lang="ts">
 import ParapheurPageHeader from '@/components/parapheur/ParapheurPageHeader.vue'
 import { useProductions } from '@/composables/useProductions'
-import { productionFrequencyLabels } from '@/utils/tasksUi'
+import {
+  productionFrequencyLabels,
+  productionWeekdayLabel,
+  productionWeekdayOptions,
+} from '@/utils/tasksUi'
 
 definePage({
   meta: {
@@ -30,9 +34,38 @@ const editForm = ref({
   label: '',
   description: '',
   deadline_time: '',
+  frequency: 'business_days',
+  schedule_weekday: 5,
+  schedule_weekdays: [1, 2, 3, 4, 5] as number[],
   validation_required: true,
   auto_transmit: false,
   submit_to_parapheur: false,
+})
+
+const scheduleSummary = computed(() => {
+  if (!item.value)
+    return ''
+
+  const frequency = item.value.frequency
+  const config = item.value.schedule_config || {}
+
+  if (frequency === 'weekdays') {
+    const days = (config.weekdays || []).map((day: number) => productionWeekdayLabel(Number(day)))
+
+    return days.length ? days.join(', ') : 'Aucun jour défini'
+  }
+
+  if (frequency === 'weekly' || frequency === 'biweekly') {
+    return productionWeekdayLabel(Number(config.weekday ?? 5))
+  }
+
+  if (frequency === 'business_days')
+    return 'Lundi à vendredi'
+
+  if (frequency === 'daily')
+    return 'Tous les jours'
+
+  return ''
 })
 
 const suspendForm = ref({
@@ -64,14 +97,44 @@ const reminderLabel = (rule: any) => {
 const syncEditForm = () => {
   if (!item.value)
     return
+  const config = item.value.schedule_config || {}
   editForm.value = {
     label: item.value.label || '',
     description: item.value.description || '',
     deadline_time: item.value.deadline_time || '',
+    frequency: item.value.frequency || 'business_days',
+    schedule_weekday: Number(config.weekday ?? 5),
+    schedule_weekdays: Array.isArray(config.weekdays) && config.weekdays.length
+      ? config.weekdays.map((day: number) => Number(day))
+      : [1, 2, 3, 4, 5],
     validation_required: Boolean(item.value.validation_required),
     auto_transmit: Boolean(item.value.auto_transmit),
     submit_to_parapheur: Boolean(item.value.submit_to_parapheur),
   }
+}
+
+const toggleEditWeekday = (day: number) => {
+  const current = editForm.value.schedule_weekdays
+  if (current.includes(day))
+    editForm.value.schedule_weekdays = current.filter(value => value !== day)
+  else
+    editForm.value.schedule_weekdays = [...current, day]
+}
+
+const buildScheduleConfig = () => {
+  if (editForm.value.frequency === 'weekdays') {
+    const days = editForm.value.schedule_weekdays.filter(day => day >= 0 && day <= 6)
+
+    return { weekdays: days.length ? days : [1, 2, 3, 4, 5] }
+  }
+
+  if (editForm.value.frequency === 'weekly' || editForm.value.frequency === 'biweekly')
+    return { weekday: Number(editForm.value.schedule_weekday) }
+
+  if (item.value?.schedule_config)
+    return item.value.schedule_config
+
+  return null
 }
 
 const load = async () => {
@@ -97,6 +160,8 @@ const save = async () => {
       label: editForm.value.label,
       description: editForm.value.description || null,
       deadline_time: editForm.value.deadline_time || null,
+      frequency: editForm.value.frequency,
+      schedule_config: buildScheduleConfig(),
       validation_required: editForm.value.validation_required,
       auto_transmit: editForm.value.auto_transmit,
       submit_to_parapheur: editForm.value.submit_to_parapheur,
@@ -256,6 +321,14 @@ onMounted(load)
                 {{ productionFrequencyLabels[item.frequency] || item.frequency }}
               </VChip>
               <VChip
+                v-if="scheduleSummary"
+                size="small"
+                variant="tonal"
+                prepend-icon="tabler-calendar-week"
+              >
+                {{ scheduleSummary }}
+              </VChip>
+              <VChip
                 size="small"
                 variant="tonal"
                 prepend-icon="tabler-clock"
@@ -280,6 +353,38 @@ onMounted(load)
                   label="Heure limite"
                   placeholder="HH:MM:SS"
                 />
+                <AppSelect
+                  v-model="editForm.frequency"
+                  label="Fréquence / jours d’envoi"
+                  :items="Object.entries(productionFrequencyLabels).map(([value, title]) => ({ title, value }))"
+                />
+                <AppSelect
+                  v-if="editForm.frequency === 'weekly' || editForm.frequency === 'biweekly'"
+                  v-model="editForm.schedule_weekday"
+                  label="Jour de la semaine"
+                  :items="[...productionWeekdayOptions]"
+                />
+                <div
+                  v-if="editForm.frequency === 'weekdays'"
+                  class="d-flex flex-column gap-2"
+                >
+                  <div class="text-body-2 font-weight-medium">
+                    Jours d’envoi
+                  </div>
+                  <div class="d-flex flex-wrap gap-2">
+                    <VChip
+                      v-for="day in productionWeekdayOptions"
+                      :key="day.value"
+                      :color="editForm.schedule_weekdays.includes(day.value) ? 'primary' : undefined"
+                      :variant="editForm.schedule_weekdays.includes(day.value) ? 'flat' : 'outlined'"
+                      filter
+                      label
+                      @click="toggleEditWeekday(day.value)"
+                    >
+                      {{ day.title }}
+                    </VChip>
+                  </div>
+                </div>
                 <div class="d-flex flex-wrap gap-4">
                   <VSwitch
                     v-model="editForm.validation_required"
@@ -304,7 +409,7 @@ onMounted(load)
                   <VBtn
                     color="primary"
                     :loading="saving"
-                    :disabled="!editForm.label.trim()"
+                    :disabled="!editForm.label.trim() || (editForm.frequency === 'weekdays' && !editForm.schedule_weekdays.length)"
                     @click="save"
                   >
                     Enregistrer

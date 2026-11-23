@@ -180,6 +180,23 @@ class ProductionModuleTest extends TestCase
         $this->assertTrue($recurrence->shouldGenerate($obligation, Carbon::parse('2026-10-12'))); // Monday
     }
 
+    public function test_weekdays_frequency_respects_selected_days(): void
+    {
+        $obligation = new ProductionObligation([
+            'frequency' => ProductionFrequency::Weekdays,
+            'schedule_config' => ['weekdays' => [1, 3, 5]], // lun, mer, ven
+            'is_active' => true,
+        ]);
+
+        $recurrence = app(RecurrenceService::class);
+        // 2026-11-23 = lundi, 24 = mardi, 25 = mercredi, 21 = samedi, 22 = dimanche
+        $this->assertTrue($recurrence->shouldGenerate($obligation, Carbon::parse('2026-11-23')));
+        $this->assertFalse($recurrence->shouldGenerate($obligation, Carbon::parse('2026-11-24')));
+        $this->assertTrue($recurrence->shouldGenerate($obligation, Carbon::parse('2026-11-25')));
+        $this->assertFalse($recurrence->shouldGenerate($obligation, Carbon::parse('2026-11-21')));
+        $this->assertFalse($recurrence->shouldGenerate($obligation, Carbon::parse('2026-11-22')));
+    }
+
     public function test_inactive_obligation_does_not_generate(): void
     {
         $admin = User::factory()->create();
@@ -199,6 +216,39 @@ class ProductionModuleTest extends TestCase
             ->where('production_obligation_id', $obligation->id)
             ->count());
         $this->assertGreaterThanOrEqual(0, $result['skipped']);
+    }
+
+    public function test_partial_obligation_update_does_not_require_code(): void
+    {
+        $admin = User::factory()->create();
+        $admin->assignRole('Administrateur');
+        $producer = User::factory()->create();
+
+        $obligation = ProductionObligation::query()->create([
+            'code' => 'PARTIAL-UPD',
+            'label' => 'Libellé initial',
+            'description' => 'Desc initiale',
+            'producer_id' => $producer->id,
+            'frequency' => ProductionFrequency::Daily->value,
+            'deadline_time' => '10:00:00',
+            'is_active' => true,
+            'created_by' => $admin->id,
+        ]);
+
+        Sanctum::actingAs($admin);
+
+        $this->putJson('/api/productions/obligations/'.$obligation->id, [
+            'label' => 'Libellé modifié',
+            'description' => 'Nouvelle description',
+            'deadline_time' => '11:30',
+            'validation_required' => false,
+            'auto_transmit' => true,
+            'submit_to_parapheur' => false,
+        ])->assertOk()
+            ->assertJsonPath('code', 'PARTIAL-UPD')
+            ->assertJsonPath('label', 'Libellé modifié')
+            ->assertJsonPath('producer_id', $producer->id)
+            ->assertJsonPath('deadline_time', '11:30:00');
     }
 
     public function test_holiday_blocks_generation(): void
