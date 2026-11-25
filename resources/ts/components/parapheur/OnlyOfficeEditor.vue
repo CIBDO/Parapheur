@@ -22,8 +22,9 @@ const compareVersions = ref<Array<{ title: string; value: number }>>([])
 const selectedCompareVersion = ref<number | null>(null)
 
 const EDITOR_HEIGHT_PX = 720
-const READY_TIMEOUT_MS = 20000
-const SCRIPT_TIMEOUT_MS = 12000
+/** Docs distant / 1ʳᵉ conversion : 20s trop court → faux positif « pas d’iframe ». */
+const READY_TIMEOUT_MS = 60000
+const SCRIPT_TIMEOUT_MS = 20000
 
 let editorId = `oo-editor-${props.documentId}-${Math.random().toString(36).slice(2, 9)}`
 const vueAnchor = ref<HTMLElement | null>(null)
@@ -248,6 +249,9 @@ const initEditor = async () => {
         onAppReady() {
           if (generation !== initGeneration)
             return
+          // Shell éditeur prêt : ce n’est plus « pas d’iframe ».
+          if (error.value.includes('iframe') || error.value.includes('healthcheck'))
+            error.value = ''
           loading.value = false
         },
         onDocumentReady() {
@@ -256,6 +260,8 @@ const initEditor = async () => {
           clearReadyTimer()
           loading.value = false
           documentReady.value = true
+          // Document ouvert après un timeout trop agressif → retirer le faux positif.
+          error.value = ''
         },
         onDocumentStateChange(event: { data?: boolean }) {
           // Ne pas rafraîchir tout le dossier ici (re-render parent).
@@ -331,11 +337,18 @@ const initEditor = async () => {
       if (generation !== initGeneration || documentReady.value || error.value)
         return
 
+      // iframe parfois hors du host (wrapper Docs) : chercher aussi dans le parent.
       const iframeCount = host.querySelectorAll('iframe').length
-      error.value = iframeCount
-        ? 'ONLYOFFICE a chargé une iframe mais le document ne s’ouvre pas (JWT, téléchargement fichier ou ONLYOFFICE_APP_URL injoignable depuis Docs).'
-        : 'ONLYOFFICE n’a pas créé d’iframe. Vérifiez que le Document Server répond (ONLYOFFICE_URL / healthcheck) puis réessayez.'
-      emit('error', error.value)
+        + (host.parentElement?.querySelectorAll('iframe').length ?? 0)
+
+      if (iframeCount > 0) {
+        // Éditeur déjà là : warning soft (conversion / fetch fichier encore en cours).
+        error.value = 'Chargement du document encore en cours côté Document Server (réseau, JWT ou ONLYOFFICE_APP_URL). Patientez ou réessayez.'
+      }
+      else {
+        error.value = 'ONLYOFFICE n’a pas créé d’iframe. Vérifiez que le Document Server répond (ONLYOFFICE_URL / healthcheck) puis réessayez.'
+        emit('error', error.value)
+      }
       loading.value = false
     }, READY_TIMEOUT_MS)
   }
