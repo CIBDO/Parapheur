@@ -13,6 +13,7 @@ definePage({
 })
 
 const router = useRouter()
+const ability = useAbility()
 const {
   loading, workspace, storage, recent, folders, storageLabel, storagePct, load,
 } = useWorkspaceHome()
@@ -22,6 +23,13 @@ const hasSearched = ref(false)
 const showAdvanced = ref(false)
 const simpleQuery = ref('')
 const searchResults = ref<any[]>([])
+
+const canManageQuotas = computed(() =>
+  ability.can('manage', 'WorkspaceAdmin') || ability.can('manage', 'all'),
+)
+const canReadLibrary = computed(() =>
+  ability.can('read', 'Library') || ability.can('manage', 'all') || ability.can('read', 'Workspace'),
+)
 
 const filters = ref({
   q: '',
@@ -45,12 +53,29 @@ const provenanceColor: Record<string, string> = {
   reference: 'info',
 }
 
-const cards = computed(() => [
-  { title: 'Mes fichiers', icon: 'tabler-folder', color: 'primary', to: 'espace-dossiers', value: folders.value.length, hint: 'Explorer' },
-  { title: 'Partagés avec moi', icon: 'tabler-share', color: 'success', to: 'espace-partages', value: null, hint: 'Reçus' },
-  { title: 'Équipes', icon: 'tabler-users', color: 'secondary', to: 'espace-collaboratifs', value: null, hint: 'Espaces partagés' },
-  { title: 'Bibliothèque', icon: 'tabler-books', color: 'info', to: 'espace-bibliotheque', value: null, hint: 'Références' },
-])
+const cards = computed(() => {
+  const items = [
+    { title: 'Mes fichiers', icon: 'tabler-folder', color: 'primary', to: 'espace-dossiers', value: folders.value.length, hint: 'Explorer' },
+    { title: 'Partagés avec moi', icon: 'tabler-share', color: 'success', to: 'espace-partages', value: null, hint: 'Reçus' },
+    { title: 'Équipes', icon: 'tabler-users', color: 'secondary', to: 'espace-collaboratifs', value: null, hint: 'Espaces partagés' },
+    { title: 'Récents', icon: 'tabler-history', color: 'info', to: 'espace-recents', value: recent.value.length || null, hint: 'Consultés' },
+    { title: 'Favoris', icon: 'tabler-star', color: 'warning', to: 'espace-favoris', value: null, hint: 'Marqués' },
+    { title: 'Corbeille', icon: 'tabler-trash', color: 'error', to: 'espace-corbeille', value: null, hint: 'Supprimés' },
+  ]
+
+  if (canReadLibrary.value) {
+    items.push({
+      title: 'Bibliothèque',
+      icon: 'tabler-books',
+      color: 'info',
+      to: 'espace-bibliotheque',
+      value: null,
+      hint: 'Références',
+    })
+  }
+
+  return items
+})
 
 const activeFilterCount = computed(() => {
   let n = 0
@@ -100,12 +125,37 @@ const tableTitle = computed(() =>
     : 'Récemment consultés',
 )
 
-const quickActions = [
-  { title: 'Mes dossiers', icon: 'tabler-folder', color: 'primary', route: 'espace-dossiers' },
-  { title: 'Mes documents', icon: 'tabler-files', color: 'info', route: 'espace-documents' },
-  { title: 'Partagés', icon: 'tabler-share', color: 'success', route: 'espace-partages' },
-  { title: 'Collaboratifs', icon: 'tabler-users', color: 'secondary', route: 'espace-collaboratifs' },
-]
+const quickActions = computed(() => {
+  const actions = [
+    { title: 'Mes dossiers', icon: 'tabler-folder', color: 'primary', route: 'espace-dossiers' },
+    { title: 'Mes documents', icon: 'tabler-files', color: 'info', route: 'espace-documents' },
+    { title: 'Partagés', icon: 'tabler-share', color: 'success', route: 'espace-partages' },
+    { title: 'Équipes', icon: 'tabler-users', color: 'secondary', route: 'espace-collaboratifs' },
+    { title: 'Récents', icon: 'tabler-history', color: 'info', route: 'espace-recents' },
+    { title: 'Favoris', icon: 'tabler-star', color: 'warning', route: 'espace-favoris' },
+    { title: 'Corbeille', icon: 'tabler-trash', color: 'error', route: 'espace-corbeille' },
+    { title: 'Recherche', icon: 'tabler-search', color: 'primary', route: 'espace-recherche' },
+  ]
+
+  if (canReadLibrary.value) {
+    actions.push({
+      title: 'Bibliothèque',
+      icon: 'tabler-books',
+      color: 'info',
+      route: 'espace-bibliotheque',
+    })
+  }
+  if (canManageQuotas.value) {
+    actions.push({
+      title: 'Quotas',
+      icon: 'tabler-database-cog',
+      color: 'secondary',
+      route: 'espace-admin',
+    })
+  }
+
+  return actions
+})
 
 const recentHeaders = [
   { title: 'Document', key: 'title' },
@@ -188,6 +238,43 @@ const workspaceTypeLabel = computed(() => {
     >
       <template #actions>
         <VBtn
+          color="primary"
+          prepend-icon="tabler-folder"
+          :to="{ name: 'espace-dossiers' }"
+        >
+          Mes fichiers
+        </VBtn>
+        <VBtn
+          variant="tonal"
+          prepend-icon="tabler-share"
+          :to="{ name: 'espace-partages' }"
+        >
+          Partagés
+        </VBtn>
+        <VBtn
+          variant="tonal"
+          prepend-icon="tabler-users"
+          :to="{ name: 'espace-collaboratifs' }"
+        >
+          Équipes
+        </VBtn>
+        <VBtn
+          v-if="canReadLibrary"
+          variant="tonal"
+          prepend-icon="tabler-books"
+          :to="{ name: 'espace-bibliotheque' }"
+        >
+          Bibliothèque
+        </VBtn>
+        <VBtn
+          v-if="canManageQuotas"
+          variant="tonal"
+          prepend-icon="tabler-database-cog"
+          :to="{ name: 'espace-admin' }"
+        >
+          Quotas
+        </VBtn>
+        <VBtn
           variant="tonal"
           color="primary"
           prepend-icon="tabler-refresh"
@@ -195,13 +282,6 @@ const workspaceTypeLabel = computed(() => {
           @click="load"
         >
           Actualiser
-        </VBtn>
-        <VBtn
-          color="primary"
-          prepend-icon="tabler-folder"
-          :to="{ name: 'espace-dossiers' }"
-        >
-          Ouvrir mes dossiers
         </VBtn>
       </template>
     </ParapheurPageHeader>
@@ -383,7 +463,8 @@ const workspaceTypeLabel = computed(() => {
         :key="card.to"
         cols="12"
         sm="6"
-        md="3"
+        md="4"
+        lg="3"
       >
         <VCard
           class="kpi-card cursor-pointer h-100"
@@ -451,6 +532,15 @@ const workspaceTypeLabel = computed(() => {
                 size="small"
                 variant="tonal"
                 color="primary"
+                class="me-2"
+                :to="{ name: 'espace-recents' }"
+              >
+                Récents
+              </VBtn>
+              <VBtn
+                v-if="!hasSearched"
+                size="small"
+                variant="tonal"
                 :to="{ name: 'espace-documents' }"
               >
                 Voir tous
