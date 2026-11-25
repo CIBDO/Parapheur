@@ -542,7 +542,7 @@ class AppointmentController extends Controller
                 ->where('end_at', '>=', $request->date('from'));
         }
 
-        return response()->json($query->orderBy('start_at')->paginate(50));
+        return response()->json($query->orderByDesc('start_at')->orderByDesc('id')->paginate(50));
     }
 
     public function storeUnavailability(Request $request): JsonResponse

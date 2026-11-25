@@ -146,6 +146,66 @@ class TaskAccessService
             || ($user->can('task.cancel') && (int) $task->created_by === (int) $user->id);
     }
 
+    /**
+     * Actions workflow réellement proposables à l'utilisateur (statut + droits).
+     *
+     * @return list<string>
+     */
+    public function availableActions(User $user, Task $task): array
+    {
+        if (! $this->canView($user, $task)) {
+            return [];
+        }
+
+        $status = $task->status instanceof TaskStatus
+            ? $task->status
+            : TaskStatus::tryFrom((string) $task->status);
+
+        if (! $status || $status->isTerminal()) {
+            return [];
+        }
+
+        $actions = [];
+
+        if ($status === TaskStatus::Brouillon
+            && ((int) $task->created_by === (int) $user->id || $this->isAdmin($user))) {
+            $actions[] = 'publish';
+        }
+
+        if ($status === TaskStatus::Imputee && $this->canTakeCharge($user, $task)) {
+            $actions[] = 'take_charge';
+        }
+
+        if (in_array($status, [TaskStatus::PriseEnCharge, TaskStatus::Retournee, TaskStatus::EnAttente], true)
+            && ($this->canTakeCharge($user, $task) || $this->canUpdate($user, $task))) {
+            $actions[] = 'start';
+        }
+
+        if ($status === TaskStatus::EnCours && $this->canUpdate($user, $task)) {
+            $actions[] = 'wait';
+        }
+
+        if ($status === TaskStatus::EnCours && $this->canComplete($user, $task)) {
+            $actions[] = 'complete';
+        }
+
+        if ($status === TaskStatus::AValider && $this->canValidate($user, $task)) {
+            $actions[] = 'validate';
+            $actions[] = 'return';
+        }
+
+        if ($this->canAssign($user, $task)) {
+            $actions[] = 'reassign';
+            $actions[] = 'escalate';
+        }
+
+        if ($this->canCancel($user, $task)) {
+            $actions[] = 'cancel';
+        }
+
+        return array_values(array_unique($actions));
+    }
+
     public function isDirectParticipant(User $user, Task $task): bool
     {
         if (in_array((int) $user->id, [

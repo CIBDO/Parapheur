@@ -131,9 +131,8 @@ const productionLink = computed(() => {
   return `/productions/occurrences/${task.value.source_id}`
 })
 
-const canManageAssignment = computed(() =>
-  !['validee', 'annulee'].includes(String(task.value?.status || '')),
-)
+const actions = computed(() => new Set<string>(task.value?.available_actions || []))
+const can = (action: string) => actions.value.has(action)
 
 watch(
   () => [task.value?.status, task.value?.progress],
@@ -591,7 +590,7 @@ watch(activeTab, (tab) => {
 
             <VCardText class="d-flex flex-wrap gap-2 py-3">
               <VBtn
-                v-if="task.status === 'brouillon'"
+                v-if="can('publish')"
                 color="primary"
                 prepend-icon="tabler-send"
                 :loading="acting"
@@ -600,7 +599,7 @@ watch(activeTab, (tab) => {
                 Publier / Imputer
               </VBtn>
               <VBtn
-                v-if="task.status === 'imputee'"
+                v-if="can('take_charge')"
                 color="info"
                 prepend-icon="tabler-hand-click"
                 :loading="acting"
@@ -609,7 +608,7 @@ watch(activeTab, (tab) => {
                 Prendre en charge
               </VBtn>
               <VBtn
-                v-if="['prise_en_charge', 'retournee', 'en_attente'].includes(task.status)"
+                v-if="can('start')"
                 color="primary"
                 prepend-icon="tabler-player-play"
                 :loading="acting"
@@ -618,7 +617,7 @@ watch(activeTab, (tab) => {
                 Démarrer
               </VBtn>
               <VBtn
-                v-if="task.status === 'en_cours'"
+                v-if="can('wait')"
                 color="warning"
                 variant="tonal"
                 prepend-icon="tabler-player-pause"
@@ -628,7 +627,7 @@ watch(activeTab, (tab) => {
                 Mettre en attente
               </VBtn>
               <VBtn
-                v-if="task.status === 'en_cours'"
+                v-if="can('complete')"
                 color="success"
                 prepend-icon="tabler-circle-check"
                 :loading="acting"
@@ -637,7 +636,7 @@ watch(activeTab, (tab) => {
                 Terminer
               </VBtn>
               <VBtn
-                v-if="task.status === 'a_valider'"
+                v-if="can('validate')"
                 color="success"
                 prepend-icon="tabler-checks"
                 :loading="acting"
@@ -646,7 +645,7 @@ watch(activeTab, (tab) => {
                 Valider
               </VBtn>
               <VBtn
-                v-if="task.status === 'a_valider'"
+                v-if="can('return')"
                 color="warning"
                 variant="tonal"
                 prepend-icon="tabler-arrow-back-up"
@@ -656,7 +655,7 @@ watch(activeTab, (tab) => {
                 Retourner
               </VBtn>
               <VBtn
-                v-if="canManageAssignment && ($can('update', 'Task') || $can('manage', 'Task'))"
+                v-if="can('reassign')"
                 color="info"
                 variant="tonal"
                 prepend-icon="tabler-user-share"
@@ -666,7 +665,7 @@ watch(activeTab, (tab) => {
                 Réaffecter
               </VBtn>
               <VBtn
-                v-if="canManageAssignment && ($can('update', 'Task') || $can('manage', 'Task'))"
+                v-if="can('escalate')"
                 color="warning"
                 variant="tonal"
                 prepend-icon="tabler-arrow-up-right"
@@ -677,7 +676,7 @@ watch(activeTab, (tab) => {
               </VBtn>
               <VSpacer />
               <VBtn
-                v-if="!['validee', 'annulee'].includes(task.status)"
+                v-if="can('cancel')"
                 color="error"
                 variant="tonal"
                 prepend-icon="tabler-x"

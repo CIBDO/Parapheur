@@ -64,7 +64,8 @@ class WorkspaceService
             })
             ->withCount('members')
             ->with(['owner:id,name,email'])
-            ->orderBy('name')
+            ->orderByDesc('updated_at')
+            ->orderByDesc('id')
             ->get();
 
         return $workspaces->map(fn (Workspace $ws) => $this->serializeWorkspace($ws, $user));

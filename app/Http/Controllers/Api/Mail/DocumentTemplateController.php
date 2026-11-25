@@ -36,7 +36,7 @@ class DocumentTemplateController extends Controller
             $query->where('is_active', $request->boolean('is_active'));
         }
 
-        return response()->json($query->orderBy('name')->paginate($request->integer('per_page', 20)));
+        return response()->json($query->orderByDesc('updated_at')->orderByDesc('id')->paginate($request->integer('per_page', 20)));
     }
 
     public function store(Request $request): JsonResponse

@@ -43,7 +43,7 @@ class MeetingDecisionController extends Controller
                 ->whereNotIn('status', ['executee', 'cloturee', 'annulee']);
         }
 
-        $paginator = $query->orderByRaw('due_date is null')->orderBy('due_date')->paginate($request->integer('per_page') ?: 20);
+        $paginator = $query->orderByRaw('due_date is null')->orderByDesc('due_date')->orderByDesc('id')->paginate($request->integer('per_page') ?: 20);
         $visible = $paginator->getCollection()->filter(function (MeetingDecision $decision) use ($request) {
             return $decision->meeting && $this->access->canView($request->user(), $decision->meeting);
         })->values()->map(fn (MeetingDecision $d) => [

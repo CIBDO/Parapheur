@@ -56,7 +56,7 @@ class ProductionDefinitionService
             });
         }
 
-        return $query->orderBy('code')->paginate((int) ($filters['per_page'] ?? 20));
+        return $query->orderByDesc('created_at')->orderByDesc('id')->paginate((int) ($filters['per_page'] ?? 20));
     }
 
     /**

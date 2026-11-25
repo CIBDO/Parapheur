@@ -25,7 +25,7 @@ class ArchiveRetentionController extends Controller
         $rules = ArchiveRetentionRule::query()
             ->with(['structure', 'series'])
             ->when($request->boolean('active_only', true), fn ($q) => $q->where('is_active', true))
-            ->orderBy('code')
+            ->orderByDesc('id')
             ->orderByDesc('version')
             ->get();
 

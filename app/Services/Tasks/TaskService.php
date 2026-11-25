@@ -132,14 +132,14 @@ class TaskService
         }
 
         $allowedSorts = ['due_at', 'created_at', 'updated_at', 'priority', 'status', 'title', 'id'];
-        $sort = in_array(($filters['sort'] ?? 'due_at'), $allowedSorts, true)
-            ? ($filters['sort'] ?? 'due_at')
-            : 'due_at';
-        $dir = ($filters['dir'] ?? 'asc') === 'desc' ? 'desc' : 'asc';
+        $sort = in_array(($filters['sort'] ?? 'created_at'), $allowedSorts, true)
+            ? ($filters['sort'] ?? 'created_at')
+            : 'created_at';
+        $dir = ($filters['dir'] ?? 'desc') === 'asc' ? 'asc' : 'desc';
         if ($sort === 'due_at') {
             $query->orderByRaw('due_at is null')->orderBy('due_at', $dir)->orderByDesc('id');
         } else {
-            $query->orderBy($sort, $dir);
+            $query->orderBy($sort, $dir)->orderByDesc('id');
         }
 
         return $query->paginate((int) ($filters['per_page'] ?? 20));
@@ -589,7 +589,7 @@ class TaskService
         }
 
         $columns = [];
-        foreach ($query->orderBy('due_at')->limit(300)->get() as $task) {
+        foreach ($query->orderByDesc('created_at')->orderByDesc('id')->limit(300)->get() as $task) {
             $status = $task->status?->value ?? 'unknown';
             $columns[$status] ??= [];
             $columns[$status][] = [

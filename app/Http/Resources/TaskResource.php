@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources;
 
+use App\Services\Tasks\TaskAccessService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -15,6 +16,8 @@ class TaskResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
+        $actor = $request->user();
+
         return [
             'id' => $this->id,
             'reference' => $this->reference,
@@ -59,6 +62,9 @@ class TaskResource extends JsonResource
             'validations' => $this->whenLoaded('validations'),
             'dependencies' => $this->whenLoaded('dependencies'),
             'document_links' => $this->whenLoaded('documentLinks'),
+            'available_actions' => $actor
+                ? app(TaskAccessService::class)->availableActions($actor, $this->resource)
+                : [],
             'created_at' => optional($this->created_at)?->toIso8601String(),
             'updated_at' => optional($this->updated_at)?->toIso8601String(),
         ];

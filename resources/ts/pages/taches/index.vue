@@ -160,6 +160,47 @@ onMounted(reload)
       </VCol>
     </VRow>
 
+    <VCard class="mb-4">
+      <VCardText class="d-flex flex-wrap gap-2 py-3">
+        <VChip
+          :color="view === 'mine' ? 'primary' : undefined"
+          :variant="view === 'mine' ? 'flat' : 'tonal'"
+          prepend-icon="tabler-user-check"
+          link
+          @click="router.push({ name: 'taches', query: { view: 'mine' } })"
+        >
+          Mes tâches
+        </VChip>
+        <VChip
+          :color="view === 'assigned' ? 'primary' : undefined"
+          :variant="view === 'assigned' ? 'flat' : 'tonal'"
+          prepend-icon="tabler-send"
+          link
+          @click="router.push({ name: 'taches', query: { view: 'assigned' } })"
+        >
+          Imputées par moi
+        </VChip>
+        <VChip
+          :color="view === 'validate' ? 'primary' : undefined"
+          :variant="view === 'validate' ? 'flat' : 'tonal'"
+          prepend-icon="tabler-checks"
+          link
+          @click="router.push({ name: 'taches', query: { view: 'validate' } })"
+        >
+          À valider
+        </VChip>
+        <VChip
+          :color="view === 'overdue' ? 'error' : undefined"
+          :variant="view === 'overdue' ? 'flat' : 'tonal'"
+          prepend-icon="tabler-alert-triangle"
+          link
+          @click="router.push({ name: 'taches', query: { view: 'overdue' } })"
+        >
+          En retard
+        </VChip>
+      </VCardText>
+    </VCard>
+
     <VCard>
       <VCardText>
         <VRow>
