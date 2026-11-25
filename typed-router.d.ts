@@ -129,7 +129,7 @@ declare module 'vue-router/auto-routes' {
     'parapheur-meeting-types': RouteRecordInfo<'parapheur-meeting-types', '/parapheur/meeting-types', Record<never, never>, Record<never, never>>,
     'parapheur-nouveau': RouteRecordInfo<'parapheur-nouveau', '/parapheur/nouveau', Record<never, never>, Record<never, never>>,
     'parapheur-reporting': RouteRecordInfo<'parapheur-reporting', '/parapheur/reporting', Record<never, never>, Record<never, never>>,
-    'parapheur-reunions-parent': RouteRecordInfo<'parapheur-reunions-parent', '/parapheur/reunions', Record<never, never>, Record<never, never>>,
+    'parapheur-reunions-shell': RouteRecordInfo<'parapheur-reunions-shell', '/parapheur/reunions', Record<never, never>, Record<never, never>>,
     'parapheur-reunions': RouteRecordInfo<'parapheur-reunions', '/parapheur/reunions', Record<never, never>, Record<never, never>>,
     'parapheur-reunions-id': RouteRecordInfo<'parapheur-reunions-id', '/parapheur/reunions/:id', { id: ParamValue<true> }, { id: ParamValue<false> }>,
     'parapheur-reunions-calendrier': RouteRecordInfo<'parapheur-reunions-calendrier', '/parapheur/reunions/calendrier', Record<never, never>, Record<never, never>>,
