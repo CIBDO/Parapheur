@@ -8,6 +8,9 @@
  * sous-pages hors liste (nouvelle, détail, séance, …).
  */
 definePage({
+  // Évite le warning Vue Router « parent named … empty path child ».
+  // La route navigable reste `parapheur-reunions` (index.vue).
+  name: false,
   meta: {
     navActiveLink: 'parapheur-reunions',
   },

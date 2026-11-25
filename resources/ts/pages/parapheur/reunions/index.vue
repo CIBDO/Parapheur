@@ -4,6 +4,7 @@ import { formatDateFr } from '@/utils/parapheurUi'
 import { meetingStatusColor, meetingStatusLabels } from '@/utils/meetingsUi'
 
 definePage({
+  name: 'parapheur-reunions',
   meta: {
     action: 'read',
     subject: 'Meeting',

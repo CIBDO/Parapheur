@@ -128,6 +128,47 @@ class TaskModuleTest extends TestCase
         return [$chef, $agent];
     }
 
+    public function test_subtask_inherits_parent_assignee_and_blocks_parent_completion(): void
+    {
+        [$chef, $agent] = $this->chefAndAgent();
+
+        Sanctum::actingAs($chef);
+        $parentId = $this->postJson('/api/tasks', [
+            'title' => 'Tâche parente',
+            'assignee_id' => $agent->id,
+            'due_at' => now()->addDays(2)->toISOString(),
+        ])->assertCreated()->json('id');
+
+        $sub = $this->postJson("/api/tasks/{$parentId}/subtasks", [
+            'title' => 'Sous-partie A',
+        ])->assertCreated();
+
+        $this->assertSame($agent->id, $sub->json('assignee_id'));
+        $this->assertSame($parentId, $sub->json('parent_id'));
+        $this->assertSame(TaskStatus::Imputee->value, $sub->json('status'));
+
+        $show = $this->getJson("/api/tasks/{$parentId}")->assertOk();
+        $this->assertCount(1, $show->json('subtasks') ?? []);
+
+        Sanctum::actingAs($agent);
+        $this->postJson("/api/tasks/{$parentId}/take-charge")->assertOk();
+        $this->postJson("/api/tasks/{$parentId}/start")->assertOk();
+        $this->postJson("/api/tasks/{$parentId}/complete", ['summary' => 'trop tôt'])
+            ->assertStatus(422);
+
+        $subId = $sub->json('id');
+        $this->postJson("/api/tasks/{$subId}/take-charge")->assertOk();
+        $this->postJson("/api/tasks/{$subId}/start")->assertOk();
+        $this->postJson("/api/tasks/{$subId}/complete", ['summary' => 'fait'])->assertOk();
+
+        Sanctum::actingAs($chef);
+        $this->postJson("/api/tasks/{$subId}/validate")->assertOk();
+
+        Sanctum::actingAs($agent);
+        $this->postJson("/api/tasks/{$parentId}/complete", ['summary' => 'ok'])
+            ->assertOk();
+    }
+
     public function test_draft_not_visible_to_assignee(): void
     {
         [$chef, $agent] = $this->chefAndAgent();

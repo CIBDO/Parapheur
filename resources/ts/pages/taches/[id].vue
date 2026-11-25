@@ -46,11 +46,16 @@ const reassignUserId = ref<number | null>(null)
 const reassignMotif = ref('')
 const users = ref<{ id: number; name: string }[]>([])
 const subtaskTitle = ref('')
-const attachmentFile = ref<File[] | null>(null)
+const subtaskAssigneeId = ref<number | null>(null)
+const subtaskDueAt = ref('')
+const attachmentFile = ref<File | File[] | null>(null)
 const uploadingAttachment = ref(false)
-const auditItems = ref<any[]>([])
-const loadingAudit = ref(false)
-
+const selectedAttachment = computed(() => {
+  const value = attachmentFile.value
+  if (!value)
+    return null
+  return Array.isArray(value) ? (value[0] ?? null) : value
+})
 const depRelation = ref('depends_on')
 const depRelatedId = ref<number | null>(null)
 const relatedOptions = ref<{ id: number; title: string; reference: string }[]>([])
@@ -185,19 +190,6 @@ const loadUsers = async () => {
   }
 }
 
-const loadAudit = async () => {
-  loadingAudit.value = true
-  try {
-    auditItems.value = await $api(`/tasks/${taskId.value}/audit`)
-  }
-  catch {
-    auditItems.value = []
-  }
-  finally {
-    loadingAudit.value = false
-  }
-}
-
 const loadClassification = async () => {
   try {
     const res = await $api('/ged/classification-nodes')
@@ -221,11 +213,23 @@ const loadAvailableDocs = async () => {
 const docLabel = (doc: { reference?: string; object?: string; title?: string; id?: number }) =>
   `${doc.reference || `#${doc.id}`} — ${doc.object || doc.title || 'Document'}`
 
+const actionError = ref('')
+
 const run = async (path: string, body?: Record<string, any>) => {
   acting.value = true
+  actionError.value = ''
   try {
-    task.value = await action(taskId.value, path, body)
+    const result = await action(taskId.value, path, body)
+    // Certaines actions (comments, subtasks) ne renvoient pas la tâche parente.
+    if (result && typeof result === 'object' && 'status' in result && 'reference' in result && String(result.id) === taskId.value)
+      task.value = result
     await load()
+  }
+  catch (e: any) {
+    actionError.value = e?.data?.message
+      || e?.response?._data?.message
+      || e?.message
+      || 'Action impossible.'
   }
   finally {
     acting.value = false
@@ -259,7 +263,7 @@ const submitEscalate = async () => {
 }
 
 const uploadAttachment = async () => {
-  const file = attachmentFile.value?.[0]
+  const file = selectedAttachment.value
   if (!file)
     return
   uploadingAttachment.value = true
@@ -290,9 +294,24 @@ const addComment = async () => {
 const addSubtask = async () => {
   if (!subtaskTitle.value.trim())
     return
-  await run('subtasks', { title: subtaskTitle.value })
+  await run('subtasks', {
+    title: subtaskTitle.value.trim(),
+    assignee_id: subtaskAssigneeId.value || task.value?.assignee_id || undefined,
+    due_at: subtaskDueAt.value || undefined,
+  })
   subtaskTitle.value = ''
+  subtaskDueAt.value = ''
+  subtaskAssigneeId.value = task.value?.assignee_id ?? null
 }
+
+watch(
+  () => task.value?.assignee_id,
+  (id) => {
+    if (subtaskAssigneeId.value == null && id)
+      subtaskAssigneeId.value = id
+  },
+  { immediate: true },
+)
 
 const addDependency = async () => {
   if (!depRelatedId.value)
@@ -419,10 +438,6 @@ onMounted(async () => {
   ])
 })
 
-watch(activeTab, (tab) => {
-  if (tab === 'audit' && !auditItems.value.length)
-    loadAudit()
-})
 </script>
 
 <template>
@@ -460,6 +475,34 @@ watch(activeTab, (tab) => {
     </div>
 
     <template v-else-if="task">
+      <VAlert
+        v-if="actionError"
+        type="error"
+        variant="tonal"
+        class="mb-4"
+        density="comfortable"
+        closable
+        @click:close="actionError = ''"
+      >
+        {{ actionError }}
+      </VAlert>
+
+      <VAlert
+        v-if="task.parent_id && task.parent"
+        type="info"
+        variant="tonal"
+        class="mb-4"
+        density="comfortable"
+        icon="tabler-list-tree"
+      >
+        Sous-tâche de
+        <a
+          class="font-weight-medium text-primary"
+          href="#"
+          @click.prevent="router.push(`/taches/${task.parent.id}`)"
+        >{{ task.parent.reference }} — {{ task.parent.title }}</a>
+      </VAlert>
+
       <VAlert
         v-if="isOverdue"
         type="error"
@@ -792,13 +835,6 @@ watch(activeTab, (tab) => {
                   {{ historyCount }}
                 </VChip>
               </VTab>
-              <VTab value="audit">
-                <VIcon
-                  start
-                  icon="tabler-shield-search"
-                />
-                Audit
-              </VTab>
             </VTabs>
 
             <VDivider />
@@ -865,60 +901,110 @@ watch(activeTab, (tab) => {
               </VWindowItem>
 
               <VWindowItem value="subtasks">
-                <div
-                  v-if="!(task.subtasks || []).length"
-                  class="text-center py-10 text-medium-emphasis"
+                <VAlert
+                  v-if="task.parent_id"
+                  type="info"
+                  variant="tonal"
+                  class="ma-4"
+                  density="comfortable"
                 >
-                  <VIcon
-                    icon="tabler-list-tree"
-                    size="40"
-                    class="mb-2"
-                  />
-                  <div>Aucune sous-tâche</div>
-                </div>
-                <VList
-                  v-else
-                  lines="two"
-                >
-                  <VListItem
-                    v-for="st in task.subtasks || []"
-                    :key="st.id"
-                    class="cursor-pointer"
-                    @click="router.push(`/taches/${st.id}`)"
+                  Ceci est déjà une sous-tâche : impossible d’en créer une autre ici.
+                  <template v-if="task.parent">
+                    Retournez à
+                    <a
+                      class="text-primary font-weight-medium"
+                      href="#"
+                      @click.prevent="router.push(`/taches/${task.parent.id}`)"
+                    >{{ task.parent.reference }}</a>
+                    pour gérer les sous-tâches.
+                  </template>
+                </VAlert>
+                <template v-else>
+                  <div
+                    v-if="!(task.subtasks || []).length"
+                    class="text-center py-10 text-medium-emphasis"
                   >
-                    <VListItemTitle>{{ st.title }}</VListItemTitle>
-                    <VListItemSubtitle>{{ st.assignee?.name || 'Non affectée' }}</VListItemSubtitle>
-                    <template #append>
-                      <VChip
-                        size="small"
-                        :color="taskStatusColor(st.status)"
-                        variant="tonal"
-                      >
-                        {{ taskStatusLabels[st.status] || st.status }}
-                      </VChip>
-                    </template>
-                  </VListItem>
-                </VList>
-                <template v-if="!task.parent_id">
-                  <VDivider />
-                  <VCardText class="d-flex flex-wrap gap-2">
-                    <AppTextField
-                      v-model="subtaskTitle"
-                      class="flex-grow-1"
-                      label="Nouvelle sous-tâche"
-                      hide-details
-                      @keyup.enter="addSubtask"
+                    <VIcon
+                      icon="tabler-list-tree"
+                      size="40"
+                      class="mb-2"
                     />
-                    <VBtn
-                      color="primary"
-                      prepend-icon="tabler-plus"
-                      :loading="acting"
-                      :disabled="!subtaskTitle.trim()"
-                      @click="addSubtask"
+                    <div>Aucune sous-tâche</div>
+                  </div>
+                  <VList
+                    v-else
+                    lines="two"
+                  >
+                    <VListItem
+                      v-for="st in task.subtasks || []"
+                      :key="st.id"
+                      class="cursor-pointer"
+                      @click="router.push(`/taches/${st.id}`)"
                     >
-                      Ajouter
-                    </VBtn>
-                  </VCardText>
+                      <VListItemTitle>{{ st.title }}</VListItemTitle>
+                      <VListItemSubtitle>{{ st.assignee?.name || 'Non affectée' }}</VListItemSubtitle>
+                      <template #append>
+                        <VChip
+                          size="small"
+                          :color="taskStatusColor(st.status)"
+                          variant="tonal"
+                        >
+                          {{ taskStatusLabels[st.status] || st.status }}
+                        </VChip>
+                      </template>
+                    </VListItem>
+                  </VList>
+                  <template v-if="!['validee', 'annulee'].includes(task.status)">
+                    <VDivider />
+                    <VCardText>
+                      <VRow dense>
+                        <VCol
+                          cols="12"
+                          md="6"
+                        >
+                          <AppTextField
+                            v-model="subtaskTitle"
+                            label="Nouvelle sous-tâche *"
+                            hide-details
+                            @keyup.enter="addSubtask"
+                          />
+                        </VCol>
+                        <VCol
+                          cols="12"
+                          md="3"
+                        >
+                          <UserAutocomplete
+                            v-model="subtaskAssigneeId"
+                            label="Responsable"
+                            :items="users"
+                            hide-details
+                          />
+                        </VCol>
+                        <VCol
+                          cols="12"
+                          md="3"
+                        >
+                          <AppTextField
+                            v-model="subtaskDueAt"
+                            label="Échéance"
+                            type="datetime-local"
+                            hide-details
+                          />
+                        </VCol>
+                        <VCol cols="12">
+                          <VBtn
+                            color="primary"
+                            prepend-icon="tabler-plus"
+                            :loading="acting"
+                            :disabled="!subtaskTitle.trim()"
+                            @click="addSubtask"
+                          >
+                            Ajouter la sous-tâche
+                          </VBtn>
+                        </VCol>
+                      </VRow>
+                    </VCardText>
+                  </template>
                 </template>
               </VWindowItem>
 
@@ -1201,6 +1287,8 @@ watch(activeTab, (tab) => {
                     prepend-inner-icon="tabler-upload"
                     density="comfortable"
                     hide-details
+                    show-size
+                    clearable
                     class="flex-grow-1"
                     style="min-inline-size: 240px"
                   />
@@ -1208,7 +1296,7 @@ watch(activeTab, (tab) => {
                     color="primary"
                     prepend-icon="tabler-upload"
                     :loading="uploadingAttachment"
-                    :disabled="!attachmentFile?.length"
+                    :disabled="!selectedAttachment"
                     @click="uploadAttachment"
                   >
                     Déposer
@@ -1268,32 +1356,6 @@ watch(activeTab, (tab) => {
                       </span>
                     </template>
                   </VListItem>
-                </VList>
-              </VWindowItem>
-
-              <VWindowItem value="audit">
-                <div
-                  v-if="loadingAudit"
-                  class="text-center py-10"
-                >
-                  <VProgressCircular indeterminate />
-                </div>
-                <div
-                  v-else-if="!auditItems.length"
-                  class="text-center py-10 text-medium-emphasis"
-                >
-                  Aucune entrée d’audit accessible
-                </div>
-                <VList
-                  v-else
-                  lines="two"
-                >
-                  <VListItem
-                    v-for="(entry, idx) in auditItems"
-                    :key="entry.id || idx"
-                    :title="entry.action || entry.event || entry.description || 'Audit'"
-                    :subtitle="`${entry.user?.name || entry.actor?.name || '—'} · ${entry.created_at ? new Date(entry.created_at).toLocaleString('fr-FR') : ''}`"
-                  />
                 </VList>
               </VWindowItem>
             </VWindow>

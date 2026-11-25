@@ -157,6 +157,7 @@ class TaskService
             'validator:id,name',
             'structure:id,code,name',
             'instruction:id,reference,title,status',
+            'parent:id,reference,title,status',
             'contributors:id,name',
             'subtasks.assignee:id,name',
             'comments.user:id,name',
@@ -469,14 +470,38 @@ class TaskService
     public function createSubtask(User $actor, Task $parent, array $data): Task
     {
         if ($parent->parent_id) {
-            throw new InvalidArgumentException('Profondeur de sous-tâches limitée à un niveau.');
+            abort(422, 'Profondeur de sous-tâches limitée à un niveau. Ajoutez-la sur la tâche parente.');
+        }
+
+        if ($parent->status?->isTerminal()) {
+            abort(422, 'Impossible d’ajouter une sous-tâche à une tâche clôturée.');
         }
 
         $data['parent_id'] = $parent->id;
         $data['instruction_id'] = $data['instruction_id'] ?? $parent->instruction_id;
         $data['source_kind'] = $data['source_kind'] ?? TaskSource::Manual->value;
+        $data['assignee_id'] = $data['assignee_id'] ?? $parent->assignee_id;
+        $data['structure_id'] = $data['structure_id'] ?? $parent->structure_id;
+        $data['validator_id'] = $data['validator_id'] ?? $parent->validator_id ?? $parent->created_by;
+        $data['priority'] = $data['priority'] ?? $parent->priority?->value ?? $parent->priority;
+        $data['confidentiality'] = $data['confidentiality']
+            ?? $parent->confidentiality?->value
+            ?? $parent->confidentiality;
+        $data['due_at'] = $data['due_at'] ?? optional($parent->due_at)?->toIso8601String();
 
-        return $this->create($actor, $data);
+        $subtask = $this->create($actor, $data);
+
+        $this->recordHistory(
+            $parent,
+            $actor,
+            'subtask_created',
+            $parent->status->value,
+            $parent->status->value,
+            $subtask->reference.' — '.$subtask->title,
+            ['subtask_id' => $subtask->id]
+        );
+
+        return $subtask;
     }
 
     public function addComment(User $actor, Task $task, string $body): TaskComment

@@ -168,6 +168,7 @@ class TaskAccessService
         $actions = [];
 
         if ($status === TaskStatus::Brouillon
+            && $task->assignee_id
             && ((int) $task->created_by === (int) $user->id || $this->isAdmin($user))) {
             $actions[] = 'publish';
         }

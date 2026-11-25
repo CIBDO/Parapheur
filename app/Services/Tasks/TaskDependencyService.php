@@ -140,6 +140,22 @@ class TaskDependencyService
 
     public function assertCanComplete(Task $task): void
     {
+        $openSubtasks = $task->subtasks()
+            ->whereNotIn('status', [
+                TaskStatus::Validee->value,
+                TaskStatus::Annulee->value,
+            ])
+            ->get(['id', 'reference', 'title', 'status']);
+
+        if ($openSubtasks->isNotEmpty()) {
+            $sample = $openSubtasks->take(3)->pluck('reference')->implode(', ');
+            throw new InvalidArgumentException(sprintf(
+                'Impossible de terminer : %d sous-tâche(s) encore ouverte(s) (%s).',
+                $openSubtasks->count(),
+                $sample
+            ));
+        }
+
         $deps = $task->dependencies()
             ->whereIn('relation', [
                 TaskDependencyRelation::DependsOn->value,

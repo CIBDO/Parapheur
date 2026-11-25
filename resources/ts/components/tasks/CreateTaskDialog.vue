@@ -39,11 +39,9 @@ const emptyForm = () => ({
 })
 
 const form = ref(emptyForm())
-const files = ref<File[]>([])
 
 const resetForm = () => {
   form.value = emptyForm()
-  files.value = []
   showAdvanced.value = false
 }
 
@@ -70,15 +68,6 @@ const close = () => {
   emit('update:isDialogVisible', false)
 }
 
-const uploadFiles = async (taskId: number | string) => {
-  for (const file of files.value) {
-    const body = new FormData()
-    body.append('file', file)
-    body.append('kind', 'attachment')
-    await $api(`/tasks/${taskId}/attachments`, { method: 'POST', body })
-  }
-}
-
 const submit = async () => {
   if (!form.value.title.trim())
     return
@@ -89,8 +78,6 @@ const submit = async () => {
       ...form.value,
       due_at: form.value.due_at || null,
     })
-    if (task?.id && files.value.length)
-      await uploadFiles(task.id)
     emit('created', task)
     close()
     if (props.redirectOnCreate && task?.id)
@@ -130,7 +117,7 @@ const submit = async () => {
           Nouvelle tâche
         </VCardTitle>
         <VCardSubtitle>
-          Création rapide — les options avancées restent optionnelles
+          Création rapide — les pièces jointes s’ajoutent ensuite sur la fiche
         </VCardSubtitle>
       </VCardItem>
 
@@ -168,20 +155,6 @@ const submit = async () => {
             class="mb-4"
             label="Description"
             rows="3"
-          />
-
-          <VFileInput
-            v-model="files"
-            class="mb-4"
-            label="Pièces jointes (optionnel)"
-            prepend-icon="tabler-paperclip"
-            multiple
-            show-size
-            chips
-            clearable
-            accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.png,.jpg,.jpeg,.odt,.ods"
-            hint="Vous pourrez aussi ajouter des fichiers après création."
-            persistent-hint
           />
 
           <VSwitch

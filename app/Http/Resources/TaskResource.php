@@ -22,6 +22,7 @@ class TaskResource extends JsonResource
             'id' => $this->id,
             'reference' => $this->reference,
             'parent_id' => $this->parent_id,
+            'parent' => $this->whenLoaded('parent'),
             'instruction_id' => $this->instruction_id,
             'title' => $this->title,
             'description' => $this->description,
