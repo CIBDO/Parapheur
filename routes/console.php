@@ -8,20 +8,9 @@ Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');
 
-Schedule::command('parapheur:remind-overdue-instructions')
-    ->dailyAt('08:00')
-    ->withoutOverlapping()
-    ->appendOutputTo(storage_path('logs/instruction-reminders.log'));
-
-Schedule::command('parapheur:remind-task-deadlines')
-    ->hourly()
-    ->withoutOverlapping()
-    ->appendOutputTo(storage_path('logs/task-reminders.log'));
-
-Schedule::command('parapheur:escalate-tasks')
-    ->hourly()
-    ->withoutOverlapping()
-    ->appendOutputTo(storage_path('logs/task-escalations.log'));
+// Rappels automatiques conservés : productions, réunions, RDV.
+// Les autres remind-* / escalate-tasks restent disponibles en Artisan manuel
+// mais ne sont plus planifiés (politique mails allégée).
 
 Schedule::command('parapheur:remind-meetings')
     ->hourly()
@@ -32,11 +21,6 @@ Schedule::command('parapheur:remind-appointments')
     ->everyFifteenMinutes()
     ->withoutOverlapping()
     ->appendOutputTo(storage_path('logs/appointment-reminders.log'));
-
-Schedule::command('parapheur:remind-mail')
-    ->dailyAt('08:15')
-    ->withoutOverlapping()
-    ->appendOutputTo(storage_path('logs/mail-reminders.log'));
 
 Schedule::command('parapheur:check-ticket-sla')
     ->everyFiveMinutes()
@@ -85,11 +69,6 @@ Schedule::command('parapheur:expire-announcements')
     ->everyFiveMinutes()
     ->withoutOverlapping()
     ->appendOutputTo(storage_path('logs/announcement-expiration.log'));
-
-Schedule::command('parapheur:remind-announcements')
-    ->dailyAt('08:30')
-    ->withoutOverlapping()
-    ->appendOutputTo(storage_path('logs/announcement-reminders.log'));
 
 Schedule::command('archives:verify-integrity --limit=200')
     ->dailyAt('02:30')

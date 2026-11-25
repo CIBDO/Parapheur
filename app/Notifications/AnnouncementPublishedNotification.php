@@ -33,6 +33,9 @@ class AnnouncementPublishedNotification extends Notification implements ShouldQu
         }
 
         return $mail
+            ->line(NotificationPresentation::actionExpected(
+                'prendre connaissance de cette communication interne dans E-Tresor.'
+            ))
             ->action('Consulter l\'annonce', url('/annonces/'.$this->announcement->id))
             ->line(NotificationPresentation::FOOTER);
     }
@@ -63,15 +66,19 @@ class AnnouncementPublishedNotification extends Notification implements ShouldQu
     private function message(): string
     {
         if ($this->announcement->confidentiality->value === 'confidential') {
-            return 'Une communication interne confidentielle vous est adressée. Ouvrez E-Tresor pour en prendre connaissance.';
+            return 'Une communication interne confidentielle vous est adressée par la Direction Générale '
+                .'du Trésor et de la Comptabilité Publique. Son contenu est consultable exclusivement dans E-Tresor.';
         }
 
         if ($this->announcement->confidentiality->value === 'restricted') {
-            return 'Une communication interne restreinte est publiée. Le détail est disponible dans E-Tresor.';
+            return 'Une communication interne à diffusion restreinte vient d’être publiée. '
+                .'Le détail est disponible dans E-Tresor pour les destinataires autorisés.';
         }
 
         $summary = trim(strip_tags((string) ($this->announcement->summary ?: $this->announcement->body)));
 
-        return $summary !== '' ? $summary : 'Une annonce interne vient d\'être publiée.';
+        return $summary !== ''
+            ? $summary
+            : 'Une communication interne vient d’être publiée à l’attention des destinataires concernés.';
     }
 }

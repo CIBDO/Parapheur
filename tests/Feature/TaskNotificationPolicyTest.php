@@ -164,6 +164,30 @@ class TaskNotificationPolicyTest extends TestCase
         Notification::assertNotSentTo($agent, TaskStatusNotification::class);
     }
 
+    public function test_mention_is_app_only(): void
+    {
+        Notification::fake();
+
+        [$chef, $agent] = $this->chefAndAgent();
+
+        Sanctum::actingAs($chef);
+        $taskId = $this->postJson('/api/tasks', [
+            'title' => 'Mention',
+            'assignee_id' => $agent->id,
+            'validator_id' => $chef->id,
+        ])->assertCreated()->json('id');
+
+        Notification::fake();
+        Sanctum::actingAs($agent);
+        $this->postJson("/api/tasks/{$taskId}/comments", [
+            'body' => "Bonjour @{$chef->id}",
+        ])->assertCreated();
+
+        Notification::assertSentTo($chef, TaskStatusNotification::class, function (TaskStatusNotification $n, $channels) {
+            return $n->event === 'mention' && $channels === ['database'];
+        });
+    }
+
     /**
      * @return array{0: User, 1: User}
      */

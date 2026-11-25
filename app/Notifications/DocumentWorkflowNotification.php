@@ -12,6 +12,16 @@ class DocumentWorkflowNotification extends Notification
 {
     use Queueable;
 
+    /** Événements qui envoient aussi un e-mail (le reste = app seulement). */
+    public const MAIL_EVENTS = [
+        'transmitted',
+        'returned',
+        'rejected',
+        'instruction',
+        'validated',
+        // commented, vised, classified, archived : in-app seulement
+    ];
+
     /** @var list<string>|null */
     private ?array $forceChannels = null;
 
@@ -38,7 +48,16 @@ class DocumentWorkflowNotification extends Notification
             return $this->forceChannels;
         }
 
-        return ['database', 'mail'];
+        if (self::sendsMail($this->event)) {
+            return ['database', 'mail'];
+        }
+
+        return ['database'];
+    }
+
+    public static function sendsMail(string $event): bool
+    {
+        return in_array($event, self::MAIL_EVENTS, true);
     }
 
     public function toMail(object $notifiable): MailMessage
@@ -52,6 +71,7 @@ class DocumentWorkflowNotification extends Notification
             ->line('Référence : '.$this->reference())
             ->line('Objet : '.$this->document->object)
             ->when($this->actorName, fn (MailMessage $mail) => $mail->line('Intervenant : '.$this->actorName))
+            ->line(NotificationPresentation::actionExpected($this->expectedAction()))
             ->action('Ouvrir le dossier', $url)
             ->line(NotificationPresentation::FOOTER);
     }
@@ -77,17 +97,31 @@ class DocumentWorkflowNotification extends Notification
 
     private function title(): string
     {
+        $ref = $this->reference();
+
         return match ($this->event) {
-            'transmitted' => 'Nouveau dossier à traiter',
-            'returned' => 'Dossier retourné pour complément',
-            'vised' => 'Visa enregistré',
-            'validated' => 'Dossier validé',
-            'rejected' => 'Dossier rejeté',
-            'commented' => 'Nouveau commentaire sur le dossier',
-            'instruction' => 'Nouvelle instruction assignée',
-            'classified' => 'Dossier classé',
-            'archived' => 'Dossier archivé',
-            default => 'Mise à jour du parapheur',
+            'transmitted' => 'Dossier transmis pour traitement — '.$ref,
+            'returned' => 'Retour pour complément — '.$ref,
+            'vised' => 'Visa enregistré — '.$ref,
+            'validated' => 'Validation administrative — '.$ref,
+            'rejected' => 'Rejet de dossier — '.$ref,
+            'commented' => 'Observation sur dossier — '.$ref,
+            'instruction' => 'Instruction assignée — '.$ref,
+            'classified' => 'Classement de dossier — '.$ref,
+            'archived' => 'Archivage de dossier — '.$ref,
+            default => 'Communication relative au parapheur — '.$ref,
+        };
+    }
+
+    private function expectedAction(): string
+    {
+        return match ($this->event) {
+            'transmitted' => 'examiner le dossier et accomplir l’acte attendu dans les meilleurs délais.',
+            'returned' => 'apporter les compléments ou corrections demandés, puis retransmettre le dossier.',
+            'rejected' => 'prendre connaissance du motif de rejet et assurer les suites utiles.',
+            'instruction' => 'exécuter l’instruction et en rendre compte dans E-Tresor.',
+            'validated' => 'prendre acte de la validation administrative du dossier.',
+            default => 'consulter le dossier dans le parapheur électronique.',
         };
     }
 

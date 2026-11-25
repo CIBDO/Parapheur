@@ -80,6 +80,33 @@ final class NotificationPresentation
     }
 
     /**
+     * Phrase d’action attendue, placée avant le CTA.
+     */
+    public static function actionExpected(string $text): string
+    {
+        $text = trim($text);
+
+        return $text === '' ? '' : 'Action attendue : '.$text;
+    }
+
+    /**
+     * Date institutionnelle (fuseau Bamako par défaut).
+     */
+    public static function formatDate(?\Carbon\CarbonInterface $date, string $pattern = 'd/m/Y'): string
+    {
+        if (! $date) {
+            return '—';
+        }
+
+        return $date->copy()->timezone('Africa/Bamako')->format($pattern);
+    }
+
+    public static function formatDateTime(?\Carbon\CarbonInterface $date): string
+    {
+        return self::formatDate($date, 'd/m/Y à H:i');
+    }
+
+    /**
      * Icône Tabler selon le module / l’événement stocké en base.
      *
      * @param  array<string, mixed>  $data

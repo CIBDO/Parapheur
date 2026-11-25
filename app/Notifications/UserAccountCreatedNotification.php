@@ -27,14 +27,20 @@ class UserAccountCreatedNotification extends Notification
         $loginUrl = url('/login');
 
         return (new MailMessage)
-            ->subject("[{$appName}] Vos identifiants de connexion")
+            ->subject(NotificationPresentation::mailSubject('Compte', 'Ouverture de votre accès au Bureau Numérique'))
             ->greeting(NotificationPresentation::greeting($notifiable))
-            ->line('Un compte a été créé pour vous sur le Bureau Numérique de la Direction Générale du Trésor et de la Comptabilité Publique (DGTCP).')
-            ->line('Voici vos informations de connexion :')
-            ->line('**Adresse e-mail :** '.$notifiable->email)
-            ->line('**Mot de passe temporaire :** '.$this->plainPassword)
+            ->line(
+                'Un compte a été ouvert à votre nom sur le Bureau Numérique de la Direction Générale '
+                .'du Trésor et de la Comptabilité Publique (DGTCP), afin de vous permettre d’accéder '
+                .'aux services numériques institutionnels.'
+            )
+            ->line('Identifiants provisoires de connexion :')
+            ->line('Adresse e-mail : '.$notifiable->email)
+            ->line('Mot de passe temporaire : '.$this->plainPassword)
+            ->line(NotificationPresentation::actionExpected(
+                'vous connecter sans délai et procéder au changement obligatoire de ce mot de passe temporaire.'
+            ))
             ->action('Se connecter', $loginUrl)
-            ->line('Pour des raisons de sécurité, vous devrez obligatoirement modifier ce mot de passe lors de votre première connexion.')
             ->line(NotificationPresentation::FOOTER);
     }
 }

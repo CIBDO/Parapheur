@@ -16,7 +16,7 @@ class TaskNotificationService
         'validation_requested',
         'reminder',
         'escalated',
-        'mention',
+        // mention : in-app seulement (trop bruyant)
     ];
 
     public function notifyAssigned(Task $task, ?User $actor = null, bool $reassigned = false): void

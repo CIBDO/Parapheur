@@ -84,16 +84,6 @@ const actorLabel = (actor: any) => {
   return labels[actor.role] || actor.role
 }
 
-const reminderLabel = (rule: any) => {
-  const when = rule.offset_type === 'before'
-    ? `${rule.offset_minutes} min avant`
-    : rule.offset_type === 'after'
-      ? `${rule.offset_minutes} min après`
-      : 'à l’échéance'
-
-  return `${when} → ${rule.target}${rule.escalate ? ' (escalade)' : ''}`
-}
-
 const syncEditForm = () => {
   if (!item.value)
     return
@@ -493,19 +483,10 @@ onMounted(load)
             </VCardTitle>
           </VCardItem>
           <VDivider />
-          <VList v-if="item.reminder_rules?.length">
-            <VListItem
-              v-for="rule in item.reminder_rules"
-              :key="rule.id"
-              :title="reminderLabel(rule)"
-            />
-          </VList>
-          <div
-            v-else
-            class="text-center py-8 text-medium-emphasis"
-          >
-            Aucune règle de rappel
-          </div>
+          <VCardText class="text-body-2 text-medium-emphasis">
+            Un seul rappel automatique : digest matinal (07:30–10:00 Bamako) si l’élément
+            du jour n’est pas encore transmis. Pas de règles de relance individuelles.
+          </VCardText>
         </VCard>
       </VCol>
 

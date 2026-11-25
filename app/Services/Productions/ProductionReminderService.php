@@ -82,6 +82,7 @@ class ProductionReminderService
                 'id' => $o->id,
                 'reference' => $o->reference,
                 'label' => $o->obligation?->label ?? $o->reference,
+                'deadline_at' => $o->deadline_at,
             ])->values();
 
             try {

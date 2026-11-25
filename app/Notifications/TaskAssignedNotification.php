@@ -25,7 +25,10 @@ class TaskAssignedNotification extends Notification
 
     public function toMail(object $notifiable): MailMessage
     {
-        $due = optional($this->task->due_at)->format('d/m/Y H:i') ?: 'non renseignée';
+        $due = NotificationPresentation::formatDateTime($this->task->due_at);
+        if ($due === '—') {
+            $due = 'non renseignée';
+        }
 
         return (new MailMessage)
             ->subject(NotificationPresentation::mailSubject('Tâches', $this->title()))
@@ -34,6 +37,9 @@ class TaskAssignedNotification extends Notification
             ->line('Référence : '.$this->task->reference)
             ->line('Objet : '.$this->task->title)
             ->line('Échéance : '.$due)
+            ->line(NotificationPresentation::actionExpected(
+                'prendre en charge la tâche dans E-Tresor et en assurer l’exécution dans le délai imparti.'
+            ))
             ->action('Ouvrir la tâche', url('/taches/'.$this->task->id))
             ->line(NotificationPresentation::FOOTER);
     }
@@ -52,18 +58,33 @@ class TaskAssignedNotification extends Notification
 
     private function title(): string
     {
-        return $this->reassigned ? 'Tâche réaffectée' : 'Nouvelle tâche';
+        return $this->reassigned
+            ? 'Réaffectation de tâche — '.$this->task->reference
+            : 'Imputation de tâche — '.$this->task->reference;
     }
 
     private function body(): string
     {
         $by = $this->actorName ? ' par '.$this->actorName : '';
-        $ref = $this->task->reference.' — '.$this->task->title;
+        $ref = $this->task->reference;
+        $title = $this->task->title;
 
         if ($this->reassigned) {
-            return 'La tâche « '.$ref.' » vous a été réaffectée'.$by.'.';
+            return sprintf(
+                'La tâche « %s » (%s) vous a été réaffectée%s. '
+                .'Elle relève désormais de votre responsabilité opérationnelle.',
+                $title,
+                $ref,
+                $by
+            );
         }
 
-        return 'La tâche « '.$ref.' » vous a été imputée'.$by.'.';
+        return sprintf(
+            'La tâche « %s » (%s) vous a été imputée%s dans le cadre du suivi des travaux '
+            .'de la Direction Générale du Trésor et de la Comptabilité Publique.',
+            $title,
+            $ref,
+            $by
+        );
     }
 }

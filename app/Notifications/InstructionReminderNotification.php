@@ -33,6 +33,11 @@ class InstructionReminderNotification extends Notification
             ->line($this->body($notifiable))
             ->line('Instruction : '.$this->instruction->title)
             ->line('Échéance : '.$due)
+            ->line(NotificationPresentation::actionExpected(
+                $this->isIssuer($notifiable)
+                    ? 'vérifier l’état d’exécution et, le cas échéant, relancer le destinataire.'
+                    : 'actualiser le suivi de cette instruction dans les meilleurs délais.'
+            ))
             ->action('Consulter l’instruction', $url)
             ->line(NotificationPresentation::FOOTER);
     }
@@ -64,10 +69,10 @@ class InstructionReminderNotification extends Notification
         $title = $this->instruction->title;
 
         if ($this->isIssuer($notifiable)) {
-            return 'L’instruction « '.$title.' », que vous avez émise, a dépassé son échéance du '.$due.'. Merci de vérifier l’état d’exécution.';
+            return 'L’instruction « '.$title.' », que vous avez émise, a dépassé son échéance du '.$due.'.';
         }
 
-        return 'L’instruction « '.$title.' », placée sous votre responsabilité, a dépassé son échéance du '.$due.'. Merci d’actualiser le suivi dans les meilleurs délais.';
+        return 'L’instruction « '.$title.' », placée sous votre responsabilité, a dépassé son échéance du '.$due.'.';
     }
 
     private function isIssuer(object $notifiable): bool

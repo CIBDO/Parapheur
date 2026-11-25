@@ -19,9 +19,18 @@ class WorkspaceMemberNotification extends Notification
         public ?string $actorName = null,
     ) {}
 
+    /** Invitation seulement en mail ; les changements de rôle restent in-app. */
+    public const MAIL_EVENTS = [
+        'member_added',
+    ];
+
     public function via(object $notifiable): array
     {
-        return ['database', 'mail'];
+        if (in_array($this->event, self::MAIL_EVENTS, true)) {
+            return ['database', 'mail'];
+        }
+
+        return ['database'];
     }
 
     public function toMail(object $notifiable): MailMessage
@@ -35,6 +44,9 @@ class WorkspaceMemberNotification extends Notification
             ->line('Espace : '.$this->workspace->name)
             ->line('Rôle : '.$this->roleLabel)
             ->when($this->actorName, fn (MailMessage $mail) => $mail->line('Intervenant : '.$this->actorName))
+            ->line(NotificationPresentation::actionExpected(
+                'accéder à l’espace collaboratif et contribuer selon les droits qui vous sont conférés.'
+            ))
             ->action('Ouvrir l’espace', $url)
             ->line(NotificationPresentation::FOOTER);
     }

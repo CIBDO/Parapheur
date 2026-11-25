@@ -30,29 +30,24 @@ class ProductionOpinionNotification extends Notification
     public function toMail(object $notifiable): MailMessage
     {
         $label = $this->occurrence->obligation?->label ?? $this->occurrence->reference;
-        $opinionLabel = match ($this->opinion) {
-            'favorable' => 'favorable',
-            'reserve' => 'avec réserve',
-            'a_revoir' => 'à revoir',
-            default => $this->opinion,
-        };
 
         $mail = (new MailMessage)
-            ->subject(NotificationPresentation::mailSubject('Productions', 'Avis reçu'))
+            ->subject(NotificationPresentation::mailSubject('Productions', $this->title()))
             ->greeting(NotificationPresentation::greeting($notifiable))
-            ->line(sprintf(
-                '%s a donné un avis %s sur « %s » (%s).',
-                $this->authorName,
-                $opinionLabel,
-                $label,
-                $this->occurrence->reference
-            ));
+            ->line($this->body())
+            ->line('Référence : '.$this->occurrence->reference)
+            ->line('Objet : '.$label)
+            ->line('Avis formulé : '.$this->opinionLabel());
 
         if ($this->comment) {
-            $mail->line('Commentaire : '.$this->comment);
+            $mail->line('Commentaire : « '.$this->comment.' »');
         }
 
         return $mail
+            ->line(NotificationPresentation::actionExpected(
+                'prendre connaissance de cet avis et assurer, le cas échéant, les suites utiles '
+                .'(complément, correction ou nouvelle transmission).'
+            ))
             ->action('Voir la production', url('/productions/occurrences/'.$this->occurrence->id))
             ->line(NotificationPresentation::FOOTER);
     }
@@ -62,17 +57,45 @@ class ProductionOpinionNotification extends Notification
     {
         return [
             'type' => 'production.opinion',
-            'title' => 'Avis reçu sur une production',
-            'message' => sprintf(
-                '%s a donné un avis (%s) sur %s.',
-                $this->authorName,
-                $this->opinion,
-                $this->occurrence->reference
-            ),
+            'title' => $this->title(),
+            'message' => $this->body(),
             'opinion' => $this->opinion,
             'occurrence_id' => $this->occurrence->id,
             'transmission_id' => $this->transmission->id,
             'url' => '/productions/occurrences/'.$this->occurrence->id,
         ];
+    }
+
+    private function title(): string
+    {
+        return sprintf(
+            'Avis %s reçu — %s',
+            $this->opinionLabel(),
+            $this->occurrence->reference
+        );
+    }
+
+    private function body(): string
+    {
+        $label = $this->occurrence->obligation?->label ?? $this->occurrence->reference;
+
+        return sprintf(
+            '%s a formulé un avis %s sur la production « %s » (%s), '
+            .'dans le cadre de la consultation des destinataires.',
+            $this->authorName,
+            $this->opinionLabel(),
+            $label,
+            $this->occurrence->reference
+        );
+    }
+
+    private function opinionLabel(): string
+    {
+        return match ($this->opinion) {
+            'favorable' => 'favorable',
+            'reserve' => 'avec réserve',
+            'a_revoir' => 'à revoir',
+            default => $this->opinion,
+        };
     }
 }

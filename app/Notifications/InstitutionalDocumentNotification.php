@@ -30,6 +30,9 @@ class InstitutionalDocumentNotification extends Notification
             ->greeting(NotificationPresentation::greeting($notifiable))
             ->line($this->message)
             ->line('Référence : '.($this->document->reference ?: '#'.$this->document->id))
+            ->line(NotificationPresentation::actionExpected(
+                'prendre connaissance du document institutionnel dans E-Tresor.'
+            ))
             ->action('Ouvrir le document', url('/ged/'.$this->document->id))
             ->line(NotificationPresentation::FOOTER);
     }

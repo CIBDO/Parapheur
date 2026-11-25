@@ -27,6 +27,9 @@ class AnnouncementReminderNotification extends Notification implements ShouldQue
             ->subject(NotificationPresentation::mailSubject('Annonces', $this->title()))
             ->greeting(NotificationPresentation::greeting($notifiable))
             ->line($this->message())
+            ->line(NotificationPresentation::actionExpected(
+                'confirmer la prise de connaissance de cette annonce dans E-Tresor.'
+            ))
             ->action('Confirmer la lecture', url('/annonces/'.$this->announcement->id))
             ->line('Cette confirmation n\'est pas une signature électronique.')
             ->line(NotificationPresentation::FOOTER);
@@ -60,6 +63,6 @@ class AnnouncementReminderNotification extends Notification implements ShouldQue
             return 'Une communication confidentielle attend votre confirmation de lecture dans E-Tresor.';
         }
 
-        return 'Merci de confirmer avoir pris connaissance de cette annonce.';
+        return 'Une annonce publiée attend votre confirmation de lecture.';
     }
 }

@@ -26,7 +26,7 @@ const users = ref<{ id: number; name: string }[]>([])
 const structures = ref<{ id: number; name: string; code?: string }[]>([])
 const calendars = ref<{ id: number; name: string; code?: string }[]>([])
 
-const wizardSteps = ['Général', 'Acteurs', 'Périodicité', 'Livrables', 'Rappel', 'Récapitulatif']
+const wizardSteps = ['Général', 'Acteurs', 'Périodicité', 'Livrables', 'Récapitulatif']
 
 const frequencies = Object.entries(productionFrequencyLabels).map(([value, title]) => ({ title, value }))
 
@@ -61,7 +61,6 @@ const emptyForm = () => ({
   include_dg: true,
   include_dga: true,
   recipients: [] as { role_name?: string; user_id?: number | null }[],
-  reminder_rules: [] as { offset_type: string; offset_minutes: number; target: string; escalate?: boolean }[],
 })
 
 const form = ref(emptyForm())
@@ -186,7 +185,6 @@ const create = async () => {
         schedule_config: scheduleConfig(),
         validators: form.value.validators.filter(v => v.user_id),
         recipients,
-        reminder_rules: [],
       },
     })
     showWizard.value = false
@@ -568,42 +566,34 @@ onMounted(async () => {
           </div>
 
           <div
-            v-else-if="step === 5"
-            class="text-body-1"
+            v-else
+            class="d-flex flex-column gap-4"
           >
-            <div class="text-medium-emphasis mb-3">
-              Rappel quotidien unique
-            </div>
+            <VList density="comfortable">
+              <VListItem
+                :title="form.label || 'Sans libellé'"
+                :subtitle="form.code || 'Sans code'"
+              />
+              <VListItem
+                title="Fréquence"
+                :subtitle="selectedWeekdaysLabel
+                  ? `${productionFrequencyLabels[form.frequency]} · ${selectedWeekdaysLabel} · ${form.deadline_time}`
+                  : `${productionFrequencyLabels[form.frequency] || form.frequency} · ${form.deadline_time}`"
+              />
+              <VListItem
+                title="Validation"
+                :subtitle="form.validation_required ? 'Obligatoire' : 'Facultative'"
+              />
+            </VList>
             <VAlert
               type="info"
               variant="tonal"
               icon="tabler-mail"
             >
-              Chaque matin (à partir de 07:30, heure de Bamako), un email est envoyé aux producteurs
-              dont les éléments du jour n’ont pas encore été transmis. Aucun autre rappel automatique.
-              Nécessite le cron schedule:run et un SMTP réel (MAIL_MAILER=smtp).
+              Rappel automatique unique : chaque matin (07:30–10:00 Bamako), un email regroupe
+              les éléments du jour non encore transmis. Aucune autre relance planifiée.
             </VAlert>
           </div>
-
-          <VList
-            v-else
-            density="comfortable"
-          >
-            <VListItem
-              :title="form.label || 'Sans libellé'"
-              :subtitle="form.code || 'Sans code'"
-            />
-            <VListItem
-              title="Fréquence"
-              :subtitle="selectedWeekdaysLabel
-                ? `${productionFrequencyLabels[form.frequency]} · ${selectedWeekdaysLabel} · ${form.deadline_time}`
-                : `${productionFrequencyLabels[form.frequency] || form.frequency} · ${form.deadline_time}`"
-            />
-            <VListItem
-              title="Validation"
-              :subtitle="form.validation_required ? 'Obligatoire' : 'Facultative'"
-            />
-          </VList>
         </VCardText>
         <VDivider />
         <VCardActions>

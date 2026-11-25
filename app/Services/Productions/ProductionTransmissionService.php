@@ -158,6 +158,9 @@ class ProductionTransmissionService
             throw ValidationException::withMessages(['opinion' => 'Avis invalide.']);
         }
 
+        $previousOpinion = $recipient->opinion;
+        $hadOpinion = $recipient->opinion_at !== null;
+
         $recipient->opinion = $opinion;
         $recipient->opinion_comment = $comment;
         $recipient->opinion_at = now();
@@ -169,7 +172,9 @@ class ProductionTransmissionService
         $transmission->loadMissing('occurrence.obligation.producer', 'occurrence.responsible');
         $occurrence = $transmission->occurrence;
         $notifyUser = $occurrence?->responsible ?? $occurrence?->obligation?->producer;
-        if ($notifyUser && (int) $notifyUser->id !== (int) $actor->id) {
+        // Un mail seulement au premier avis ou si l’avis change (évite le spam au re-POST).
+        $shouldMail = ! $hadOpinion || $previousOpinion !== $opinion;
+        if ($shouldMail && $notifyUser && (int) $notifyUser->id !== (int) $actor->id) {
             $notifyUser->notify(new ProductionOpinionNotification(
                 $occurrence,
                 $transmission,

@@ -33,6 +33,11 @@ class AnnouncementWorkflowNotification extends Notification implements ShouldQue
             ->greeting(NotificationPresentation::greeting($notifiable))
             ->line($this->message)
             ->line('Référence : '.$this->announcement->reference)
+            ->line(NotificationPresentation::actionExpected(
+                $this->event === 'validation_requested'
+                    ? 'examiner le projet de communication et statuer (valider ou renvoyer).'
+                    : 'prendre connaissance de la décision et assurer les suites utiles.'
+            ))
             ->action('Ouvrir l\'annonce', url('/annonces/gestion/'.$this->announcement->id))
             ->line(NotificationPresentation::FOOTER);
     }

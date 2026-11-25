@@ -12,6 +12,16 @@ class MailCorrespondenceNotification extends Notification
 {
     use Queueable;
 
+    /** Événements qui envoient aussi un e-mail (le reste = app seulement). */
+    public const MAIL_EVENTS = [
+        'assigned',
+        'reassigned',
+        'complement_requested',
+        'reply_prepared',
+        'dispatched',
+        // taken_charge, reminder : in-app / manuel seulement
+    ];
+
     public function __construct(
         public Correspondence $correspondence,
         public string $event,
@@ -21,7 +31,16 @@ class MailCorrespondenceNotification extends Notification
 
     public function via(object $notifiable): array
     {
-        return ['database', 'mail'];
+        if (self::sendsMail($this->event)) {
+            return ['database', 'mail'];
+        }
+
+        return ['database'];
+    }
+
+    public static function sendsMail(string $event): bool
+    {
+        return in_array($event, self::MAIL_EVENTS, true);
     }
 
     public function toMail(object $notifiable): MailMessage
@@ -35,6 +54,7 @@ class MailCorrespondenceNotification extends Notification
             ->line('Référence : '.$this->reference())
             ->line('Objet : '.$this->correspondence->subject)
             ->when($this->actorName, fn (MailMessage $mail) => $mail->line('Intervenant : '.$this->actorName))
+            ->line(NotificationPresentation::actionExpected($this->expectedAction()))
             ->action('Ouvrir le courrier', $url)
             ->line(NotificationPresentation::FOOTER);
     }
@@ -74,15 +94,29 @@ class MailCorrespondenceNotification extends Notification
 
     private function title(): string
     {
+        $ref = $this->reference();
+
         return match ($this->event) {
-            'assigned' => 'Nouveau courrier à traiter',
-            'reassigned' => 'Courrier réaffecté',
-            'taken_charge' => 'Prise en charge enregistrée',
-            'reply_prepared' => 'Projet de réponse prêt',
-            'dispatched' => 'Courrier expédié',
-            'reminder' => 'Rappel d’échéance courrier',
-            'complement_requested' => 'Complément d’information demandé',
-            default => 'Mise à jour courrier',
+            'assigned' => 'Courrier à traiter — '.$ref,
+            'reassigned' => 'Réaffectation de courrier — '.$ref,
+            'taken_charge' => 'Prise en charge enregistrée — '.$ref,
+            'reply_prepared' => 'Projet de réponse établi — '.$ref,
+            'dispatched' => 'Expédition enregistrée — '.$ref,
+            'reminder' => 'Rappel d’échéance courrier — '.$ref,
+            'complement_requested' => 'Complément d’information demandé — '.$ref,
+            default => 'Communication relative au courrier — '.$ref,
+        };
+    }
+
+    private function expectedAction(): string
+    {
+        return match ($this->event) {
+            'assigned', 'reassigned' => 'prendre en charge le dossier et en assurer le traitement dans les délais impartis.',
+            'reply_prepared' => 'examiner le projet de réponse et procéder à sa validation ou à sa correction.',
+            'dispatched' => 'prendre acte de l’expédition enregistrée au Bureau Numérique.',
+            'complement_requested' => 'fournir les éléments complémentaires demandés dans E-Tresor.',
+            'reminder' => 'actualiser le traitement du dossier avant échéance.',
+            default => 'consulter le dossier de courrier dans E-Tresor.',
         };
     }
 

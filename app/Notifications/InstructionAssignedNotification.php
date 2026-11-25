@@ -37,6 +37,7 @@ class InstructionAssignedNotification extends Notification
             ->line('Référence : '.($this->instruction->reference ?: '#'.$this->instruction->id))
             ->line('Objet : '.$this->instruction->title)
             ->line('Échéance : '.$due)
+            ->line(NotificationPresentation::actionExpected($this->expectedAction()))
             ->action('Consulter', url($this->path()))
             ->line(NotificationPresentation::FOOTER);
     }
@@ -69,11 +70,21 @@ class InstructionAssignedNotification extends Notification
     private function title(): string
     {
         $directive = $this->instruction->isDirective();
+        $ref = $this->instruction->reference ?: ('#'.$this->instruction->id);
 
         return match ($this->profile) {
-            'coordinator' => $directive ? 'Coordination d’une directive' : 'Coordination d’une instruction',
-            'recipient' => $directive ? 'Directive portée à votre connaissance' : 'Instruction portée à votre connaissance',
-            default => $directive ? 'Directive à exécuter' : 'Instruction à exécuter',
+            'coordinator' => ($directive ? 'Coordination de directive' : 'Coordination d’instruction').' — '.$ref,
+            'recipient' => ($directive ? 'Directive pour information' : 'Instruction pour information').' — '.$ref,
+            default => ($directive ? 'Directive à exécuter' : 'Instruction à exécuter').' — '.$ref,
+        };
+    }
+
+    private function expectedAction(): string
+    {
+        return match ($this->profile) {
+            'coordinator' => 'suivre l’exécution et en rendre compte dans les délais fixés.',
+            'recipient' => 'prendre connaissance du document ; aucune exécution directe ne vous est demandée, sauf indication contraire.',
+            default => 'prendre connaissance du document et en organiser l’exécution dans le délai imparti.',
         };
     }
 

@@ -31,15 +31,17 @@ class AppointmentNotification extends Notification
     public function toMail(object $notifiable): MailMessage
     {
         $url = url('/parapheur/agenda/'.$this->appointment->id);
+
         return (new MailMessage)
             ->subject(NotificationPresentation::mailSubject('Agenda', $this->title()))
             ->greeting(NotificationPresentation::greeting($notifiable))
             ->line($this->body())
             ->line('Rendez-vous : '.$this->appointment->displaySubject())
             ->line('Référence : '.($this->appointment->reference ?: '#'.$this->appointment->id))
-            ->line('Date : '.(optional($this->appointment->start_at)?->format('d/m/Y H:i') ?: '—'))
+            ->line('Date et heure : '.(NotificationPresentation::formatDateTime($this->appointment->start_at) ?: '—'))
             ->line('Lieu : '.($this->appointment->location ?: '—'))
             ->when($this->actorName, fn (MailMessage $mail) => $mail->line('Intervenant : '.$this->actorName))
+            ->line(NotificationPresentation::actionExpected($this->expectedAction()))
             ->action('Consulter le rendez-vous', $url)
             ->line(NotificationPresentation::FOOTER);
     }
@@ -60,20 +62,22 @@ class AppointmentNotification extends Notification
 
     private function title(): string
     {
+        $short = $this->appointment->displaySubject();
+
         return match ($this->event) {
-            'created' => 'Nouvelle demande de rendez-vous',
-            'updated' => 'Rendez-vous modifié',
-            'slot_proposed' => 'Créneau proposé',
-            'validated' => 'Rendez-vous validé',
-            'confirmed' => 'Rendez-vous confirmé',
-            'rejected' => 'Demande de rendez-vous refusée',
-            'rescheduled' => 'Rendez-vous reporté',
-            'cancelled' => 'Rendez-vous annulé',
-            'redirected' => 'Demande réorientée',
-            'reminder' => 'Rappel de rendez-vous',
-            'document_added' => 'Document ajouté au dossier',
-            'followup_created' => 'Suite à donner enregistrée',
-            default => 'Mise à jour de l’agenda',
+            'created' => 'Demande d’audience — '.$short,
+            'updated' => 'Actualisation de rendez-vous — '.$short,
+            'slot_proposed' => 'Proposition de créneau — '.$short,
+            'validated' => 'Validation de rendez-vous — '.$short,
+            'confirmed' => 'Confirmation de rendez-vous — '.$short,
+            'rejected' => 'Demande d’audience non retenue — '.$short,
+            'rescheduled' => 'Report de rendez-vous — '.$short,
+            'cancelled' => 'Annulation de rendez-vous — '.$short,
+            'redirected' => 'Réorientation de demande — '.$short,
+            'reminder' => 'Rappel de rendez-vous — '.$short,
+            'document_added' => 'Pièce ajoutée au dossier — '.$short,
+            'followup_created' => 'Suite à donner — '.$short,
+            default => 'Communication relative à l’agenda — '.$short,
         };
     }
 
@@ -136,18 +140,30 @@ class AppointmentNotification extends Notification
             ),
             'reminder' => $this->reminderBody($subject, $detail, $date),
             'document_added' => sprintf(
-                'Un document a été ajouté au dossier du rendez-vous « %s »%s.',
+                'Une pièce a été versée au dossier du rendez-vous « %s »%s. Elle est consultable dans E-Tresor.',
                 $subject,
                 $by
             ),
             'followup_created' => sprintf(
-                'Une suite à donner a été enregistrée pour le rendez-vous « %s »%s.',
+                'Une suite à donner a été enregistrée au titre du rendez-vous « %s »%s.',
                 $subject,
                 $by
             ),
             default => $detail !== ''
                 ? $detail
-                : sprintf('Une mise à jour concerne le rendez-vous « %s ».', $subject),
+                : sprintf('Une communication relative au rendez-vous « %s » vous est adressée.', $subject),
+        };
+    }
+
+    private function expectedAction(): string
+    {
+        return match ($this->event) {
+            'slot_proposed' => 'confirmer le créneau proposé ou indiquer vos disponibilités.',
+            'confirmed', 'validated', 'reminder' => 'prendre vos dispositions pour honorer le rendez-vous aux date, heure et lieu indiqués.',
+            'rejected', 'cancelled' => 'prendre acte de cette décision ; aucune présence n’est requise.',
+            'rescheduled', 'updated', 'redirected' => 'prendre connaissance des nouvelles modalités du dossier.',
+            'document_added', 'followup_created' => 'consulter le dossier dans E-Tresor.',
+            default => 'consulter le dossier de rendez-vous dans E-Tresor.',
         };
     }
 
@@ -155,7 +171,8 @@ class AppointmentNotification extends Notification
     {
         if (preg_match('/J-1/iu', $detail)) {
             return sprintf(
-                'Rappel : le rendez-vous « %s » est prévu demain%s. Merci de vous organiser en conséquence.',
+                'Nous vous rappelons que le rendez-vous « %s » est prévu demain%s. '
+                .'Merci de prendre vos dispositions en conséquence.',
                 $subject,
                 $date ? ' ('.$date.')' : ''
             );
@@ -163,7 +180,7 @@ class AppointmentNotification extends Notification
 
         if (preg_match('/H-2/iu', $detail)) {
             return sprintf(
-                'Rappel : le rendez-vous « %s » aura lieu dans environ deux heures%s.',
+                'Nous vous rappelons que le rendez-vous « %s » aura lieu dans environ deux heures%s.',
                 $subject,
                 $date ? ' ('.$date.')' : ''
             );
@@ -171,7 +188,7 @@ class AppointmentNotification extends Notification
 
         if (preg_match('/H-30|30 minutes/iu', $detail)) {
             return sprintf(
-                'Rappel : le rendez-vous « %s » aura lieu dans environ trente minutes%s.',
+                'Nous vous rappelons que le rendez-vous « %s » aura lieu dans environ trente minutes%s.',
                 $subject,
                 $date ? ' ('.$date.')' : ''
             );

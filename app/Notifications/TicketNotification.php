@@ -12,6 +12,20 @@ class TicketNotification extends Notification
 {
     use Queueable;
 
+    /** Événements qui envoient aussi un e-mail (le reste = app seulement). */
+    public const MAIL_EVENTS = [
+        'assigned',
+        'transferred',
+        'waiting_requester',
+        'resolved',
+        'reopened',
+        'escalated',
+        'sla_breach',
+        'ola_breach',
+        'approval_refused',
+        'approval_accepted',
+    ];
+
     public function __construct(
         public Ticket $ticket,
         public string $event,
@@ -34,11 +48,16 @@ class TicketNotification extends Notification
         if ($pref === null || $pref->database_enabled) {
             $channels[] = 'database';
         }
-        if ($pref === null || $pref->mail_enabled) {
+        if (($pref === null || $pref->mail_enabled) && self::sendsMail($this->event)) {
             $channels[] = 'mail';
         }
 
         return $channels;
+    }
+
+    public static function sendsMail(string $event): bool
+    {
+        return in_array($event, self::MAIL_EVENTS, true);
     }
 
     public function toMail(object $notifiable): MailMessage
@@ -54,6 +73,7 @@ class TicketNotification extends Notification
             ->line('Objet : '.$this->ticket->title)
             ->line('Statut : '.$status)
             ->when($this->actorName, fn (MailMessage $mail) => $mail->line('Intervenant : '.$this->actorName))
+            ->line(NotificationPresentation::actionExpected($this->expectedAction()))
             ->action('Consulter le ticket', $url)
             ->line(NotificationPresentation::FOOTER);
     }
@@ -81,27 +101,43 @@ class TicketNotification extends Notification
 
     private function title(): string
     {
+        $number = $this->ticket->number;
+
         return match ($this->event) {
-            'created' => 'Demande enregistrée',
-            'assigned' => 'Ticket confié à votre attention',
-            'transferred' => 'Ticket transféré',
-            'taken_charge' => 'Prise en charge confirmée',
-            'comment_requester', 'requester_replied' => 'Message du demandeur',
-            'comment_agent' => 'Réponse du Centre de services',
-            'waiting_requester' => 'Votre réponse est attendue',
-            'escalated' => 'Escalade du ticket',
-            'sla_warning' => 'Alerte délai de service (SLA)',
-            'sla_breach' => 'Dépassement du délai de service (SLA)',
-            'ola_warning' => 'Alerte engagement interne (OLA)',
-            'ola_breach' => 'Dépassement de l’engagement interne (OLA)',
-            'resolved' => 'Solution proposée — validation requise',
-            'solution_accepted' => 'Solution acceptée',
-            'reopened' => 'Ticket réouvert',
-            'closed' => 'Ticket clôturé',
-            'priority_changed' => 'Priorité actualisée',
-            'approval_accepted' => 'Demande approuvée',
-            'approval_refused' => 'Demande non approuvée',
-            default => 'Mise à jour du Centre de services',
+            'created' => 'Enregistrement de demande — '.$number,
+            'assigned' => 'Affectation de ticket — '.$number,
+            'transferred' => 'Transfert de ticket — '.$number,
+            'taken_charge' => 'Prise en charge — '.$number,
+            'comment_requester', 'requester_replied' => 'Message du demandeur — '.$number,
+            'comment_agent' => 'Réponse du Centre de services — '.$number,
+            'waiting_requester' => 'Réponse attendue — '.$number,
+            'escalated' => 'Escalade — '.$number,
+            'sla_warning' => 'Alerte délai de service — '.$number,
+            'sla_breach' => 'Dépassement du délai de service — '.$number,
+            'ola_warning' => 'Alerte engagement interne — '.$number,
+            'ola_breach' => 'Dépassement de l’engagement interne — '.$number,
+            'resolved' => 'Solution proposée — validation requise — '.$number,
+            'solution_accepted' => 'Solution acceptée — '.$number,
+            'reopened' => 'Réouverture de ticket — '.$number,
+            'closed' => 'Clôture de ticket — '.$number,
+            'priority_changed' => 'Priorité actualisée — '.$number,
+            'approval_accepted' => 'Demande approuvée — '.$number,
+            'approval_refused' => 'Demande non approuvée — '.$number,
+            default => 'Communication du Centre de services — '.$number,
+        };
+    }
+
+    private function expectedAction(): string
+    {
+        return match ($this->event) {
+            'assigned', 'transferred' => 'prendre en charge le ticket et en assurer le traitement dans les délais de service.',
+            'waiting_requester' => 'fournir les éléments demandés afin de permettre la poursuite du traitement.',
+            'resolved' => 'valider la solution proposée ou formuler vos réserves dans E-Tresor.',
+            'reopened' => 'reprendre le traitement du dossier réouvert.',
+            'escalated', 'sla_breach', 'ola_breach' => 'intervenir sans délai sur le dossier signalé.',
+            'approval_accepted' => 'engager le traitement désormais autorisé.',
+            'approval_refused' => 'prendre connaissance du motif et assurer les suites utiles.',
+            default => 'consulter le ticket dans le Centre de services.',
         };
     }
 

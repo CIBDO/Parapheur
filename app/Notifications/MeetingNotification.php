@@ -32,6 +32,9 @@ class MeetingNotification extends Notification
     public function toMail(object $notifiable): MailMessage
     {
         $url = url('/parapheur/reunions/'.$this->meeting->id);
+        $date = optional($this->meeting->meeting_date)->format('d/m/Y');
+        $time = trim((string) $this->meeting->meeting_time);
+        $when = trim(($date ?: '—').($time !== '' ? ' à '.$time : ''));
 
         return (new MailMessage)
             ->subject(NotificationPresentation::mailSubject('Réunions', $this->title()))
@@ -39,9 +42,10 @@ class MeetingNotification extends Notification
             ->line($this->body())
             ->line('Réunion : '.$this->meeting->displayTitle())
             ->line('Référence : '.($this->meeting->reference ?: '#'.$this->meeting->id))
-            ->line('Date : '.optional($this->meeting->meeting_date)->format('d/m/Y').' '.$this->meeting->meeting_time)
+            ->line('Date et heure : '.$when)
             ->line('Lieu : '.($this->meeting->location ?: '—'))
             ->when($this->actorName, fn (MailMessage $mail) => $mail->line('Intervenant : '.$this->actorName))
+            ->line(NotificationPresentation::actionExpected($this->expectedAction()))
             ->action('Consulter la réunion', $url)
             ->line(NotificationPresentation::FOOTER);
     }
@@ -63,23 +67,25 @@ class MeetingNotification extends Notification
 
     private function title(): string
     {
+        $short = $this->meeting->displayTitle();
+
         return match ($this->event) {
-            'created' => 'Nouvelle réunion',
-            'updated' => 'Réunion modifiée',
-            'invitation' => 'Convocation à une réunion',
-            'place_changed' => 'Changement de lieu',
-            'time_changed' => 'Changement d’horaire',
-            'postponed' => 'Réunion reportée',
-            'cancelled' => 'Réunion annulée',
-            'document_added' => 'Document préparatoire ajouté',
-            'confirmation_reminder' => 'Rappel de confirmation de présence',
-            'meeting_reminder' => 'Rappel de réunion',
-            'minutes_available' => 'Compte rendu disponible',
-            'decision_assigned' => 'Décision vous concernant',
-            'decision_late' => 'Décision en retard',
-            'started' => 'Réunion en cours',
-            'finished' => 'Réunion terminée',
-            default => 'Mise à jour de réunion',
+            'created' => 'Création de réunion — '.$short,
+            'updated' => 'Actualisation de réunion — '.$short,
+            'invitation' => 'Convocation — '.$short,
+            'place_changed' => 'Changement de lieu — '.$short,
+            'time_changed' => 'Changement d’horaire — '.$short,
+            'postponed' => 'Report de réunion — '.$short,
+            'cancelled' => 'Annulation de réunion — '.$short,
+            'document_added' => 'Document préparatoire — '.$short,
+            'confirmation_reminder' => 'Rappel de confirmation de présence — '.$short,
+            'meeting_reminder' => 'Rappel de tenue de réunion — '.$short,
+            'minutes_available' => 'Compte rendu disponible — '.$short,
+            'decision_assigned' => 'Décision à suivre — '.$short,
+            'decision_late' => 'Décision en retard — '.$short,
+            'started' => 'Réunion en cours — '.$short,
+            'finished' => 'Clôture de réunion — '.$short,
+            default => 'Communication relative à une réunion — '.$short,
         };
     }
 
@@ -157,28 +163,31 @@ class MeetingNotification extends Notification
                 $by
             ),
             'confirmation_reminder' => sprintf(
-                'Rappel : merci de confirmer votre participation à la réunion « %s »%s.',
+                'Dans le cadre de l’organisation institutionnelle des travaux, votre confirmation de participation '
+                .'à la réunion « %s »%s demeure attendue.',
                 $title,
                 $when !== '' ? ', prévue le '.$when : ''
             ),
             'meeting_reminder' => sprintf(
-                'Rappel : la réunion « %s » aura lieu prochainement%s%s.',
+                'Nous vous rappelons la tenue prochaine de la réunion « %s »%s%s. '
+                .'Merci de vous organiser afin d’y participer selon votre qualité.',
                 $title,
                 $when !== '' ? ' ('.$when.')' : '',
-                $location ? ' — '.$location : ''
+                $location ? ', au lieu suivant : '.$location : ''
             ),
             'minutes_available' => sprintf(
-                'Le compte rendu de la réunion « %s » est désormais disponible. Merci d’en prendre connaissance.',
+                'Le compte rendu de la réunion « %s » est désormais disponible dans E-Tresor. '
+                .'Vous êtes invité(e) à en prendre connaissance.',
                 $title
             ),
             'decision_assigned' => sprintf(
-                'Une décision issue de la réunion « %s » vous a été confiée%s.%s Merci d’en assurer le suivi.',
+                'Une décision issue de la réunion « %s » vous a été confiée%s.%s',
                 $title,
                 $by,
                 $detail !== '' ? ' Objet : '.$detail.'.' : ''
             ),
             'decision_late' => sprintf(
-                'La décision qui vous a été confiée dans le cadre de la réunion « %s » est en retard%s. Merci d’actualiser le suivi sans délai.',
+                'La décision qui vous a été confiée au titre de la réunion « %s » n’a pas été soldée dans le délai imparti%s.',
                 $title,
                 $detail !== '' ? ' (« '.$detail.' »)' : ''
             ),
@@ -193,6 +202,20 @@ class MeetingNotification extends Notification
             default => trim($this->message) !== ''
                 ? $this->message
                 : sprintf('Une mise à jour concerne la réunion « %s ».', $title),
+        };
+    }
+
+    private function expectedAction(): string
+    {
+        return match ($this->event) {
+            'invitation', 'confirmation_reminder' => 'confirmer votre participation dans E-Tresor.',
+            'meeting_reminder' => 'prendre vos dispositions pour assister à la réunion à la date et au lieu indiqués.',
+            'place_changed', 'time_changed', 'postponed', 'updated' => 'prendre connaissance des nouvelles modalités.',
+            'cancelled' => 'prendre acte de l’annulation ; aucune présence n’est requise.',
+            'document_added', 'minutes_available' => 'consulter les documents mis à disposition dans le dossier de réunion.',
+            'decision_assigned' => 'assurer le suivi de la décision et en rendre compte à l’échéance.',
+            'decision_late' => 'actualiser sans délai le suivi de la décision dans E-Tresor.',
+            default => 'consulter le dossier de réunion dans E-Tresor.',
         };
     }
 

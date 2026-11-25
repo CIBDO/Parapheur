@@ -32,15 +32,18 @@ class ProductionTransmissionNotification extends Notification implements ShouldQ
     public function toMail(object $notifiable): MailMessage
     {
         $url = url('/productions/recues?transmission='.$this->transmission->id);
+        $label = $this->occurrence->obligation?->label ?? $this->occurrence->reference;
 
         return (new MailMessage)
             ->subject(NotificationPresentation::mailSubject('Productions', $this->title()))
             ->greeting(NotificationPresentation::greeting($notifiable))
             ->line($this->body())
             ->line('Référence : '.$this->occurrence->reference)
-            ->line('Objet : '.($this->occurrence->obligation?->label ?? $this->occurrence->reference))
+            ->line('Objet : '.$label)
+            ->line('Nature : '.($this->transmission->is_rectificative ? 'transmission rectificative' : 'transmission initiale'))
+            ->line(NotificationPresentation::actionExpected($this->expectedAction()))
             ->action('Consulter la production', $url)
-            ->line('Les pièces restent consultables dans E-Tresor. Elles ne sont pas jointes à ce message.')
+            ->line('Les pièces demeurent consultables exclusivement dans E-Tresor ; elles ne sont pas jointes à ce message.')
             ->line(NotificationPresentation::FOOTER);
     }
 
@@ -61,15 +64,17 @@ class ProductionTransmissionNotification extends Notification implements ShouldQ
 
     private function title(): string
     {
+        $label = $this->occurrence->obligation?->label ?? $this->occurrence->reference;
+
         if ($this->transmission->is_rectificative) {
             return $this->profile === 'delegate'
-                ? 'Transmission rectificative — délégation'
-                : 'Transmission rectificative';
+                ? 'Transmission rectificative (délégation) — '.$label
+                : 'Transmission rectificative — '.$label;
         }
 
         return $this->profile === 'delegate'
-            ? 'Production transmise au délégué'
-            : 'Production transmise à votre attention';
+            ? 'Transmission au délégué — '.$label
+            : 'Transmission à votre attention — '.$label;
     }
 
     private function body(): string
@@ -80,12 +85,39 @@ class ProductionTransmissionNotification extends Notification implements ShouldQ
 
         if ($this->profile === 'delegate') {
             return $rectificative
-                ? sprintf('Une version rectificative de « %s » (%s) vous est transmise en votre qualité de délégué. Merci d’en prendre connaissance.', $label, $ref)
-                : sprintf('La production « %s » (%s) vous est transmise en votre qualité de délégué. Merci d’en prendre connaissance à la place du titulaire.', $label, $ref);
+                ? sprintf(
+                    'Une version rectificative de la production « %s » (%s) vous est adressée en votre qualité de délégué, '
+                    .'dans le cadre du circuit de production institutionnelle. Elle se substitue à la communication précédente.',
+                    $label,
+                    $ref
+                )
+                : sprintf(
+                    'La production « %s » (%s) vous est transmise en votre qualité de délégué, '
+                    .'afin que vous en preniez connaissance au nom du titulaire.',
+                    $label,
+                    $ref
+                );
         }
 
         return $rectificative
-            ? sprintf('Une version rectificative de « %s » (%s) vous est transmise pour consultation. Elle remplace la communication précédente.', $label, $ref)
-            : sprintf('La production « %s » (%s) vous est transmise pour consultation, à votre attention. Merci d’en prendre connaissance.', $label, $ref);
+            ? sprintf(
+                'Une version rectificative de la production « %s » (%s) vous est transmise pour consultation. '
+                .'Elle remplace la communication antérieure adressée à votre attention.',
+                $label,
+                $ref
+            )
+            : sprintf(
+                'La production « %s » (%s) vous a été transmise pour consultation dans le cadre du circuit '
+                .'de production institutionnelle de la DGTCP.',
+                $label,
+                $ref
+            );
+    }
+
+    private function expectedAction(): string
+    {
+        return $this->profile === 'delegate'
+            ? 'prendre connaissance des pièces dans E-Tresor et assurer le suivi relevant de votre délégation.'
+            : 'prendre connaissance des pièces dans E-Tresor et, le cas échéant, enregistrer votre avis.';
     }
 }
