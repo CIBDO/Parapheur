@@ -155,8 +155,9 @@ const isAuthor = computed(() =>
   Boolean(dossier.value?.author_id)
   && Number(dossier.value.author_id) === currentUserId.value,
 )
+/** Initiateur qui consulte un dossier déjà chez quelqu’un d’autre (pas d’actions destinataire). */
 const isInitiatorSpectator = computed(() =>
-  isAuthor.value && !isAssignee.value && !isAdmin.value && Boolean(dossier.value?.current_assignee_id),
+  isAuthor.value && !isAssignee.value && Boolean(dossier.value?.current_assignee_id),
 )
 
 /** Dossier revenu à l’auteur pour correction / complément */
@@ -166,11 +167,15 @@ const isReturnedToAuthor = computed(() =>
   && ['a_corriger', 'corrige'].includes(dossier.value?.status),
 )
 
-/** Actions destinataire : viser, valider, retourner, etc. */
+/**
+ * Actions destinataire (prise de connaissance, visa, retour…) :
+ * uniquement si le dossier est chez l’utilisateur connecté — pas l’initiateur distant,
+ * même avec un rôle admin.
+ */
 const canProcess = computed(() =>
   !isFrozen.value
   && canActPermission.value
-  && (isAssignee.value || isAdmin.value),
+  && isAssignee.value,
 )
 const canVise = computed(() => canProcess.value && canVisePermission.value)
 const canValidate = computed(() => canProcess.value && canValidatePermission.value)
@@ -178,7 +183,7 @@ const canComment = computed(() => canProcess.value)
 const canMutate = computed(() => {
   if (isFrozen.value || !canActPermission.value)
     return false
-  if (isAdmin.value || isAssignee.value)
+  if (isAssignee.value)
     return true
 
   // Auteur uniquement tant que le dossier n’est pas encore chez un destinataire
@@ -189,7 +194,10 @@ const canMutate = computed(() => {
 const canTransmit = computed(() => {
   if (isFrozen.value || !canActPermission.value)
     return false
-  if (isAdmin.value || isAssignee.value)
+  if (isAssignee.value)
+    return true
+  // Réaffectation de secours (admin) sans usurper les actes du destinataire
+  if (isAdmin.value && !isInitiatorSpectator.value)
     return true
 
   return isAuthor.value
@@ -245,7 +253,11 @@ const showActionComment = computed(() =>
   showComments.value || showTreatGroup.value || showCirculation.value || showFiling.value,
 )
 const showActionPanel = computed(() =>
-  showComments.value || showTreatGroup.value || showCirculation.value || showFiling.value,
+  showComments.value
+  || showTreatGroup.value
+  || showCirculation.value
+  || showFiling.value
+  || (canTransmit.value && !isInitiatorSpectator.value),
 )
 const dossierOverdue = computed(() =>
   isOverdue(dossier.value?.due_date, dossier.value?.status),
@@ -672,9 +684,15 @@ const circuitSteps = computed(() => {
     >
       <VCardText class="py-3">
         <div class="text-subtitle-2 mb-2">
-          À faire
+          {{ isAssignee ? 'À faire' : 'Actions' }}
           <span
-            v-if="dossier.current_assignee"
+            v-if="dossier.current_assignee && isAssignee"
+            class="text-medium-emphasis font-weight-regular"
+          >
+            · chez vous
+          </span>
+          <span
+            v-else-if="dossier.current_assignee"
             class="text-medium-emphasis font-weight-regular"
           >
             · chez {{ dossier.current_assignee.name }}
