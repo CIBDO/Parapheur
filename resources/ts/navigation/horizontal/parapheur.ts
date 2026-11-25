@@ -19,26 +19,14 @@ export default [
         subject: 'Task',
       },
       {
-        title: 'Calendrier',
-        to: 'taches-calendrier',
-        action: 'read',
-        subject: 'Task',
-      },
-      {
         title: 'Instructions',
         to: 'taches-instructions',
         action: 'read',
         subject: 'Instruction',
       },
       {
-        title: 'Directives',
-        to: { name: 'taches-instructions', query: { kind: 'directive' } },
-        action: 'read',
-        subject: 'Instruction',
-      },
-      {
-        title: 'Rapports',
-        to: 'taches-rapports',
+        title: 'Calendrier',
+        to: 'taches-calendrier',
         action: 'read',
         subject: 'Task',
       },
@@ -53,24 +41,6 @@ export default [
       {
         title: 'Aujourd’hui',
         to: 'productions',
-        action: 'read',
-        subject: 'Production',
-      },
-      {
-        title: 'Reçues',
-        to: 'productions-recues',
-        action: 'read',
-        subject: 'Production',
-      },
-      {
-        title: 'Dossier du jour',
-        to: 'productions-dossier-du-jour',
-        action: 'read',
-        subject: 'Production',
-      },
-      {
-        title: 'À produire',
-        to: 'productions-occurrences',
         action: 'read',
         subject: 'Production',
       },

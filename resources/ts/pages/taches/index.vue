@@ -20,11 +20,24 @@ definePage({
 
 const router = useRouter()
 const route = useRoute()
+const ability = useAbility()
 const { loading, items, meta, dashboard, list, loadDashboard } = useTasks()
+
+const canViewTeam = computed(() =>
+  ability.can('read', 'TaskTeam') || ability.can('manage', 'Task') || ability.can('manage', 'all'),
+)
+const canViewReports = computed(() =>
+  ability.can('read', 'Task') || ability.can('manage', 'Task') || ability.can('manage', 'all'),
+)
 
 const showCreateDialog = ref(false)
 const showAdvanced = ref(false)
 const page = ref(1)
+
+const setView = (next: string) => {
+  page.value = 1
+  router.push({ name: 'taches', query: { view: next } })
+}
 const filters = ref({
   q: '',
   status: '',
@@ -124,6 +137,28 @@ onMounted(reload)
         </VBtn>
         <VBtn
           variant="tonal"
+          prepend-icon="tabler-list-check"
+          @click="router.push({ name: 'taches-instructions' })"
+        >
+          Instructions
+        </VBtn>
+        <VBtn
+          variant="tonal"
+          prepend-icon="tabler-calendar"
+          @click="router.push({ name: 'taches-calendrier' })"
+        >
+          Calendrier
+        </VBtn>
+        <VBtn
+          v-if="canViewReports"
+          variant="tonal"
+          prepend-icon="tabler-chart-bar"
+          @click="router.push({ name: 'taches-rapports' })"
+        >
+          Rapports
+        </VBtn>
+        <VBtn
+          variant="tonal"
           prepend-icon="tabler-refresh"
           :loading="loading"
           @click="reload"
@@ -138,25 +173,45 @@ onMounted(reload)
         cols="6"
         md="3"
       >
-        <VCard><VCardText>À faire : <strong>{{ dashboard.a_faire ?? 0 }}</strong></VCardText></VCard>
+        <VCard
+          class="cursor-pointer"
+          @click="setView('mine')"
+        >
+          <VCardText>À faire : <strong>{{ dashboard.a_faire ?? 0 }}</strong></VCardText>
+        </VCard>
       </VCol>
       <VCol
         cols="6"
         md="3"
       >
-        <VCard><VCardText>En retard : <strong>{{ dashboard.en_retard ?? 0 }}</strong></VCardText></VCard>
+        <VCard
+          class="cursor-pointer"
+          @click="setView('overdue')"
+        >
+          <VCardText>En retard : <strong>{{ dashboard.en_retard ?? 0 }}</strong></VCardText>
+        </VCard>
       </VCol>
       <VCol
         cols="6"
         md="3"
       >
-        <VCard><VCardText>À valider : <strong>{{ dashboard.a_valider ?? 0 }}</strong></VCardText></VCard>
+        <VCard
+          class="cursor-pointer"
+          @click="setView('validate')"
+        >
+          <VCardText>À valider : <strong>{{ dashboard.a_valider ?? 0 }}</strong></VCardText>
+        </VCard>
       </VCol>
       <VCol
         cols="6"
         md="3"
       >
-        <VCard><VCardText>Aujourd’hui : <strong>{{ dashboard.aujourdhui ?? 0 }}</strong></VCardText></VCard>
+        <VCard
+          class="cursor-pointer"
+          @click="router.push({ name: 'taches-calendrier' })"
+        >
+          <VCardText>Aujourd’hui : <strong>{{ dashboard.aujourdhui ?? 0 }}</strong></VCardText>
+        </VCard>
       </VCol>
     </VRow>
 
@@ -167,7 +222,7 @@ onMounted(reload)
           :variant="view === 'mine' ? 'flat' : 'tonal'"
           prepend-icon="tabler-user-check"
           link
-          @click="router.push({ name: 'taches', query: { view: 'mine' } })"
+          @click="setView('mine')"
         >
           Mes tâches
         </VChip>
@@ -176,7 +231,7 @@ onMounted(reload)
           :variant="view === 'assigned' ? 'flat' : 'tonal'"
           prepend-icon="tabler-send"
           link
-          @click="router.push({ name: 'taches', query: { view: 'assigned' } })"
+          @click="setView('assigned')"
         >
           Imputées par moi
         </VChip>
@@ -185,7 +240,7 @@ onMounted(reload)
           :variant="view === 'validate' ? 'flat' : 'tonal'"
           prepend-icon="tabler-checks"
           link
-          @click="router.push({ name: 'taches', query: { view: 'validate' } })"
+          @click="setView('validate')"
         >
           À valider
         </VChip>
@@ -194,9 +249,19 @@ onMounted(reload)
           :variant="view === 'overdue' ? 'flat' : 'tonal'"
           prepend-icon="tabler-alert-triangle"
           link
-          @click="router.push({ name: 'taches', query: { view: 'overdue' } })"
+          @click="setView('overdue')"
         >
           En retard
+        </VChip>
+        <VChip
+          v-if="canViewTeam"
+          :color="view === 'team' ? 'primary' : undefined"
+          :variant="view === 'team' ? 'flat' : 'tonal'"
+          prepend-icon="tabler-users"
+          link
+          @click="setView('team')"
+        >
+          Mon équipe
         </VChip>
       </VCardText>
     </VCard>

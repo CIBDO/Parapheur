@@ -25,6 +25,16 @@ const users = ref<{ id: number; name: string }[]>([])
 const creating = ref(false)
 const kindFilter = computed(() => String(route.query.kind || ''))
 
+const setKind = (kind: string) => {
+  const query = { ...route.query } as Record<string, string>
+  if (kind)
+    query.kind = kind
+  else
+    delete query.kind
+
+  router.push({ name: 'taches-instructions', query })
+}
+
 const form = ref({
   title: '',
   body: '',
@@ -107,8 +117,8 @@ onMounted(async () => {
 <template>
   <div>
     <ParapheurPageHeader
-      :title="kindFilter === 'directive' ? 'Directives' : 'Instructions'"
-      :subtitle="kindFilter === 'directive' ? 'Orientations institutionnelles décomposables en tâches' : 'Imputations et tâches d’exécution associées'"
+      :title="kindFilter === 'directive' ? 'Directives' : (kindFilter ? 'Instructions' : 'Instructions & directives')"
+      :subtitle="kindFilter === 'directive' ? 'Orientations institutionnelles décomposables en tâches' : 'Imputations, directives et tâches d’exécution associées'"
       :icon="kindFilter === 'directive' ? 'tabler-speakerphone' : 'tabler-list-check'"
     >
       <template #actions>
@@ -137,6 +147,38 @@ onMounted(async () => {
         </VBtn>
       </template>
     </ParapheurPageHeader>
+
+    <VCard class="mb-4">
+      <VCardText class="d-flex flex-wrap gap-2 py-3">
+        <VChip
+          :color="!kindFilter ? 'primary' : undefined"
+          :variant="!kindFilter ? 'flat' : 'tonal'"
+          prepend-icon="tabler-list"
+          link
+          @click="setKind('')"
+        >
+          Toutes
+        </VChip>
+        <VChip
+          :color="kindFilter === 'imputation' ? 'primary' : undefined"
+          :variant="kindFilter === 'imputation' ? 'flat' : 'tonal'"
+          prepend-icon="tabler-list-check"
+          link
+          @click="setKind('imputation')"
+        >
+          Instructions
+        </VChip>
+        <VChip
+          :color="kindFilter === 'directive' ? 'primary' : undefined"
+          :variant="kindFilter === 'directive' ? 'flat' : 'tonal'"
+          prepend-icon="tabler-speakerphone"
+          link
+          @click="setKind('directive')"
+        >
+          Directives
+        </VChip>
+      </VCardText>
+    </VCard>
 
     <VCard>
       <VTable>

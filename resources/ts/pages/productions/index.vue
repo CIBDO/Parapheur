@@ -11,11 +11,19 @@ definePage({
 })
 
 const router = useRouter()
+const ability = useAbility()
 const { loadMyDashboard, listOccurrences } = useProductions()
 const loading = ref(false)
 const errorMessage = ref('')
 const stats = ref<Record<string, number>>({})
 const recent = ref<any[]>([])
+
+const canManageModels = computed(() =>
+  ability.can('manage', 'Production') || ability.can('manage', 'all'),
+)
+const canPilot = computed(() =>
+  ability.can('pilot', 'Production') || ability.can('manage', 'Production') || ability.can('manage', 'all'),
+)
 
 const cards = [
   {
@@ -85,20 +93,11 @@ onMounted(load)
     >
       <template #actions>
         <VBtn
-          variant="tonal"
           color="primary"
-          prepend-icon="tabler-refresh"
-          :loading="loading"
-          @click="load"
+          prepend-icon="tabler-list"
+          @click="router.push('/productions/occurrences?view=mine')"
         >
-          Actualiser
-        </VBtn>
-        <VBtn
-          variant="tonal"
-          prepend-icon="tabler-folder"
-          @click="router.push('/productions/dossier-du-jour')"
-        >
-          Dossier du jour
+          À produire
         </VBtn>
         <VBtn
           variant="tonal"
@@ -108,11 +107,36 @@ onMounted(load)
           Reçues
         </VBtn>
         <VBtn
-          color="primary"
-          prepend-icon="tabler-list"
-          @click="router.push('/productions/occurrences?view=mine')"
+          variant="tonal"
+          prepend-icon="tabler-folder"
+          @click="router.push('/productions/dossier-du-jour')"
         >
-          À produire
+          Dossier du jour
+        </VBtn>
+        <VBtn
+          v-if="canManageModels"
+          variant="tonal"
+          prepend-icon="tabler-settings"
+          @click="router.push('/productions/obligations')"
+        >
+          Modèles d’envoi
+        </VBtn>
+        <VBtn
+          v-if="canPilot"
+          variant="tonal"
+          prepend-icon="tabler-chart-dots"
+          @click="router.push('/productions/direction')"
+        >
+          Suivi
+        </VBtn>
+        <VBtn
+          variant="tonal"
+          color="primary"
+          prepend-icon="tabler-refresh"
+          :loading="loading"
+          @click="load"
+        >
+          Actualiser
         </VBtn>
       </template>
     </ParapheurPageHeader>

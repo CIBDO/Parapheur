@@ -71,6 +71,8 @@ const cards = computed(() => [
 const quickActions = [
   { title: 'Nouvelle tâche', icon: 'tabler-checkbox', color: 'primary', action: 'create-task' as const },
   { title: 'Instructions', icon: 'tabler-list-check', color: 'success', route: 'taches-instructions' },
+  { title: 'Productions du jour', icon: 'tabler-file-time', color: 'info', route: 'productions' },
+  { title: 'Reçues', icon: 'tabler-inbox', color: 'secondary', path: '/productions/recues' },
   { title: 'Tickets', icon: 'tabler-ticket', color: 'warning', route: 'ticketing' },
   { title: 'Courrier', icon: 'tabler-mail', color: 'secondary', route: 'courrier' },
   { title: 'Parapheur', icon: 'tabler-file', color: 'primary', route: 'parapheur' },
@@ -79,6 +81,11 @@ const quickActions = [
 const onQuickAction = (action: typeof quickActions[number]) => {
   if ('action' in action && action.action === 'create-task') {
     showCreateDialog.value = true
+
+    return
+  }
+  if ('path' in action && action.path) {
+    router.push(action.path)
 
     return
   }
@@ -197,6 +204,13 @@ const otherIcon = (type?: string) => {
           :to="{ name: 'taches' }"
         >
           Mes tâches
+        </VBtn>
+        <VBtn
+          size="small"
+          variant="text"
+          :to="{ name: 'productions' }"
+        >
+          Productions
         </VBtn>
         <VBtn
           size="small"
